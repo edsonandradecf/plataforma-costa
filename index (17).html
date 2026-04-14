@@ -1,0 +1,1837 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plataforma Costa</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='white'/%3E%3Crect x='1' y='1' width='30' height='30' rx='5.5' fill='none' stroke='%238B6914' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Georgia,serif' font-weight='700' font-size='20' fill='%2322c55e' text-anchor='middle'%3EC%3C/text%3E%3C/svg%3E">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
+<style>
+:root {
+  --bg: #f4f5f7;
+  --bg2: #ffffff;
+  --bg3: #eef0f3;
+  --sidebar: #1a1d23;
+  --sidebar-hover: #2a2d35;
+  --sidebar-active: #22c55e22;
+  --text: #1a1d23;
+  --text2: #6b7280;
+  --text3: #9ca3af;
+  --border: #e5e7eb;
+  --green: #22c55e;
+  --green2: #16a34a;
+  --red: #ef4444;
+  --red2: #dc2626;
+  --blue: #3b82f6;
+  --amber: #f59e0b;
+  --card: #ffffff;
+  --input-bg: #f9fafb;
+  --shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+[data-theme="dark"] {
+  --bg: #0f1117;
+  --bg2: #1a1d23;
+  --bg3: #23262f;
+  --sidebar: #0a0c10;
+  --sidebar-hover: #1a1d23;
+  --sidebar-active: #22c55e18;
+  --text: #f1f5f9;
+  --text2: #94a3b8;
+  --text3: #64748b;
+  --border: #2d3748;
+  --card: #1a1d23;
+  --input-bg: #23262f;
+  --shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; transition: background 0.2s, color 0.2s; }
+
+/* LOGIN */
+#login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: var(--bg); }
+.login-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 2.5rem 2rem; width: 100%; max-width: 380px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
+.login-logo { text-align: center; margin-bottom: 2rem; font-size: 1.6rem; font-weight: 700; letter-spacing: -0.5px; }
+.login-logo span { color: var(--green); }
+.login-card input { width: 100%; padding: 0.75rem 1rem; border: 1px solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--text); font-size: 0.95rem; margin-bottom: 1rem; outline: none; transition: border 0.2s; }
+.login-card input:focus { border-color: var(--green); }
+.pass-wrap { position: relative; margin-bottom: 1rem; }
+.pass-wrap input { margin-bottom: 0; padding-right: 2.75rem; }
+.pass-eye { position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text3); padding: 4px; display: flex; align-items: center; transition: color 0.15s; }
+.pass-eye:hover { color: var(--green); }
+.login-card button.btn-primary { width: 100%; padding: 0.75rem; background: var(--green); color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+.login-card button.btn-primary:hover { background: var(--green2); }
+.login-remember { display: flex; align-items: center; gap: 8px; margin-bottom: 1rem; font-size: 0.875rem; color: var(--text2); cursor: pointer; }
+.login-remember input { width: auto; margin: 0; }
+.login-error { color: var(--red); font-size: 0.85rem; text-align: center; margin-top: 0.75rem; min-height: 1.2em; }
+
+/* LAYOUT */
+#app { display: none; min-height: 100vh; }
+.layout { display: flex; min-height: 100vh; }
+
+/* SIDEBAR */
+.sidebar { width: 220px; background: var(--sidebar); min-height: 100vh; display: flex; flex-direction: column; position: fixed; left: 0; top: 0; bottom: 0; z-index: 100; transition: width 0.25s cubic-bezier(.4,0,.2,1), background 0.2s; overflow: hidden; }
+.sidebar.collapsed { width: 54px; }
+.sidebar-logo { height: 54px; padding: 0 14px; font-size: 1.05rem; font-weight: 700; color: #fff; border-bottom: 1px solid rgba(255,255,255,0.07); letter-spacing: -0.3px; white-space: nowrap; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.sidebar-logo span { color: var(--green); }
+.sidebar-logo-text { flex: 1; overflow: hidden; transition: opacity 0.2s, max-width 0.25s; max-width: 200px; }
+.sidebar.collapsed .sidebar-logo-text { opacity: 0; max-width: 0; }
+.sidebar-toggle { background: none; border: none; color: rgba(255,255,255,0.45); cursor: pointer; padding: 5px; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 28px; height: 28px; transition: color 0.15s, background 0.15s; }
+.sidebar-toggle:hover { color: #fff; background: rgba(255,255,255,0.12); }
+.sidebar-nav { flex: 1; padding: 6px 0; overflow-y: auto; overflow-x: hidden; }
+.nav-item { display: flex; align-items: center; gap: 12px; padding: 0 0 0 16px; height: 42px; cursor: pointer; color: rgba(255,255,255,0.6); font-size: 0.875rem; transition: all 0.15s; border-left: 3px solid transparent; user-select: none; white-space: nowrap; }
+.nav-item:hover { background: var(--sidebar-hover); color: #fff; }
+.nav-item.active { background: var(--sidebar-active); color: var(--green); border-left-color: var(--green); }
+.nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+.nav-item-label { overflow: hidden; transition: opacity 0.2s, max-width 0.25s; max-width: 200px; }
+.sidebar.collapsed .nav-item-label { opacity: 0; max-width: 0; }
+.sidebar.collapsed .nav-item { padding: 0; justify-content: center; border-left: 3px solid transparent; }
+.sidebar.collapsed .nav-item.active { border-left-color: var(--green); background: var(--sidebar-active); color: var(--green); }
+.sidebar.collapsed .nav-item:hover { border-left-color: transparent; }
+.sidebar-bottom { padding: 10px 14px; border-top: 1px solid rgba(255,255,255,0.07); flex-shrink: 0; overflow: hidden; }
+.sidebar.collapsed .sidebar-bottom { padding: 10px 0; display: flex; flex-direction: column; align-items: center; }
+.sidebar-user { color: rgba(255,255,255,0.45); font-size: 0.78rem; margin-bottom: 8px; white-space: nowrap; overflow: hidden; transition: opacity 0.2s, max-height 0.25s; max-height: 40px; }
+.sidebar-user strong { color: rgba(255,255,255,0.8); display: block; font-size: 0.82rem; }
+.sidebar.collapsed .sidebar-user { opacity: 0; max-height: 0; margin: 0; }
+.btn-logout { width: 100%; padding: 6px 10px; background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.65); border: 1px solid rgba(255,255,255,0.1); border-radius: 7px; cursor: pointer; font-size: 0.8rem; transition: all 0.15s; white-space: nowrap; text-align: center; }
+.btn-logout:hover { background: rgba(255,255,255,0.14); color: #fff; }
+.sidebar.collapsed .btn-logout { width: 34px; height: 34px; padding: 0; border-radius: 50%; font-size: 1rem; display: flex; align-items: center; justify-content: center; }
+
+/* MAIN */
+.main { margin-left: 220px; flex: 1; min-height: 100vh; background: var(--bg); transition: margin-left 0.22s ease; }
+.main.sidebar-collapsed { margin-left: 52px; }
+.topbar { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 0.875rem 1.75rem; display: flex; align-items: center; justify-content: between; gap: 1rem; }
+.topbar h1 { font-size: 1.1rem; font-weight: 600; flex: 1; }
+.theme-toggle { background: none; border: 1px solid var(--border); border-radius: 8px; padding: 0.4rem 0.75rem; cursor: pointer; color: var(--text2); font-size: 0.85rem; display: flex; align-items: center; gap: 6px; transition: all 0.15s; }
+.theme-toggle:hover { border-color: var(--green); color: var(--green); }
+.page-content { padding: 1.75rem; }
+
+/* CARDS */
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; box-shadow: var(--shadow); }
+.card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+.card-title { font-size: 1rem; font-weight: 600; }
+
+/* BUTTONS */
+.btn { padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.875rem; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--card); color: var(--text); transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px; }
+.btn:hover { border-color: var(--green); color: var(--green); }
+.btn-green { background: var(--green); color: #fff; border-color: var(--green); }
+.btn-green:hover { background: var(--green2); border-color: var(--green2); color: #fff; }
+.btn-red { background: var(--red); color: #fff; border-color: var(--red); }
+.btn-red:hover { background: var(--red2); border-color: var(--red2); color: #fff; }
+.btn-sm { padding: 0.3rem 0.65rem; font-size: 0.8rem; }
+
+/* TASKS */
+.task-list { display: flex; flex-direction: column; gap: 8px; }
+.task-item { display: flex; align-items: center; gap: 12px; padding: 0.875rem 1rem; background: var(--bg3); border-radius: 10px; border: 1px solid var(--border); transition: all 0.15s; }
+.task-item.done { opacity: 0.6; }
+.task-item.done .task-text { text-decoration: line-through; color: var(--text3); }
+.task-check { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; background: var(--bg2); }
+.task-check.checked { background: var(--green); border-color: var(--green); }
+.task-check.checked::after { content: '✓'; color: #fff; font-size: 11px; font-weight: 700; }
+.task-text { flex: 1; font-size: 0.9rem; }
+.task-meta { font-size: 0.78rem; color: var(--text3); white-space: nowrap; }
+.task-badge { font-size: 0.7rem; font-weight: 600; padding: 2px 8px; border-radius: 99px; background: #fef2f2; color: var(--red); border: 1px solid #fecaca; white-space: nowrap; }
+.task-delete { background: none; border: none; color: var(--text3); cursor: pointer; padding: 4px; border-radius: 6px; transition: all 0.15s; font-size: 1rem; }
+.task-delete:hover { color: var(--red); background: #fef2f2; }
+
+/* ADD TASK FORM */
+.add-task-form { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 1.25rem; }
+.add-task-form input, .add-task-form select { padding: 0.6rem 0.875rem; border: 1px solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--text); font-size: 0.875rem; outline: none; transition: border 0.2s; }
+.add-task-form input:focus, .add-task-form select:focus { border-color: var(--green); }
+.add-task-form input[type="text"] { flex: 1; min-width: 160px; }
+
+/* COMPRAS */
+.compras-item { display: flex; align-items: center; gap: 10px; padding: 0.75rem 1rem; background: var(--bg3); border-radius: 10px; border: 1px solid var(--border); margin-bottom: 8px; }
+.compras-check { width: 18px; height: 18px; border-radius: 4px; border: 2px solid var(--border); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; background: var(--bg2); }
+.compras-check.checked { background: var(--green); border-color: var(--green); }
+.compras-check.checked::after { content: '✓'; color: #fff; font-size: 10px; font-weight: 700; }
+.compras-text { flex: 1; font-size: 0.9rem; }
+.compras-text.done { text-decoration: line-through; color: var(--text3); }
+
+/* MURAL */
+.mural-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
+.mural-note { background: #fefce8; border: 1px solid #fef08a; border-radius: 10px; padding: 1.1rem; min-height: 120px; position: relative; }
+[data-theme="dark"] .mural-note { background: #292524; border-color: #44403c; }
+.mural-note-author { font-size: 0.75rem; color: var(--text3); margin-bottom: 0.5rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.mural-note-text { font-size: 0.9rem; color: var(--text); line-height: 1.5; }
+.mural-note-del { position: absolute; top: 8px; right: 8px; background: none; border: none; color: var(--text3); cursor: pointer; font-size: 1rem; padding: 2px 4px; border-radius: 4px; transition: all 0.15s; }
+.mural-note-del:hover { color: var(--red); background: #fef2f2; }
+
+/* AGENDA */
+.calendar { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.calendar-header { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.25rem; background: var(--bg2); border-bottom: 1px solid var(--border); }
+.calendar-nav { background: none; border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; cursor: pointer; color: var(--text); font-size: 1rem; transition: all 0.15s; }
+.calendar-nav:hover { border-color: var(--green); color: var(--green); }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+.cal-day-header { text-align: center; padding: 0.65rem; font-size: 0.75rem; font-weight: 600; color: var(--text3); background: var(--bg3); border-bottom: 1px solid var(--border); text-transform: uppercase; }
+.cal-day { min-height: 80px; padding: 6px; background: var(--bg2); border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.15s; position: relative; }
+.cal-day:hover { background: var(--bg3); }
+.cal-day.other-month { background: var(--bg); }
+.cal-day.other-month .cal-day-num { color: var(--text3); }
+.cal-day.today { background: #f0fdf4; }
+[data-theme="dark"] .cal-day.today { background: #14532d20; }
+.cal-day-num { font-size: 0.8rem; font-weight: 500; color: var(--text2); margin-bottom: 4px; }
+.cal-day.today .cal-day-num { color: var(--green); font-weight: 700; }
+.cal-event { font-size: 0.7rem; background: var(--green); color: #fff; border-radius: 3px; padding: 1px 5px; margin-bottom: 2px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: pointer; }
+
+/* ETIQUETAS */
+.label-form { display: grid; gap: 1rem; }
+.label-form label { font-size: 0.85rem; font-weight: 500; color: var(--text2); display: block; margin-bottom: 4px; }
+.label-form input, .label-form select, .label-form textarea { width: 100%; padding: 0.65rem 0.875rem; border: 1px solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--text); font-size: 0.875rem; outline: none; font-family: inherit; transition: border 0.2s; }
+.label-form input:focus, .label-form select:focus, .label-form textarea:focus { border-color: var(--green); }
+.label-form textarea { min-height: 140px; resize: vertical; font-family: monospace; font-size: 0.8rem; }
+.dim-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+/* LOGS */
+.log-item { display: flex; align-items: flex-start; gap: 12px; padding: 0.75rem 0; border-bottom: 1px solid var(--border); font-size: 0.875rem; }
+.log-item:last-child { border-bottom: none; }
+.log-time { color: var(--text3); font-size: 0.78rem; white-space: nowrap; min-width: 130px; }
+.log-user { font-weight: 600; color: var(--green); min-width: 70px; }
+.log-desc { color: var(--text2); }
+
+/* INICIO */
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+.stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; box-shadow: var(--shadow); }
+.stat-label { font-size: 0.8rem; color: var(--text3); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem; }
+.stat-value { font-size: 1.75rem; font-weight: 700; color: var(--text); }
+.stat-icon { font-size: 1.5rem; margin-bottom: 0.5rem; }
+
+/* MODAL */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.modal { background: var(--card); border-radius: 16px; padding: 1.75rem; width: 100%; max-width: 480px; border: 1px solid var(--border); box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+.modal h3 { font-size: 1.05rem; font-weight: 600; margin-bottom: 1.25rem; }
+.modal input, .modal select, .modal textarea { width: 100%; padding: 0.65rem 0.875rem; border: 1px solid var(--border); border-radius: 8px; background: var(--input-bg); color: var(--text); font-size: 0.875rem; outline: none; margin-bottom: 0.875rem; font-family: inherit; transition: border 0.2s; }
+.modal input:focus, .modal select:focus, .modal textarea:focus { border-color: var(--green); }
+.modal textarea { resize: vertical; min-height: 80px; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 0.5rem; }
+
+/* EMPTY */
+.empty-state { text-align: center; padding: 3rem 1rem; color: var(--text3); }
+.empty-state svg { width: 48px; height: 48px; margin-bottom: 1rem; opacity: 0.4; }
+.empty-state p { font-size: 0.9rem; }
+
+/* TABNUTRI */
+.tn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+.tn-saved-list { display: flex; flex-direction: column; gap: 8px; }
+.tn-saved-item { display: flex; align-items: center; gap: 10px; padding: 0.75rem 1rem; background: var(--bg3); border-radius: 10px; border: 1px solid var(--border); }
+.tn-saved-item:hover { border-color: var(--green); }
+.tn-saved-name { flex: 1; font-size: 0.9rem; font-weight: 500; }
+.tn-saved-sub { font-size: 0.78rem; color: var(--text3); }
+.tn-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tn-form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.tn-label { font-size: 0.8rem; font-weight: 500; color: var(--text2); display: block; margin-bottom: 3px; }
+.tn-input { width: 100%; padding: 0.55rem 0.75rem; border: 1px solid var(--border); border-radius: 7px; background: var(--input-bg); color: var(--text); font-size: 0.85rem; outline: none; transition: border 0.2s; font-family: inherit; }
+.tn-input:focus { border-color: var(--green); }
+.tn-section { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text3); margin: 1rem 0 0.5rem; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+/* Etiqueta preview */
+.tn-preview-wrap { background: #fff; color: #000; border-radius: 8px; border: 1px solid var(--border); padding: 10px; font-family: Arial, sans-serif; font-size: 11px; width: 283px; min-height: 425px; flex-shrink: 0; margin: 0 auto; }
+.tn-preview-product { font-size: 13px; font-weight: 700; text-align: center; margin-bottom: 2px; }
+.tn-preview-desc { font-size: 10px; text-align: center; color: #444; margin-bottom: 6px; }
+.tn-tbl { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+.tn-tbl th { background: #000; color: #fff; font-size: 11px; padding: 2px 4px; }
+.tn-tbl .tn-tbl-title { font-size: 13px; font-weight: 900; padding: 3px 4px; }
+.tn-tbl .tn-tbl-porcao { font-size: 10px; padding: 2px 4px; border-bottom: 1px solid #000; }
+.tn-tbl td { padding: 2px 4px; border-bottom: 1px solid #ccc; font-size: 10px; }
+.tn-tbl td.tn-bold { font-weight: 700; }
+.tn-tbl tr.tn-divider td { border-bottom: 2px solid #000; }
+.tn-preview-info { font-size: 9px; color: #333; margin-top: 4px; line-height: 1.4; }
+.tn-preview-codes { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 6px; gap: 6px; }
+/* MISC */
+.badge-admin { font-size: 0.7rem; font-weight: 600; padding: 2px 8px; border-radius: 99px; background: #f0fdf4; color: var(--green2); border: 1px solid #bbf7d0; }
+.flex { display: flex; }
+.gap-2 { gap: 8px; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.mb-1 { margin-bottom: 0.5rem; }
+.mb-2 { margin-bottom: 1rem; }
+.text-sm { font-size: 0.875rem; }
+.text-muted { color: var(--text2); }
+.w-full { width: 100%; }
+.section-title { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text3); padding: 0.5rem 1.25rem 0.25rem; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen">
+  <div style="position:absolute;top:1rem;right:1rem;">
+    <button class="theme-toggle" onclick="toggleTheme()" id="login-theme-btn">🌙 Escuro</button>
+  </div>
+  <div class="login-card">
+    <div class="login-logo">Plataforma&nbsp;<span>Costa</span></div>
+    <input type="text" id="login-user" placeholder="Usuário" autocomplete="username">
+    <div class="pass-wrap">
+      <input type="password" id="login-pass" placeholder="Senha" autocomplete="current-password">
+      <button class="pass-eye" type="button" onclick="togglePassVis()" id="pass-eye-btn" title="Mostrar/ocultar senha">
+        <svg id="eye-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+    </div>
+    <label class="login-remember">
+      <input type="checkbox" id="login-remember"> Manter login salvo
+    </label>
+    <button class="btn-primary" onclick="doLogin()">Entrar</button>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <span class="sidebar-logo-text">Plataforma&nbsp;<span>Costa</span></span>
+        <button class="sidebar-toggle" onclick="toggleSidebar()" id="sidebar-toggle-btn" title="Recolher menu">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+      </div>
+      <nav class="sidebar-nav" id="sidebar-nav"></nav>
+      <div class="sidebar-bottom">
+        <div class="sidebar-user"><strong id="sidebar-username"></strong> <span id="sidebar-role"></span></div>
+        <button class="btn-logout" onclick="doLogout()" id="btn-logout-el">Sair</button>
+      </div>
+    </aside>
+    <div class="main">
+      <div class="topbar">
+        <h1 id="page-title">Início</h1>
+        <span id="sync-status" style="font-size:0.78rem;color:var(--text3);margin-right:4px"></span>
+        <button class="theme-toggle" onclick="toggleTheme()" id="app-theme-btn">🌙 Escuro</button>
+      </div>
+      <div class="page-content" id="page-content"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal" style="display:none;" onclick="closeModalOutside(event)">
+  <div class="modal" id="modal-inner">
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<script>
+// ─── DATA STORE ───────────────────────────────────────────────────────────────
+const USERS = [
+  { login: 'Edson', senha: '@Edanco_10', role: 'admin' },
+  { login: 'Julia', senha: 'juliaRS2', role: 'admin' },
+  { login: 'expedicao', senha: 'expedicao', role: 'expedicao' },
+  { login: 'producao', senha: 'producao', role: 'producao' },
+];
+
+let state = {
+  tasks: { expedicao: [], producao: [] },
+  compras: [],
+  mural: [],
+  agenda: [],
+  logs: [],
+  tabnutri: [],
+  currentUser: null,
+  currentPage: 'inicio',
+  calMonth: new Date().getMonth(),
+  calYear: new Date().getFullYear(),
+};
+
+// ─── FIREBASE REALTIME DATABASE CONFIG ──────────────────────────────────────
+const FIREBASE_URL = 'https://plataforma-costa-default-rtdb.firebaseio.com';
+
+let _saveTimer = null;
+let _isSaving = false;
+let _pendingSave = false;
+let _sseSource = null;  // SSE listener para tempo real
+
+function showSyncStatus(msg, color) {
+  const el = document.getElementById('sync-status');
+  if (el) { el.textContent = msg; el.style.color = color || 'var(--text3)'; }
+}
+
+function applyParsed(parsed) {
+  if (!parsed) return;
+  var t = parsed.tasks || {};
+  state.tasks = {
+    expedicao: Array.isArray(t.expedicao) ? t.expedicao : [],
+    producao:  Array.isArray(t.producao)  ? t.producao  : [],
+  };
+  state.compras  = Array.isArray(parsed.compras)  ? parsed.compras  : [];
+  state.mural    = Array.isArray(parsed.mural)    ? parsed.mural    : [];
+  state.agenda   = Array.isArray(parsed.agenda)   ? parsed.agenda   : [];
+  state.logs     = Array.isArray(parsed.logs)     ? parsed.logs     : [];
+  state.tabnutri = Array.isArray(parsed.tabnutri) ? parsed.tabnutri : [];
+}
+
+// ── Carrega dados do Firebase uma vez (no login) ──────────────────────────
+async function loadState() {
+  // 1. Cache local instantâneo para não piscar
+  try {
+    const s = localStorage.getItem('costa_state');
+    if (s) applyParsed(JSON.parse(s));
+  } catch(e) {}
+
+  // 2. Busca dados atualizados do Firebase
+  try {
+    showSyncStatus('⟳ Sincronizando...', 'var(--text3)');
+    const resp = await fetch(FIREBASE_URL + '/data.json');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const parsed = await resp.json();
+    if (parsed) {
+      applyParsed(parsed);
+      localStorage.setItem('costa_state', JSON.stringify(parsed));
+    }
+    showSyncStatus('✓ Pronto', 'var(--green)');
+    setTimeout(() => showSyncStatus('', ''), 1500);
+  } catch(e) {
+    showSyncStatus('⚠ Sem conexão', 'var(--amber)');
+  }
+}
+
+// ── Listener em tempo real via SSE do Firebase ────────────────────────────
+// O Firebase Realtime Database suporta Server-Sent Events nativamente.
+// Quando qualquer usuário salva, todos os outros recebem o dado novo em ~1s
+// sem precisar recarregar a página.
+function startRealtimeSync() {
+  if (_sseSource) { _sseSource.close(); _sseSource = null; }
+
+  try {
+    _sseSource = new EventSource(FIREBASE_URL + '/data.json');
+
+    _sseSource.addEventListener('put', function(e) {
+      try {
+        const msg = JSON.parse(e.data);
+        // msg.path === '/' significa dados completos; msg.data é o payload
+        if (!msg || !msg.data) return;
+        const incoming = msg.data;
+
+        // Não aplicar sem usuário logado ou se EU fui quem salvou (evita flicker)
+        if (!state.currentUser || _isSaving) return;
+
+        applyParsed(incoming);
+        localStorage.setItem('costa_state', JSON.stringify(incoming));
+
+        // Re-renderiza a página atual com os novos dados
+        if (state.currentUser) {
+          safeRenderPage();
+          showSyncStatus('🔄 Atualizado', 'var(--green)');
+          setTimeout(() => showSyncStatus('', ''), 1500);
+        }
+      } catch(err) {}
+    });
+
+    _sseSource.addEventListener('cancel', function() {
+      showSyncStatus('⚠ Sync pausado', 'var(--amber)');
+    });
+
+    _sseSource.onerror = function() {
+      // Reconecta automaticamente após 5s se a conexão cair
+      showSyncStatus('⚠ Reconectando...', 'var(--amber)');
+      if (_sseSource) { _sseSource.close(); _sseSource = null; }
+      setTimeout(() => { if (state.currentUser) startRealtimeSync(); }, 5000);
+    };
+
+  } catch(e) {
+    // SSE não disponível — fallback para polling a cada 8 segundos
+    startPolling();
+  }
+}
+
+// ── Fallback: polling a cada 8s se SSE não funcionar ─────────────────────
+let _pollTimer = null;
+function startPolling() {
+  if (_pollTimer) return;
+  _pollTimer = setInterval(async () => {
+    if (!state.currentUser || _isSaving) return;
+    try {
+      const resp = await fetch(FIREBASE_URL + '/data.json');
+      if (!resp.ok) return;
+      const parsed = await resp.json();
+      if (!parsed) return;
+      const local = localStorage.getItem('costa_state');
+      const remoteStr = JSON.stringify(parsed);
+      if (local !== remoteStr) {
+        applyParsed(parsed);
+        localStorage.setItem('costa_state', remoteStr);
+        if (state.currentUser) {
+          safeRenderPage();
+          showSyncStatus('🔄 Atualizado', 'var(--green)');
+          setTimeout(() => showSyncStatus('', ''), 1500);
+        }
+      }
+    } catch(e) {}
+  }, 8000);
+}
+
+function stopSync() {
+  if (_sseSource) { _sseSource.close(); _sseSource = null; }
+  if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
+}
+
+// ── Salvar dados no Firebase ──────────────────────────────────────────────
+function saveState() {
+  const data = {
+    tasks:    state.tasks,
+    compras:  state.compras,
+    mural:    state.mural,
+    agenda:   state.agenda,
+    logs:     state.logs,
+    tabnutri: state.tabnutri,
+  };
+  localStorage.setItem('costa_state', JSON.stringify(data));
+  if (_saveTimer) clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => pushToCloud(data), 600);
+}
+
+async function pushToCloud(data) {
+  if (_isSaving) { _pendingSave = true; return; }
+  _isSaving = true;
+  showSyncStatus('⬆ Salvando...', 'var(--text3)');
+  try {
+    const resp = await fetch(FIREBASE_URL + '/data.json', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    showSyncStatus('✓ Salvo', 'var(--green)');
+    setTimeout(() => showSyncStatus('', ''), 1500);
+  } catch(e) {
+    showSyncStatus('⚠ Erro ao salvar', 'var(--red)');
+  } finally {
+    _isSaving = false;
+    if (_pendingSave) { _pendingSave = false; pushToCloud(data); }
+  }
+}
+
+function addLog(action) {
+  const now = new Date();
+  state.logs.unshift({
+    time: now.toLocaleString('pt-BR'),
+    user: state.currentUser.login,
+    action,
+  });
+  if (state.logs.length > 500) state.logs = state.logs.slice(0, 500);
+  saveState();
+}
+
+// ─── AUTH ──────────────────────────────────────────────────────────────────────
+function doLogin() {
+  const u = document.getElementById('login-user').value.trim();
+  const p = document.getElementById('login-pass').value;
+  const user = USERS.find(x => x.login === u && x.senha === p);
+  if (!user) { document.getElementById('login-error').textContent = 'Usuário ou senha incorretos.'; return; }
+  document.getElementById('login-error').textContent = '';
+  if (document.getElementById('login-remember').checked) {
+    localStorage.setItem('costa_saved_login', JSON.stringify({ login: u, senha: p }));
+  } else {
+    localStorage.removeItem('costa_saved_login');
+  }
+  state.currentUser = user;
+  console.log('Login OK:', user.login, 'role:', user.role);
+  addLog('Fez login na plataforma');
+  startApp();
+}
+
+function doLogout() {
+  addLog('Saiu da plataforma');
+  stopSync();
+  state.currentUser = null;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+}
+
+document.getElementById('login-user').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('login-pass').focus(); });
+document.getElementById('login-pass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+
+// ─── THEME ─────────────────────────────────────────────────────────────────────
+function toggleTheme() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const t = isDark ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('costa_theme', t);
+  const label = t === 'dark' ? '☀️ Claro' : '🌙 Escuro';
+  ['login-theme-btn','app-theme-btn'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.textContent = label;
+  });
+}
+(function initTheme() {
+  const t = localStorage.getItem('costa_theme') || 'light';
+  document.documentElement.setAttribute('data-theme', t);
+  const label = t === 'dark' ? '☀️ Claro' : '🌙 Escuro';
+  ['login-theme-btn','app-theme-btn'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.textContent = label;
+  });
+})();
+
+// Try saved login
+(function checkSavedLogin() {
+  // Load local cache only — Firebase sync happens after login
+  try {
+    const s = localStorage.getItem('costa_state');
+    if (s) applyParsed(JSON.parse(s));
+  } catch(e) {}
+  // Restore saved credentials
+  const saved = localStorage.getItem('costa_saved_login');
+  if (saved) {
+    try {
+      const { login, senha } = JSON.parse(saved);
+      const user = USERS.find(x => x.login === login && x.senha === senha);
+      if (user) {
+        document.getElementById('login-user').value = login;
+        document.getElementById('login-pass').value = senha;
+        document.getElementById('login-remember').checked = true;
+      }
+    } catch(e) {}
+  }
+})();
+
+function togglePassVis() {
+  const inp = document.getElementById('login-pass');
+  const btn = document.getElementById('pass-eye-btn');
+  const isHidden = inp.type === 'password';
+  inp.type = isHidden ? 'text' : 'password';
+  btn.querySelector('svg').innerHTML = isHidden
+    ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>'
+    : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+}
+
+// ─── NAVIGATION ────────────────────────────────────────────────────────────────
+function getPagesAdmin() {
+  return [
+    { id: 'inicio',    label: 'Início',               icon: iconHome() },
+    { id: 'expedicao', label: 'Expedição',             icon: iconTruck() },
+    { id: 'producao',  label: 'Produção',              icon: iconFactory() },
+    { id: 'compras',   label: 'Compras',               icon: iconCart() },
+    { id: 'mural',     label: 'Mural',                 icon: iconMural() },
+    { id: 'etiquetas', label: 'Gerador de Etiquetas',  icon: iconLabel() },
+    { id: 'agenda',    label: 'Agenda',                icon: iconCal() },
+    { id: 'tabnutri',  label: 'Tabela Nutricional',    icon: iconTabNutri() },
+    { id: 'logs',      label: 'Logs',                  icon: iconLog() },
+  ];
+}
+function getPagesLimited() {
+  return getPagesAdmin().filter(p => p.id !== 'logs');
+}
+
+function buildSidebar() {
+  if (!state.currentUser) return;
+  const nav = document.getElementById('sidebar-nav');
+  if (!nav) return;
+  nav.innerHTML = '';
+  const pages = state.currentUser.role === 'admin' ? getPagesAdmin() : getPagesLimited();
+  pages.forEach(p => {
+    const el = document.createElement('div');
+    el.className = 'nav-item' + (state.currentPage === p.id ? ' active' : '');
+    el.innerHTML = p.icon + `<span class="nav-item-label">${p.label}</span>`;
+    el.title = p.label;
+    el.onclick = () => navigate(p.id);
+    nav.appendChild(el);
+  });
+  const unEl = document.getElementById('sidebar-username');
+  const roEl = document.getElementById('sidebar-role');
+  if (unEl) unEl.textContent = state.currentUser.login;
+  if (roEl) roEl.textContent = state.currentUser.role === 'admin' ? '(Admin)' : '';
+  // Update logout button icon when collapsed
+  const collapsed = document.querySelector('.sidebar').classList.contains('collapsed');
+  const logoutBtn = document.getElementById('btn-logout-el');
+  if (logoutBtn) logoutBtn.textContent = collapsed ? '↩' : 'Sair';
+}
+
+function toggleSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  const main = document.querySelector('.main');
+  const btn = document.getElementById('btn-logout-el');
+  const isCollapsed = sidebar.classList.toggle('collapsed');
+  main.classList.toggle('sidebar-collapsed', isCollapsed);
+  if (btn) btn.textContent = isCollapsed ? '↩' : 'Sair';
+  localStorage.setItem('costa_sidebar_collapsed', isCollapsed ? '1' : '0');
+}
+
+
+
+function cleanOldTasks() {
+  const todayStr = new Date().toISOString().slice(0,10);
+  let changed = false;
+  ['expedicao','producao'].forEach(area => {
+    if (!state.tasks) state.tasks = {};
+    if (!Array.isArray(state.tasks[area])) state.tasks[area] = [];
+    const before = state.tasks[area].length;
+    state.tasks[area] = state.tasks[area].filter(t => !(t.done && t.date < todayStr));
+    if (state.tasks[area].length !== before) changed = true;
+  });
+  if (changed) saveState();
+}
+
+function startApp() {
+  if (!state.currentUser) { console.error('startApp called without currentUser!'); return; }
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  // Restore sidebar collapsed state
+  if (localStorage.getItem('costa_sidebar_collapsed') === '1') {
+    document.querySelector('.sidebar').classList.add('collapsed');
+    document.querySelector('.main').classList.add('sidebar-collapsed');
+  }
+  cleanOldTasks(); // limpa tarefas antigas uma vez ao entrar, não a cada render
+  buildSidebar();
+  renderPage();
+  // Start real-time sync after login
+  startRealtimeSync();
+}
+
+function renderPage() {
+  if (!state.currentUser) return;
+  var titles = { inicio:'Início', expedicao:'Expedição', producao:'Produção', compras:'Compras', mural:'Mural', etiquetas:'Gerador de Etiquetas', agenda:'Agenda', tabnutri:'Tabela Nutricional', logs:'Logs' };
+  var titleEl = document.getElementById('page-title');
+  if (titleEl) titleEl.textContent = titles[state.currentPage] || '';
+  var c = document.getElementById('page-content');
+  if (!c) return;
+  var pg = state.currentPage;
+  if (pg === 'inicio')    { c.innerHTML = renderInicio(); return; }
+  if (pg === 'expedicao') { c.innerHTML = renderTasks('expedicao'); return; }
+  if (pg === 'producao')  { c.innerHTML = renderTasks('producao'); return; }
+  if (pg === 'compras')   { c.innerHTML = renderCompras(); setupCompras(); return; }
+  if (pg === 'mural')     { c.innerHTML = renderMural(); setupMural(); return; }
+  if (pg === 'etiquetas') { c.innerHTML = renderEtiquetas(); return; }
+  if (pg === 'agenda')    { c.innerHTML = renderAgenda(); return; }
+  if (pg === 'tabnutri')  { c.innerHTML = renderTabNutri(); setupTabNutri(); return; }
+  if (pg === 'logs')      { c.innerHTML = renderLogs(); return; }
+}
+
+function navigate(page) {
+  if (!state.currentUser) return;
+  state.currentPage = page;
+  buildSidebar();
+  renderPage();
+}
+
+// safeRenderPage: called by SSE sync — only updates data, never changes page
+function safeRenderPage() {
+  if (!state.currentUser) return;
+  var active = document.activeElement;
+  if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) return;
+  renderPage();
+}
+
+// ─── INICIO ────────────────────────────────────────────────────────────────────
+function renderInicio() {
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const todayStr = today.toISOString().slice(0,10);
+
+  // Count tasks: today OR overdue (late) and not done — compare strings to avoid timezone shift
+  function countTasks(area) {
+    return state.tasks[area].filter(t => {
+      if (t.done) return false;
+      return t.date <= todayStr;
+    }).length;
+  }
+  const expPendente = countTasks('expedicao');
+  const prodPendente = countTasks('producao');
+  const comprasPendente = state.compras.filter(t => !t.done).length;
+  const muralTotal = state.mural.length;
+
+  // Agenda hoje
+  const now = new Date();
+  const todayEvents = state.agenda.filter(e => e.date === todayStr).sort((a,b) => (a.time||'').localeCompare(b.time||''));
+  let agendaHtml = '';
+  if (!todayEvents.length) {
+    agendaHtml = `<p style="color:var(--text3);font-size:0.875rem;padding:0.5rem 0">Nenhum compromisso para hoje.</p>`;
+  } else {
+    agendaHtml = todayEvents.map(e => {
+      const hora = e.time ? `<span style="font-size:0.78rem;color:var(--text3);background:var(--bg3);padding:2px 8px;border-radius:99px;margin-right:8px">${e.time}</span>` : '';
+      return `<div style="display:flex;align-items:center;padding:0.6rem 0;border-bottom:1px solid var(--border)">
+        <span style="width:10px;height:10px;border-radius:50%;background:var(--green);flex-shrink:0;margin-right:10px"></span>
+        ${hora}<span style="font-size:0.9rem;flex:1">${esc(e.title)}</span>
+        ${e.desc ? `<span style="font-size:0.78rem;color:var(--text3)">${esc(e.desc)}</span>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  // Mural
+  let muralHtml = '';
+  if (!state.mural.length) {
+    muralHtml = `<p style="color:var(--text3);font-size:0.875rem;padding:0.5rem 0">Nenhum recado no mural.</p>`;
+  } else {
+    muralHtml = `<div class="mural-grid" style="margin-top:0.5rem">` +
+      state.mural.map(m => `<div class="mural-note">
+        <div class="mural-note-author">${esc(m.author)} · ${m.time}</div>
+        <div class="mural-note-text">${esc(m.text)}</div>
+      </div>`).join('') +
+    `</div>`;
+  }
+
+  return `
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-icon">📦</div><div class="stat-label">Tarefas Expedição Hoje</div><div class="stat-value">${expPendente}</div></div>
+    <div class="stat-card"><div class="stat-icon">🏭</div><div class="stat-label">Tarefas Produção Hoje</div><div class="stat-value">${prodPendente}</div></div>
+    <div class="stat-card"><div class="stat-icon">🛒</div><div class="stat-label">Itens para Comprar</div><div class="stat-value">${comprasPendente}</div></div>
+    <div class="stat-card"><div class="stat-icon">📌</div><div class="stat-label">Recados no Mural</div><div class="stat-value">${muralTotal}</div></div>
+  </div>
+  <div class="card" style="margin-bottom:1rem">
+    <div class="card-header" style="margin-bottom:0.75rem">
+      <span class="card-title">📅 Compromissos de Hoje</span>
+      <span style="font-size:0.8rem;color:var(--text3)">${now.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'})}</span>
+    </div>
+    ${agendaHtml}
+  </div>
+  <div class="card" style="margin-bottom:1rem">
+    <div class="card-header" style="margin-bottom:0.25rem">
+      <span class="card-title">📌 Mural de Recados</span>
+    </div>
+    ${muralHtml}
+  </div>
+  <div class="card"><p class="text-muted text-sm">Bem-vindo(a), <strong>${state.currentUser ? state.currentUser.login : ''}</strong>! Use o menu lateral para navegar pela plataforma.</p></div>`;
+}
+
+// ─── TASKS ─────────────────────────────────────────────────────────────────────
+function renderTasks(area) {
+  if (!state.currentUser) return '';
+  const isAdmin = state.currentUser.role === 'admin';
+  const today = new Date();
+  today.setHours(0,0,0,0);
+
+  // Limpeza feita fora do render — apenas lê o state, não modifica
+
+  let html = `<div class="card">`;
+  if (isAdmin) {
+    html += `<div class="add-task-form mb-2">
+      <input type="text" id="task-text" placeholder="Descrição da tarefa...">
+      <input type="date" id="task-date" value="${new Date().toISOString().slice(0,10)}">
+      <div style="display:flex;align-items:center;gap:6px">
+        <input type="time" id="task-time" value="08:00" style="flex:1">
+        <label style="display:flex;align-items:center;gap:4px;font-size:0.78rem;color:var(--text2);white-space:nowrap;cursor:pointer">
+          <input type="checkbox" id="task-no-time" onchange="toggleTaskTime()" style="width:auto;margin:0"> Sem horário
+        </label>
+      </div>
+      <button class="btn btn-green" onclick="addTask('${area}')">+ Adicionar</button>
+    </div>`;
+  }
+
+  // Sort: undone+late first (oldest date first), then today, then done — by date+time
+  const tasks = [...state.tasks[area]].map((t, i) => ({...t, _origIdx: i}))
+    .sort((a, b) => {
+      // Done tasks always go to bottom
+      if (a.done !== b.done) return a.done ? 1 : -1;
+      // Sort by date string (ISO), then by time string
+      const dateA = a.date + (a.time || '');
+      const dateB = b.date + (b.time || '');
+      return dateA.localeCompare(dateB);
+    });
+
+  if (!tasks.length) {
+    html += `<div class="empty-state">${iconEmpty()}<p>Nenhuma tarefa cadastrada</p></div>`;
+  } else {
+    html += `<div class="task-list">`;
+    tasks.forEach((t) => {
+      const i = t._origIdx;
+      const isLate = !t.done && t.date < today.toISOString().slice(0,10);
+      const dateStr = new Date(t.date + 'T12:00:00').toLocaleDateString('pt-BR') + (t.time ? ' ' + t.time : ' · Sem horário');
+      html += `<div class="task-item ${t.done?'done':''}">
+        <div class="task-check ${t.done?'checked':''}" onclick="toggleTask('${area}',${i})"></div>
+        <div class="task-text">${esc(t.text)}</div>
+        <span class="task-meta">${dateStr}</span>
+        ${isLate ? `<span class="task-badge">⚠ Atraso</span>` : ''}
+        ${isAdmin ? `<button class="task-delete" onclick="deleteTask('${area}',${i})" title="Excluir">✕</button>` : ''}
+      </div>`;
+    });
+    html += `</div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+function bindTasks(area) {
+  // Only re-render if we're still on that area's page
+  if (state.currentPage !== area) return;
+  document.getElementById('page-content').innerHTML = renderTasks(area);
+}
+
+function toggleTaskTime() {
+  const noTime = document.getElementById('task-no-time').checked;
+  document.getElementById('task-time').disabled = noTime;
+  document.getElementById('task-time').style.opacity = noTime ? '0.4' : '1';
+}
+
+function addTask(area) {
+  const text = document.getElementById('task-text').value.trim();
+  const date = document.getElementById('task-date').value;
+  const noTime = document.getElementById('task-no-time').checked;
+  const time = noTime ? '' : document.getElementById('task-time').value;
+  if (!text || !date) return;
+  state.tasks[area].push({ text, date, time, done: false, id: Date.now() });
+  saveState();
+  addLog(`Adicionou tarefa em ${area}: "${text}"`);
+  bindTasks(area);
+}
+
+function toggleTask(area, i) {
+  state.tasks[area][i].done = !state.tasks[area][i].done;
+  const t = state.tasks[area][i];
+  addLog(`Marcou tarefa como ${t.done?'concluída':'pendente'} em ${area}: "${t.text}"`);
+  saveState();
+  bindTasks(area);
+}
+
+function deleteTask(area, i) {
+  const t = state.tasks[area][i];
+  state.tasks[area].splice(i, 1);
+  addLog(`Excluiu tarefa em ${area}: "${t.text}"`);
+  saveState();
+  bindTasks(area);
+}
+
+// ─── COMPRAS ──────────────────────────────────────────────────────────────────
+function renderCompras() {
+  let html = `<div class="card">
+    <div class="add-task-form mb-2">
+      <input type="text" id="compra-text" placeholder="Item para comprar...">
+      <button class="btn btn-green" onclick="addCompra()">+ Adicionar</button>
+    </div>`;
+  if (!state.compras.length) {
+    html += `<div class="empty-state">${iconEmpty()}<p>Lista de compras vazia</p></div>`;
+  } else {
+    state.compras.forEach((c, i) => {
+      html += `<div class="compras-item">
+        <div class="compras-check ${c.done?'checked':''}" onclick="toggleCompra(${i})"></div>
+        <span class="compras-text ${c.done?'done':''}">${esc(c.text)}</span>
+        <button class="task-delete" onclick="deleteCompra(${i})">✕</button>
+      </div>`;
+    });
+  }
+  html += `</div>`;
+  return html;
+}
+
+function bindCompras() {
+  if (state.currentPage !== 'compras') return;
+  document.getElementById('page-content').innerHTML = renderCompras();
+  setupCompras();
+}
+
+function setupCompras() {
+  const el = document.getElementById('compra-text');
+  if (el) el.addEventListener('keydown', e => { if(e.key==='Enter') addCompra(); });
+}
+
+function addCompra() {
+  const text = document.getElementById('compra-text').value.trim();
+  if (!text) return;
+  state.compras.push({ text, done: false });
+  addLog(`Adicionou item à lista de compras: "${text}"`);
+  saveState();
+  bindCompras();
+}
+
+function toggleCompra(i) {
+  state.compras[i].done = !state.compras[i].done;
+  addLog(`Marcou item de compras como ${state.compras[i].done?'comprado':'pendente'}: "${state.compras[i].text}"`);
+  saveState();
+  bindCompras();
+}
+
+function deleteCompra(i) {
+  const t = state.compras[i].text;
+  state.compras.splice(i, 1);
+  addLog(`Removeu item da lista de compras: "${t}"`);
+  saveState();
+  bindCompras();
+}
+
+// ─── MURAL ────────────────────────────────────────────────────────────────────
+function renderMural() {
+  let html = `<div class="card mb-2">
+    <div class="add-task-form">
+      <input type="text" id="mural-text" placeholder="Escrever recado no mural..." style="flex:1">
+      <button class="btn btn-green" onclick="addMural()">📌 Fixar</button>
+    </div>
+  </div>`;
+  if (!state.mural.length) {
+    html += `<div class="empty-state">${iconEmpty()}<p>Mural vazio</p></div>`;
+  } else {
+    html += `<div class="mural-grid">`;
+    state.mural.forEach((m, i) => {
+      html += `<div class="mural-note">
+        <button class="mural-note-del" onclick="deleteMural(${i})">✕</button>
+        <div class="mural-note-author">${esc(m.author)} · ${m.time}</div>
+        <div class="mural-note-text">${esc(m.text)}</div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+  return html;
+}
+
+function bindMural() {
+  if (state.currentPage !== 'mural') return;
+  document.getElementById('page-content').innerHTML = renderMural();
+  setupMural();
+}
+
+function setupMural() {
+  const el = document.getElementById('mural-text');
+  if (el) el.addEventListener('keydown', e => { if(e.key==='Enter') addMural(); });
+}
+
+function addMural() {
+  const text = document.getElementById('mural-text').value.trim();
+  if (!text) return;
+  const now = new Date().toLocaleDateString('pt-BR');
+  state.mural.unshift({ text, author: state.currentUser.login, time: now });
+  addLog(`Adicionou recado no mural`);
+  saveState();
+  bindMural();
+}
+
+function deleteMural(i) {
+  addLog(`Removeu recado do mural`);
+  state.mural.splice(i, 1);
+  saveState();
+  bindMural();
+}
+
+// ─── ETIQUETAS ────────────────────────────────────────────────────────────────
+function renderEtiquetas() {
+  return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;max-width:900px">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Configurações</span></div>
+      <div class="label-form">
+        <div>
+          <label>Código ZPL</label>
+          <textarea id="zpl-input" placeholder="Cole o código ZPL aqui...&#10;^XA&#10;^FO50,50^ADN,36,20^FDOlá Mundo^FS&#10;^XZ" style="min-height:180px"></textarea>
+        </div>
+        <div class="dim-grid">
+          <div>
+            <label>Largura (mm)</label>
+            <input type="number" id="lbl-w" value="100" min="10" max="400">
+          </div>
+          <div>
+            <label>Altura (mm)</label>
+            <input type="number" id="lbl-h" value="150" min="10" max="400">
+          </div>
+          <div>
+            <label>DPI</label>
+            <select id="lbl-dpi">
+              <option value="6dpmm">152 DPI</option>
+              <option value="8dpmm" selected>203 DPI</option>
+              <option value="12dpmm">300 DPI</option>
+              <option value="24dpmm">600 DPI</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-green" style="flex:1;padding:0.65rem" onclick="previewEtiqueta()">👁 Visualizar</button>
+          <button class="btn btn-green" style="flex:1;padding:0.65rem" onclick="gerarEtiqueta()">⬇ Baixar PDF</button>
+        </div>
+        <div id="lbl-status" style="color:var(--text2);font-size:0.85rem;text-align:center;min-height:1.2em;"></div>
+      </div>
+    </div>
+    <div class="card" style="display:flex;flex-direction:column">
+      <div class="card-header"><span class="card-title">Prévia</span></div>
+      <div id="lbl-preview" style="flex:1;display:flex;align-items:center;justify-content:center;background:var(--bg3);border-radius:8px;min-height:220px;overflow:auto;padding:8px">
+        <span style="color:var(--text3);font-size:0.85rem">A prévia aparecerá aqui</span>
+      </div>
+      <div id="lbl-pages" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"></div>
+    </div>
+  </div>`;
+}
+
+function bindEtiquetas() {}
+
+function getLabelaryDpi(sel) {
+  return sel || '8dpmm';
+}
+
+function sleep(ms) { return new Promise(function(r){ setTimeout(r, ms); }); }
+
+async function fetchLabelaryPage(zplPage, dpm, wMm, hMm, attempt) {
+  if (!attempt) attempt = 0;
+  var wIn = (wMm / 25.4).toFixed(2);
+  var hIn = (hMm / 25.4).toFixed(2);
+  var url = 'https://api.labelary.com/v1/printers/' + dpm + '/labels/' + wIn + 'x' + hIn + '/0/';
+  if (attempt > 0) await sleep(attempt * 1500);
+  var resp;
+  try {
+    resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Accept': 'image/png', 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: zplPage,
+    });
+  } catch(e) { throw new Error('Sem conexao com Labelary. Verifique sua internet.'); }
+  if (resp.status === 429) {
+    if (attempt < 5) return fetchLabelaryPage(zplPage, dpm, wMm, hMm, attempt + 1);
+    throw new Error('Limite de requisicoes atingido. Aguarde 30 seg e tente novamente.');
+  }
+  if (!resp.ok) throw new Error('Labelary erro ' + resp.status + '. Verifique o ZPL.');
+  var blob = await resp.blob();
+  return new Promise(function(res, rej) {
+    var r = new FileReader();
+    r.onload = function() { res(r.result); };
+    r.onerror = rej;
+    r.readAsDataURL(blob);
+  });
+}
+
+function splitZplLabels(zpl) {
+  var parts = zpl.split(/\^XZ/i).map(function(s){ return s.trim(); }).filter(Boolean);
+  return parts.map(function(p) {
+    var label = (p.startsWith('^XA') || p.startsWith('^xa')) ? p : ('^XA\n' + p);
+    return label + '\n^XZ';
+  });
+}
+
+async function previewEtiqueta() {
+  var zpl = document.getElementById('zpl-input').value.trim();
+  var w = parseFloat(document.getElementById('lbl-w').value) || 100;
+  var h = parseFloat(document.getElementById('lbl-h').value) || 150;
+  var dpm = document.getElementById('lbl-dpi').value;
+  var status = document.getElementById('lbl-status');
+  var previewDiv = document.getElementById('lbl-preview');
+  var pagesDiv = document.getElementById('lbl-pages');
+
+  if (!zpl) { status.textContent = 'Por favor, insira o codigo ZPL.'; return; }
+  status.textContent = 'Carregando previa...';
+  previewDiv.innerHTML = '<span style="color:var(--text3);font-size:0.85rem">Gerando...</span>';
+  pagesDiv.innerHTML = '';
+
+  try {
+    var labels = splitZplLabels(zpl);
+    var firstImg = await fetchLabelaryPage(labels[0], dpm, w, h, 0);
+    previewDiv.innerHTML = '<img src="' + firstImg + '" style="max-width:100%;max-height:340px;border-radius:4px;border:1px solid var(--border)">';
+    if (labels.length > 1) {
+      status.textContent = labels.length + ' etiquetas detectadas. Clique em Baixar PDF para gerar todas.';
+      var thumbCount = Math.min(labels.length, 4);
+      for (var i = 1; i < thumbCount; i++) {
+        await sleep(700);
+        var thumb = await fetchLabelaryPage(labels[i], dpm, w, h, 0);
+        var el = document.createElement('img');
+        el.src = thumb;
+        el.style.cssText = 'height:60px;border-radius:4px;border:1px solid var(--border);cursor:pointer';
+        el.title = 'Etiqueta ' + (i+1);
+        (function(t, pd){ el.onclick = function(){ pd.innerHTML = '<img src="' + t + '" style="max-width:100%;max-height:340px;border-radius:4px;border:1px solid var(--border)">'; }; })(thumb, previewDiv);
+        pagesDiv.appendChild(el);
+      }
+      if (labels.length > thumbCount) {
+        var more = document.createElement('span');
+        more.textContent = '+' + (labels.length - thumbCount) + ' mais';
+        more.style.cssText = 'font-size:0.78rem;color:var(--text3);align-self:center';
+        pagesDiv.appendChild(more);
+      }
+    } else {
+      status.textContent = 'Previa gerada com sucesso!';
+      setTimeout(function(){ status.textContent = ''; }, 3000);
+    }
+  } catch(e) {
+    status.textContent = 'Erro: ' + e.message;
+    previewDiv.innerHTML = '<span style="color:var(--red);font-size:0.85rem">Falha na previa</span>';
+  }
+}
+
+async function gerarEtiqueta() {
+  var zpl = document.getElementById('zpl-input').value.trim();
+  var w = parseFloat(document.getElementById('lbl-w').value) || 100;
+  var h = parseFloat(document.getElementById('lbl-h').value) || 150;
+  var dpm = document.getElementById('lbl-dpi').value;
+  var status = document.getElementById('lbl-status');
+
+  if (!zpl) { status.textContent = 'Por favor, insira o codigo ZPL.'; return; }
+
+  var labels = splitZplLabels(zpl);
+  status.textContent = 'Iniciando: ' + labels.length + ' etiqueta(s)...';
+
+  try {
+    var jsPDFLib = window.jspdf;
+    var orientation = w >= h ? 'landscape' : 'portrait';
+    var doc = new jsPDFLib.jsPDF({ orientation: orientation, unit: 'mm', format: [w, h] });
+
+    for (var i = 0; i < labels.length; i++) {
+      status.textContent = 'Gerando etiqueta ' + (i+1) + ' de ' + labels.length + '...';
+      if (i > 0) await sleep(450);
+      var imgData = await fetchLabelaryPage(labels[i], dpm, w, h, 0);
+      if (i > 0) doc.addPage([w, h], orientation);
+      doc.addImage(imgData, 'PNG', 0, 0, w, h);
+    }
+
+    doc.save('etiquetas-costa.pdf');
+    addLog('Gerou ' + labels.length + ' etiqueta(s) ZPL em PDF (' + w + 'x' + h + 'mm)');
+    status.textContent = 'PDF com ' + labels.length + ' etiqueta(s) baixado com sucesso!';
+    setTimeout(function(){ status.textContent = ''; }, 5000);
+  } catch(e) {
+    status.textContent = 'Erro ao gerar PDF: ' + e.message;
+  }
+}
+
+// ─── AGENDA ──────────────────────────────────────────────────────────────────
+function renderAgenda() {
+  const months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const days = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+  const y = state.calYear, m = state.calMonth;
+  const first = new Date(y, m, 1).getDay();
+  const total = new Date(y, m+1, 0).getDate();
+  const today = new Date();
+
+  let html = `<div style="margin-bottom:1rem;display:flex;gap:8px">
+    <button class="btn btn-green" onclick="openModalEvento()">+ Novo Compromisso</button>
+  </div>
+  <div class="card" style="padding:0">
+    <div class="calendar">
+      <div class="calendar-header">
+        <button class="calendar-nav" onclick="calNav(-1)">‹</button>
+        <strong>${months[m]} ${y}</strong>
+        <button class="calendar-nav" onclick="calNav(1)">›</button>
+      </div>
+      <div class="calendar-grid">`;
+
+  days.forEach(d => { html += `<div class="cal-day-header">${d}</div>`; });
+
+  // Pad start
+  for (let i = 0; i < first; i++) {
+    const d = new Date(y, m, -first+i+1);
+    html += `<div class="cal-day other-month"><div class="cal-day-num">${d.getDate()}</div></div>`;
+  }
+
+  for (let d = 1; d <= total; d++) {
+    const isToday = d === today.getDate() && m === today.getMonth() && y === today.getFullYear();
+    const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const events = state.agenda.filter(e => e.date === dateStr);
+    let evHtml = events.map(e => `<div class="cal-event" title="${esc(e.title)}" onclick="viewEvento('${e.id}')">${esc(e.title)}</div>`).join('');
+    html += `<div class="cal-day${isToday?' today':''}">
+      <div class="cal-day-num">${d}</div>
+      ${evHtml}
+    </div>`;
+  }
+
+  // Pad end
+  const remaining = 7 - ((first + total) % 7);
+  if (remaining < 7) {
+    for (let i = 1; i <= remaining; i++) {
+      html += `<div class="cal-day other-month"><div class="cal-day-num">${i}</div></div>`;
+    }
+  }
+
+  html += `</div></div></div>`;
+
+  // Upcoming events
+  const upcoming = state.agenda.sort((a,b)=>a.date.localeCompare(b.date));
+  if (upcoming.length) {
+    html += `<div class="card" style="margin-top:1rem"><div class="card-header"><span class="card-title">Próximos Compromissos</span></div>`;
+    upcoming.slice(0,10).forEach(e => {
+      const d = new Date(e.date+'T'+e.time).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});
+      html += `<div class="flex items-center gap-2 mb-1" style="padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="width:14px;height:14px;border-radius:50%;background:var(--green);display:inline-block;flex-shrink:0"></span>
+        <span class="text-sm" style="flex:1"><strong>${esc(e.title)}</strong></span>
+        <span class="text-sm text-muted">${d}</span>
+        <button class="task-delete" onclick="deleteEvento('${e.id}')">✕</button>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  return html;
+}
+
+function bindAgenda() {}
+
+function calNav(dir) {
+  state.calMonth += dir;
+  if (state.calMonth < 0) { state.calMonth = 11; state.calYear--; }
+  if (state.calMonth > 11) { state.calMonth = 0; state.calYear++; }
+  document.getElementById('page-content').innerHTML = renderAgenda();
+  bindAgenda();
+}
+
+function openModalEvento() {
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('modal-content').innerHTML = `
+    <h3>Novo Compromisso</h3>
+    <input type="text" id="ev-title" placeholder="Título do compromisso">
+    <input type="date" id="ev-date" value="${today}">
+    <input type="time" id="ev-time" value="09:00">
+    <textarea id="ev-desc" placeholder="Descrição (opcional)" style="min-height:60px"></textarea>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-green" onclick="saveEvento()">Salvar</button>
+    </div>`;
+  document.getElementById('modal').style.display = 'flex';
+}
+
+function saveEvento() {
+  const title = document.getElementById('ev-title').value.trim();
+  const date = document.getElementById('ev-date').value;
+  const time = document.getElementById('ev-time').value;
+  if (!title || !date) return;
+  const ev = { id: 'ev_'+Date.now(), title, date, time, desc: document.getElementById('ev-desc').value };
+  state.agenda.push(ev);
+  addLog(`Adicionou compromisso na agenda: "${title}" em ${date}`);
+  saveState();
+  closeModal();
+  document.getElementById('page-content').innerHTML = renderAgenda();
+}
+
+function viewEvento(id) {
+  const e = state.agenda.find(x => x.id === id);
+  if (!e) return;
+  const d = new Date(e.date+'T'+e.time).toLocaleString('pt-BR',{dateStyle:'long',timeStyle:'short'});
+  document.getElementById('modal-content').innerHTML = `
+    <h3>${esc(e.title)}</h3>
+    <p style="color:var(--text2);margin-bottom:1rem">${d}</p>
+    ${e.desc ? `<p style="font-size:0.9rem;margin-bottom:1rem">${esc(e.desc)}</p>` : ''}
+    <div class="modal-actions">
+      <button class="btn btn-red" onclick="deleteEvento('${e.id}');closeModal()">Excluir</button>
+      <button class="btn btn-green" onclick="closeModal()">Fechar</button>
+    </div>`;
+  document.getElementById('modal').style.display = 'flex';
+}
+
+function deleteEvento(id) {
+  const e = state.agenda.find(x => x.id === id);
+  if (e) addLog(`Removeu compromisso da agenda: "${e.title}"`);
+  state.agenda = state.agenda.filter(x => x.id !== id);
+  saveState();
+  document.getElementById('page-content').innerHTML = renderAgenda();
+}
+
+// ─── TABELA NUTRICIONAL ───────────────────────────────────────────────────────
+var _tnEdit = null; // id do item sendo editado
+
+function tnDefaultForm() {
+  return {
+    nome: '', descricao: '', porcao: '30g', porcoes: '10',
+    vce_energia: '100', energia: '100',
+    carboidratos: '20', carboidratos_vd: '7',
+    acucares: '5', acucares_ad: '',
+    gorduras_totais: '3', gorduras_totais_vd: '4',
+    gorduras_sat: '1', gorduras_sat_vd: '5',
+    gorduras_trans: '0',
+    fibras: '1', fibras_vd: '4',
+    sodio: '50', sodio_vd: '2',
+    proteinas: '2', proteinas_vd: '3',
+    ingredientes: '', alergicos: '',
+    peso: '300g', validade: '12 meses', lote: '',
+    cnpj: '', sac: '',
+    ean: '',
+  };
+}
+
+var _tnData = tnDefaultForm();
+
+function renderTabNutri() {
+  var tab = (typeof _tnTab !== 'undefined') ? _tnTab : 'biblioteca';
+  var tabBib = tab === 'biblioteca';
+
+  // ── Tab bar ──
+  var tabBar = '<div style="display:flex;gap:0;margin-bottom:1.5rem;border-bottom:2px solid var(--border)">' +
+    '<button onclick="tnSetTab(\'biblioteca\')" style="padding:0.65rem 1.5rem;background:none;border:none;border-bottom:' + (tabBib ? '3px solid var(--green);color:var(--green);font-weight:600' : 'none;color:var(--text2)') + ';cursor:pointer;font-size:0.95rem;margin-bottom:-2px;transition:all 0.15s">📚 Biblioteca</button>' +
+    '<button onclick="tnSetTab(\'criar\')" style="padding:0.65rem 1.5rem;background:none;border:none;border-bottom:' + (!tabBib ? '3px solid var(--green);color:var(--green);font-weight:600' : 'none;color:var(--text2)') + ';cursor:pointer;font-size:0.95rem;margin-bottom:-2px;transition:all 0.15s">' + (_tnEdit !== null ? '✏️ Editando' : '➕ Criar Tabela') + '</button>' +
+  '</div>';
+
+  if (tabBib) {
+    // ── BIBLIOTECA ──
+    var searchVal = (typeof _tnSearch !== 'undefined') ? _tnSearch.toLowerCase() : '';
+    var saved = state.tabnutri;
+    var filtered = saved.map(function(item, i){ return { item: item, i: i }; })
+      .filter(function(x){ return !searchVal || x.item.nome.toLowerCase().indexOf(searchVal) !== -1; });
+
+    var savedHtml = '';
+    // Search bar
+    savedHtml += '<div style="margin-bottom:1rem;position:relative">' +
+      '<input id="tn-search-input" type="text" class="tn-input" placeholder="🔍  Buscar por nome do produto..." ' +
+      'value="' + esc(searchVal) + '" oninput="tnSearchFilter(this.value)" ' +
+      'style="padding-left:2.2rem;font-size:0.95rem">' +
+      '<svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--text3)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
+    '</div>';
+
+    if (!saved.length) {
+      savedHtml += '<div class="empty-state">' + iconEmpty() + '<p>Nenhuma tabela salva ainda. Clique em "Criar Tabela" para começar.</p></div>';
+    } else if (!filtered.length) {
+      savedHtml += '<div class="empty-state">' + iconEmpty() + '<p>Nenhum produto encontrado para "<b>' + esc(searchVal) + '</b>".</p></div>';
+    } else {
+      savedHtml += '<div style="font-size:0.8rem;color:var(--text3);margin-bottom:0.75rem">' + filtered.length + ' produto(s) encontrado(s)</div>';
+      savedHtml += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem">';
+      filtered.forEach(function(x) {
+        var item = x.item, i = x.i;
+        savedHtml += '<div class="card" style="padding:1rem">' +
+          '<div style="font-size:1rem;font-weight:600;margin-bottom:4px">' + esc(item.nome) + '</div>' +
+          '<div style="font-size:0.8rem;color:var(--text3);margin-bottom:10px">' +
+            esc(item.porcao || '—') + ' &bull; ' + (item.ean ? 'EAN: ' + esc(item.ean) : 'Sem EAN') +
+            (item.peso ? ' &bull; ' + esc(item.peso) : '') +
+          '</div>' +
+          '<div style="display:flex;gap:6px">' +
+            '<button class="btn btn-sm" style="flex:1" onclick="tnLoad(' + i + ')">✏️ Editar</button>' +
+            '<button class="btn btn-sm btn-green" style="flex:1" onclick="tnPrint(' + i + ')">⬇ PDF</button>' +
+            '<button class="btn btn-sm btn-red" onclick="tnDelete(' + i + ')">✕</button>' +
+          '</div>' +
+        '</div>';
+      });
+      savedHtml += '</div>';
+    }
+    return tabBar + savedHtml;
+  }
+
+  // ── CRIAR / EDITAR ──
+  var formTitle = _tnEdit !== null ? ('Editando: ' + (state.tabnutri[_tnEdit] ? state.tabnutri[_tnEdit].nome : '')) : 'Nova Tabela Nutricional';
+
+  var formHtml =
+    '<div style="display:grid;grid-template-columns:1fr 360px;gap:1.5rem;align-items:start">' +
+
+    // Left col: form
+    '<div class="card">' +
+      '<div class="card-header"><span class="card-title" id="tn-form-title">' + formTitle + '</span>' +
+      (_tnEdit !== null ? '<button class="btn btn-sm" onclick="tnReset()">+ Nova</button>' : '') +
+      '</div>' +
+
+      '<div class="tn-section">Produto</div>' +
+      '<div class="tn-form-grid" style="margin-bottom:8px">' +
+        '<div><label class="tn-label">Nome do Produto *</label><input class="tn-input" id="tn-nome" placeholder="Ex: Granola Crunchy" oninput="tnLiveUpdate()"></div>' +
+        '<div><label class="tn-label">Descrição</label><input class="tn-input" id="tn-descricao" placeholder="Ex: Com mel e castanhas" oninput="tnLiveUpdate()"></div>' +
+      '</div>' +
+      '<div class="tn-form-grid-3" style="margin-bottom:8px">' +
+        '<div><label class="tn-label">Porção (ex: 30g)</label><input class="tn-input" id="tn-porcao" value="30g" oninput="tnLiveUpdate()"></div>' +
+        '<div><label class="tn-label">Porções por emb.</label><input class="tn-input" id="tn-porcoes" value="10" oninput="tnLiveUpdate()"></div>' +
+        '<div><label class="tn-label">Peso Líquido</label><input class="tn-input" id="tn-peso" value="300g" oninput="tnLiveUpdate()"></div>' +
+      '</div>' +
+
+      '<div class="tn-section">Informação Nutricional (por porção)</div>' +
+      '<div style="background:var(--bg3);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:0.78rem;color:var(--text3)">Preencha os valores por porção. VD = % do Valor Diário de Referência.</div>' +
+
+      '<div class="tn-form-grid" style="margin-bottom:8px">' +
+        '<div><label class="tn-label">Valor Energético (kcal)</label><input class="tn-input" id="tn-energia" value="100" oninput="tnLiveUpdate()"></div>' +
+        '<div><label class="tn-label">%VD Energia</label><input class="tn-input" id="tn-vce_energia" value="5" oninput="tnLiveUpdate()"></div>' +
+      '</div>' +
+      '<div class="tn-form-grid" style="margin-bottom:8px">' +
+        '<div><label class="tn-label">Carboidratos (g)</label><input class="tn-input" id="tn-carboidratos" value="20" oninput="tnLiveUpdate()"></div>' +
+        '<div><label class="tn-label">%VD Carboidratos</label><input class="tn-input" id="tn-carboidratos_vd" value="7" oninput="tnLiveUpdate()"></div>' +
+      '</div>' +
+      '<div class="tn-form-grid" style="margin-bottom:8px">' +
+        '<div><label class="tn-label">Açúcares Totais (g)</label><input class="tn-input" id="tn-acucares" value="5" oninput="tnLiveUpdate()"></div>' +
+        '<div><label class="tn-label">Açúcares Adicionados (g)</label><input class="tn-input" id="tn-acucares_ad" value="0" oninput="tnLiveUpdate()"></div>' +
+      '</div>' +
+      '<div class="tn-form-grid" style="margin-bottom:8px">' +
+        '<div><label class="tn-label">Gorduras Totais (g)</label><input class="tn-input" id="tn-gorduras_totais" value="3" oninput="tnLiveUpdate()"></div>' +
+        '<div><label class="tn-label">%VD Gorduras Totais</label><input class="tn-input" id="tn-gorduras_totais_vd" value="4" oninput="tnLiveUpdate()"></div>' +
+      '</div>' +
+      '<div class="tn-form-grid" style="margin-bottom:8px">' +
+        '<div><label class="tn-label">Gorduras Saturadas (g)</label><input class="tn-input" id="tn-gorduras_sat" value="1" oninput="tnLiveUpdate()"></div>' +
+        '<div><label class="tn-label">%VD Gord. Saturadas</label><input class="tn-input" id="tn-gorduras_sat_vd" value="5" oninput="tnLiveUpdate()"></div>' +
+      '</div>' +
+      '<div class="tn-form-grid" style="margin-bottom:8px">' +
+        '<div><label class="tn-label">Gorduras Trans (g)</label><input class="tn-input" id="tn-gorduras_trans" value="0" oninput="tnLiveUpdate()"></div>' +
+        '<div><label class="tn-label">Fibras Alimentares (g)</label><input class="tn-input" id="tn-fibras" value="1" oninput="tnLiveUpdate()"></div>' +
+      '</div>' +
+      '<div class="tn-form-grid" style="margin-bottom:8px">' +
+        '<div><label class="tn-label">%VD Fibras</label><input class="tn-input" id="tn-fibras_vd" value="4" oninput="tnLiveUpdate()"></div>' +
+        '<div><label class="tn-label">Sódio (mg)</label><input class="tn-input" id="tn-sodio" value="50" oninput="tnLiveUpdate()"></div>' +
+      '</div>' +
+      '<div class="tn-form-grid" style="margin-bottom:8px">' +
+        '<div><label class="tn-label">%VD Sódio</label><input class="tn-input" id="tn-sodio_vd" value="2" oninput="tnLiveUpdate()"></div>' +
+        '<div><label class="tn-label">Proteínas (g)</label><input class="tn-input" id="tn-proteinas" value="2" oninput="tnLiveUpdate()"></div>' +
+      '</div>' +
+      '<div class="tn-form-grid" style="margin-bottom:8px">' +
+        '<div><label class="tn-label">%VD Proteínas</label><input class="tn-input" id="tn-proteinas_vd" value="3" oninput="tnLiveUpdate()"></div>' +
+      '</div>' +
+
+      '<div class="tn-section">Ingredientes e Alérgenos</div>' +
+      '<div style="margin-bottom:8px"><label class="tn-label">Ingredientes</label><textarea class="tn-input" id="tn-ingredientes" rows="3" placeholder="Aveia, mel, amendoim..." oninput="tnLiveUpdate()" style="resize:vertical"></textarea></div>' +
+      '<div style="margin-bottom:8px"><label class="tn-label">Alérgenos / Contém / Pode conter</label><textarea class="tn-input" id="tn-alergicos" rows="2" placeholder="Contém glúten, amendoim. Pode conter soja." oninput="tnLiveUpdate()" style="resize:vertical"></textarea></div>' +
+
+      '<div class="tn-section">Validade, Lote e Rastreabilidade</div>' +
+      '<div class="tn-form-grid" style="margin-bottom:8px">' +
+        '<div><label class="tn-label">Validade</label><input class="tn-input" id="tn-validade" value="12 meses" oninput="tnLiveUpdate()"></div>' +
+        '<div><label class="tn-label">Lote (opcional)</label><input class="tn-input" id="tn-lote" placeholder="LOT001" oninput="tnLiveUpdate()"></div>' +
+      '</div>' +
+
+      '<div class="tn-section">Empresa e Contato</div>' +
+      '<div class="tn-form-grid" style="margin-bottom:8px">' +
+        '<div><label class="tn-label">CNPJ</label><input class="tn-input" id="tn-cnpj" placeholder="00.000.000/0001-00" oninput="tnLiveUpdate()"></div>' +
+        '<div><label class="tn-label">SAC (WhatsApp)</label><input class="tn-input" id="tn-sac" placeholder="(11) 99999-9999" oninput="tnLiveUpdate()"></div>' +
+      '</div>' +
+
+      '<div class="tn-section">Código de Barras e QR Code</div>' +
+      '<div style="margin-bottom:1rem"><label class="tn-label">Código EAN (8 ou 13 dígitos)</label><input class="tn-input" id="tn-ean" placeholder="7891234567890" oninput="tnLiveUpdate()"></div>' +
+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+        '<button class="btn btn-green" style="flex:1;padding:0.7rem" onclick="tnSave()">💾 Salvar Tabela</button>' +
+        '<button class="btn btn-green" style="flex:1;padding:0.7rem" onclick="tnGeneratePDF()">⬇ Baixar PDF</button>' +
+      '</div>' +
+      '<div id="tn-status" style="color:var(--text2);font-size:0.82rem;text-align:center;margin-top:8px;min-height:1.2em"></div>' +
+    '</div>' +
+
+    // Right col: live preview
+    '<div class="card" style="position:sticky;top:1rem">' +
+      '<div class="card-header"><span class="card-title">Prévia (100×150mm)</span></div>' +
+      '<div style="overflow:auto;display:flex;justify-content:center;padding:4px 0">' +
+        '<div id="tn-preview-box" class="tn-preview-wrap"></div>' +
+      '</div>' +
+      '<div style="margin-top:10px;display:none" id="tn-barcode-wrap"><svg id="tn-barcode-svg"></svg></div>' +
+      '<div style="margin-top:6px;display:none" id="tn-qr-wrap"><div id="tn-qr-div"></div></div>' +
+    '</div>' +
+
+  '</div>';
+
+  return tabBar + formHtml;
+}
+
+var _tnTab = 'biblioteca';
+var _tnSearch = '';
+
+function tnSearchFilter(val) {
+  _tnSearch = val || '';
+  // Re-render only the biblioteca content without full navigate (keeps focus)
+  var c = document.getElementById('page-content');
+  if (c) c.innerHTML = renderTabNutri();
+  // Restore focus to search input
+  var inp = document.getElementById('tn-search-input');
+  if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+}
+
+function tnSetTab(tab) {
+  _tnTab = tab;
+  if (tab !== 'criar') _tnEdit = null;
+  if (tab === 'biblioteca') _tnSearch = '';
+  navigate('tabnutri');
+}
+
+function bindTabNutri() {
+  setupTabNutri();
+}
+
+function setupTabNutri() {
+  if (_tnTab === 'biblioteca') return;
+  if (_tnEdit !== null) {
+    var d = state.tabnutri[_tnEdit];
+    if (d) {
+      Object.keys(d).forEach(function(k) {
+        var el = document.getElementById('tn-' + k);
+        if (el) el.value = d[k];
+      });
+      var titleEl = document.getElementById('tn-form-title');
+      if (titleEl) titleEl.textContent = 'Editando: ' + d.nome;
+    }
+  }
+  tnLiveUpdate();
+}
+
+function tnGetFormData() {
+  var fields = ['nome','descricao','porcao','porcoes','peso','energia','vce_energia',
+    'carboidratos','carboidratos_vd','acucares','acucares_ad','gorduras_totais','gorduras_totais_vd',
+    'gorduras_sat','gorduras_sat_vd','gorduras_trans','fibras','fibras_vd',
+    'sodio','sodio_vd','proteinas','proteinas_vd',
+    'ingredientes','alergicos','validade','lote','cnpj','sac','ean'];
+  var data = {};
+  fields.forEach(function(f) {
+    var el = document.getElementById('tn-' + f);
+    data[f] = el ? el.value.trim() : '';
+  });
+  return data;
+}
+
+function tnLiveUpdate() {
+  var d = tnGetFormData();
+  var box = document.getElementById('tn-preview-box');
+  if (!box) return;
+
+  var qrContent = d.sac ? ('SAC: ' + d.sac + (d.cnpj ? ' | CNPJ: ' + d.cnpj : '')) : (d.cnpj || 'Costa');
+
+  box.innerHTML =
+    '<div class="tn-preview-product">' + (d.nome || 'Nome do Produto') + '</div>' +
+    (d.descricao ? '<div class="tn-preview-desc">' + d.descricao + '</div>' : '') +
+    '<table class="tn-tbl" style="border:2px solid #000">' +
+      '<tr><th class="tn-tbl-title" colspan="3" style="text-align:left;border-bottom:2px solid #000">INFORMAÇÃO NUTRICIONAL</th></tr>' +
+      '<tr><td colspan="3" class="tn-tbl-porcao"><b>Porção ' + (d.porcao||'—') + '</b> (' + (d.porcoes||'—') + ' porções por embalagem)</td></tr>' +
+      '<tr style="background:#eee"><td colspan="2"><b></b></td><td style="font-size:9px;text-align:right"><b>%VD*</b></td></tr>' +
+      '<tr class="tn-divider"><td class="tn-bold">Valor Energético</td><td>' + (d.energia||'0') + ' kcal</td><td style="text-align:right">' + (d.vce_energia||'0') + '%</td></tr>' +
+      '<tr><td class="tn-bold">Carboidratos</td><td>' + (d.carboidratos||'0') + ' g</td><td style="text-align:right">' + (d.carboidratos_vd||'0') + '%</td></tr>' +
+      '<tr><td style="padding-left:10px">Açúcares Totais</td><td>' + (d.acucares||'0') + ' g</td><td style="text-align:right">—</td></tr>' +
+      '<tr><td style="padding-left:10px">Açúcares Adicionados</td><td>' + (d.acucares_ad||'0') + ' g</td><td style="text-align:right">—</td></tr>' +
+      '<tr><td class="tn-bold">Gorduras Totais</td><td>' + (d.gorduras_totais||'0') + ' g</td><td style="text-align:right">' + (d.gorduras_totais_vd||'0') + '%</td></tr>' +
+      '<tr><td style="padding-left:10px">Gorduras Saturadas</td><td>' + (d.gorduras_sat||'0') + ' g</td><td style="text-align:right">' + (d.gorduras_sat_vd||'0') + '%</td></tr>' +
+      '<tr><td style="padding-left:10px">Gorduras Trans</td><td>' + (d.gorduras_trans||'0') + ' g</td><td style="text-align:right">—</td></tr>' +
+      '<tr><td class="tn-bold">Fibras Alimentares</td><td>' + (d.fibras||'0') + ' g</td><td style="text-align:right">' + (d.fibras_vd||'0') + '%</td></tr>' +
+      '<tr><td class="tn-bold">Sódio</td><td>' + (d.sodio||'0') + ' mg</td><td style="text-align:right">' + (d.sodio_vd||'0') + '%</td></tr>' +
+      '<tr class="tn-divider"><td class="tn-bold">Proteínas</td><td>' + (d.proteinas||'0') + ' g</td><td style="text-align:right">' + (d.proteinas_vd||'0') + '%</td></tr>' +
+    '</table>' +
+    '<div class="tn-preview-info" style="margin-top:4px">*% Valores Diários de referência com base em uma dieta de 2000kcal. Seus valores diários podem ser maiores ou menores dependendo de suas necessidades energéticas.</div>' +
+    (d.ingredientes ? '<div class="tn-preview-info"><b>Ingredientes:</b> ' + d.ingredientes + '</div>' : '') +
+    (d.alergicos ? '<div class="tn-preview-info" style="font-weight:700">' + d.alergicos + '</div>' : '') +
+    '<div class="tn-preview-info"><b>Peso Líq.:</b> ' + (d.peso||'—') +
+      (d.validade ? ' &nbsp;|&nbsp; <b>Validade:</b> ' + d.validade : '') +
+      (d.lote ? ' &nbsp;|&nbsp; <b>Lote:</b> ' + d.lote : '') + '</div>' +
+    (d.cnpj ? '<div class="tn-preview-info"><b>CNPJ:</b> ' + d.cnpj + '</div>' : '') +
+    (d.sac ? '<div class="tn-preview-info"><b>SAC WhatsApp:</b> ' + d.sac + '</div>' : '') +
+    '<div class="tn-preview-codes" id="tn-codes-row">' +
+      '<div id="tn-barcode-area" style="flex:1"></div>' +
+      '<div id="tn-qr-area" style="width:64px;height:64px;flex-shrink:0"></div>' +
+    '</div>';
+
+  // Render barcode
+  var barcodeArea = document.getElementById('tn-barcode-area');
+  if (barcodeArea && d.ean && d.ean.length >= 8) {
+    try {
+      var svgEl = document.createElementNS('http://www.w3.org/2000/svg','svg');
+      svgEl.style.cssText = 'max-width:180px;height:50px';
+      barcodeArea.appendChild(svgEl);
+      JsBarcode(svgEl, d.ean, { format: d.ean.length === 8 ? 'EAN8' : 'EAN13', width: 1.5, height: 40, fontSize: 10, margin: 2 });
+    } catch(e) { barcodeArea.innerHTML = '<span style="font-size:9px;color:#c00">EAN inválido</span>'; }
+  }
+
+  // Render QR
+  var qrArea = document.getElementById('tn-qr-area');
+  if (qrArea) {
+    qrArea.innerHTML = '';
+    try {
+      new QRCode(qrArea, { text: qrContent, width: 64, height: 64, correctLevel: QRCode.CorrectLevel.M });
+    } catch(e) {}
+  }
+}
+
+function tnSave() {
+  var d = tnGetFormData();
+  if (!d.nome) { document.getElementById('tn-status').textContent = 'Informe o nome do produto.'; return; }
+  if (_tnEdit !== null) {
+    state.tabnutri[_tnEdit] = d;
+    addLog('Atualizou tabela nutricional: "' + d.nome + '"');
+  } else {
+    state.tabnutri.push(d);
+    addLog('Salvou tabela nutricional: "' + d.nome + '"');
+  }
+  saveState();
+  _tnEdit = null;
+  _tnTab = 'biblioteca';
+  document.getElementById('tn-status').textContent = '✓ Tabela salva com sucesso!';
+  setTimeout(function(){ navigate('tabnutri'); }, 800);
+}
+
+function tnLoad(i) {
+  _tnEdit = i;
+  _tnTab = 'criar';
+  navigate('tabnutri');
+}
+
+function tnDelete(i) {
+  if (!confirm('Excluir esta tabela nutricional?')) return;
+  addLog('Excluiu tabela nutricional: "' + state.tabnutri[i].nome + '"');
+  state.tabnutri.splice(i, 1);
+  saveState();
+  navigate('tabnutri');
+}
+
+function tnReset() {
+  _tnEdit = null;
+  _tnTab = 'criar';
+  navigate('tabnutri');
+}
+
+function tnPrint(i) {
+  _tnEdit = i;
+  _tnTab = 'criar';
+  navigate('tabnutri');
+  setTimeout(function(){ tnGeneratePDF(); }, 400);
+}
+
+function tnGeneratePDF() {
+  var d = tnGetFormData();
+  if (!d.nome) { document.getElementById('tn-status').textContent = 'Preencha o nome do produto.'; return; }
+  var status = document.getElementById('tn-status');
+  status.textContent = 'Gerando PDF...';
+
+  try {
+    var jsPDFLib = window.jspdf;
+    var W = 100, H = 150;
+    var doc = new jsPDFLib.jsPDF({ orientation: 'portrait', unit: 'mm', format: [W, H] });
+    var px = 4, py = 4, lw = W - px*2;
+
+    // Product name
+    doc.setFontSize(12); doc.setFont('helvetica','bold');
+    doc.text(d.nome || 'Produto', W/2, py+5, { align:'center' });
+    if (d.descricao) { doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.text(d.descricao, W/2, py+9, { align:'center' }); }
+
+    var y = py + 13;
+
+    // Tabela header
+    doc.setFillColor(0,0,0); doc.rect(px, y, lw, 6, 'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(10); doc.setFont('helvetica','bold');
+    doc.text('INFORMAÇÃO NUTRICIONAL', px+2, y+4.2);
+    doc.setTextColor(0,0,0); y += 7;
+
+    doc.setFontSize(7.5); doc.setFont('helvetica','normal');
+    doc.text('Porção ' + (d.porcao||'—') + ' (' + (d.porcoes||'—') + ' porções por embalagem)', px+1, y+3.5);
+    doc.line(px, y+5, px+lw, y+5); y += 6;
+
+    // Header row %VD
+    doc.setFillColor(230,230,230); doc.rect(px, y, lw, 4.5, 'F');
+    doc.setFontSize(7); doc.setFont('helvetica','bold');
+    doc.text('%VD*', px+lw-3, y+3.2, { align:'right' });
+    y += 5;
+
+    function nutriRow(label, val, vd, bold, divider) {
+      var rowH = 4.5;
+      if (bold) { doc.setFont('helvetica','bold'); } else { doc.setFont('helvetica','normal'); }
+      doc.setFontSize(7.5);
+      var indent = label.startsWith('  ') ? 4 : 1;
+      doc.text(label.trim(), px+indent, y+3.2);
+      doc.text(val, px+lw/2, y+3.2);
+      doc.text(vd, px+lw-1, y+3.2, { align:'right' });
+      if (divider) { doc.setLineWidth(0.4); doc.line(px, y+rowH, px+lw, y+rowH); doc.setLineWidth(0.2); }
+      else { doc.setDrawColor(180,180,180); doc.line(px, y+rowH, px+lw, y+rowH); doc.setDrawColor(0,0,0); }
+      y += rowH;
+    }
+    doc.setLineWidth(0.2);
+    nutriRow('Valor Energético', (d.energia||'0')+' kcal', (d.vce_energia||'0')+'%', true, true);
+    nutriRow('Carboidratos', (d.carboidratos||'0')+' g', (d.carboidratos_vd||'0')+'%', true, false);
+    nutriRow('  Açúcares Totais', (d.acucares||'0')+' g', '—', false, false);
+    nutriRow('  Açúcares Adicionados', (d.acucares_ad||'0')+' g', '—', false, false);
+    nutriRow('Gorduras Totais', (d.gorduras_totais||'0')+' g', (d.gorduras_totais_vd||'0')+'%', true, false);
+    nutriRow('  Gorduras Saturadas', (d.gorduras_sat||'0')+' g', (d.gorduras_sat_vd||'0')+'%', false, false);
+    nutriRow('  Gorduras Trans', (d.gorduras_trans||'0')+' g', '—', false, false);
+    nutriRow('Fibras Alimentares', (d.fibras||'0')+' g', (d.fibras_vd||'0')+'%', true, false);
+    nutriRow('Sódio', (d.sodio||'0')+' mg', (d.sodio_vd||'0')+'%', true, false);
+    nutriRow('Proteínas', (d.proteinas||'0')+' g', (d.proteinas_vd||'0')+'%', true, true);
+
+    // Border around table
+    doc.setLineWidth(0.5); doc.rect(px, py+13, lw, y-(py+13));
+    doc.setLineWidth(0.2);
+
+    // VD note
+    y += 1.5;
+    doc.setFontSize(6); doc.setFont('helvetica','normal');
+    var vdNote = '*% Valores Diários de referência com base em uma dieta de 2000kcal.';
+    var vdLines = doc.splitTextToSize(vdNote, lw);
+    doc.text(vdLines, px, y+3); y += vdLines.length * 3.5 + 1;
+
+    // Ingredientes
+    if (d.ingredientes) {
+      doc.setFontSize(6.5); doc.setFont('helvetica','bold');
+      doc.text('Ingredientes:', px, y+3);
+      doc.setFont('helvetica','normal');
+      var iLines = doc.splitTextToSize(d.ingredientes, lw);
+      doc.text(iLines, px, y+6.5); y += iLines.length * 3.2 + 6;
+    }
+
+    // Alérgenos
+    if (d.alergicos) {
+      doc.setFontSize(6.5); doc.setFont('helvetica','bold');
+      var aLines = doc.splitTextToSize(d.alergicos, lw);
+      doc.text(aLines, px, y+3); y += aLines.length * 3.2 + 3;
+    }
+
+    // Peso / Validade / Lote
+    doc.setFontSize(6.5); doc.setFont('helvetica','normal');
+    var infoLine = 'Peso Líq.: ' + (d.peso||'—') + (d.validade ? '  |  Validade: '+d.validade : '') + (d.lote ? '  |  Lote: '+d.lote : '');
+    doc.text(infoLine, px, y+3); y += 4.5;
+
+    // CNPJ + SAC
+    if (d.cnpj || d.sac) {
+      var cLine = (d.cnpj ? 'CNPJ: '+d.cnpj : '') + (d.cnpj && d.sac ? '  |  ' : '') + (d.sac ? 'SAC WhatsApp: '+d.sac : '');
+      doc.text(cLine, px, y+3); y += 4.5;
+    }
+
+    // Barcode + QR (render via canvas)
+    var barcodeX = px;
+    var codeY = y + 1;
+    var qrSize = 22;
+
+    // QR Code via canvas
+    var qrText = d.sac ? ('SAC: '+d.sac+(d.cnpj?' | CNPJ: '+d.cnpj:'')) : (d.cnpj||d.nome||'Costa');
+    var qrCanvas = document.createElement('canvas');
+    qrCanvas.width = 128; qrCanvas.height = 128;
+    try {
+      new QRCode(qrCanvas, { text: qrText, width:128, height:128, correctLevel: QRCode.CorrectLevel.M });
+      setTimeout(function(){
+        try {
+          var qrImg = qrCanvas.toDataURL('image/png');
+          doc.addImage(qrImg, 'PNG', W-px-qrSize, codeY, qrSize, qrSize);
+        } catch(e2) {}
+        // Barcode via SVG→canvas
+        if (d.ean && d.ean.length >= 8) {
+          var svgEl = document.createElementNS('http://www.w3.org/2000/svg','svg');
+          document.body.appendChild(svgEl);
+          try {
+            JsBarcode(svgEl, d.ean, { format: d.ean.length===8?'EAN8':'EAN13', width:2, height:50, fontSize:12, margin:4, background:'#ffffff' });
+            var svgData = new XMLSerializer().serializeToString(svgEl);
+            var svgBlob = new Blob([svgData], {type:'image/svg+xml;charset=utf-8'});
+            var url = URL.createObjectURL(svgBlob);
+            var img = new Image();
+            img.onload = function() {
+              var bc = document.createElement('canvas');
+              bc.width = svgEl.viewBox.baseVal.width || 300;
+              bc.height = svgEl.viewBox.baseVal.height || 70;
+              var ctx = bc.getContext('2d');
+              ctx.fillStyle = '#fff'; ctx.fillRect(0,0,bc.width,bc.height);
+              ctx.drawImage(img, 0, 0);
+              var bcImg = bc.toDataURL('image/png');
+              var bcW = lw - qrSize - 4;
+              doc.addImage(bcImg,'PNG', barcodeX, codeY, bcW, qrSize);
+              document.body.removeChild(svgEl);
+              URL.revokeObjectURL(url);
+              doc.save('tabela-nutricional-' + (d.nome||'produto').replace(/\s+/g,'-').toLowerCase() + '.pdf');
+              addLog('Gerou PDF de tabela nutricional: "' + d.nome + '"');
+              status.textContent = '✓ PDF baixado com sucesso!';
+              setTimeout(function(){ status.textContent=''; }, 4000);
+            };
+            img.src = url;
+          } catch(e3) {
+            document.body.removeChild(svgEl);
+            doc.save('tabela-nutricional-' + (d.nome||'produto').replace(/\s+/g,'-').toLowerCase() + '.pdf');
+            addLog('Gerou PDF de tabela nutricional: "' + d.nome + '"');
+            status.textContent = '✓ PDF baixado!';
+            setTimeout(function(){ status.textContent=''; }, 4000);
+          }
+        } else {
+          doc.save('tabela-nutricional-' + (d.nome||'produto').replace(/\s+/g,'-').toLowerCase() + '.pdf');
+          addLog('Gerou PDF de tabela nutricional: "' + d.nome + '"');
+          status.textContent = '✓ PDF baixado!';
+          setTimeout(function(){ status.textContent=''; }, 4000);
+        }
+      }, 100);
+    } catch(e) {
+      doc.save('tabela-nutricional-' + (d.nome||'produto').replace(/\s+/g,'-').toLowerCase() + '.pdf');
+      status.textContent = '✓ PDF baixado!';
+    }
+  } catch(err) {
+    status.textContent = 'Erro ao gerar PDF: ' + err.message;
+  }
+}
+
+
+// ─── LOGS ─────────────────────────────────────────────────────────────────────
+function renderLogs() {
+  if (!state.logs.length) return `<div class="card"><div class="empty-state">${iconEmpty()}<p>Nenhuma atividade registrada</p></div></div>`;
+  let html = `<div class="card"><div class="card-header"><span class="card-title">Histórico de Atividades</span>
+    <button class="btn btn-sm btn-red" onclick="clearLogs()">Limpar Logs</button>
+  </div>`;
+  state.logs.forEach(l => {
+    html += `<div class="log-item">
+      <span class="log-time">${l.time}</span>
+      <span class="log-user">${esc(l.user)}</span>
+      <span class="log-desc">${esc(l.action)}</span>
+    </div>`;
+  });
+  html += `</div>`;
+  return html;
+}
+
+function clearLogs() {
+  if (!confirm('Limpar todos os logs?')) return;
+  state.logs = [];
+  saveState();
+  renderPage();
+}
+
+// ─── MODAL ────────────────────────────────────────────────────────────────────
+function closeModal() { document.getElementById('modal').style.display = 'none'; }
+function closeModalOutside(e) { if(e.target.id === 'modal') closeModal(); }
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+function esc(str) { return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function iconHome() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`; }
+function iconTruck() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`; }
+function iconFactory() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 20V8l6-4v4l6-4v4l6-4v16H2z"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="10" y1="20" x2="10" y2="14"/><line x1="14" y1="20" x2="14" y2="14"/></svg>`; }
+function iconCart() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>`; }
+function iconMural() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>`; }
+function iconLabel() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>`; }
+function iconCal() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`; }
+function iconLog() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`; }
+function iconTabNutri() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/></svg>`; }
+function iconEmpty() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`; }
+</script>
+</body>
+</html>

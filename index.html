@@ -343,8 +343,34 @@ function showSyncStatus(msg, color) {
   if (el) { el.textContent = msg; el.style.color = color || 'var(--text3)'; }
 }
 
-function applyParsed(parsed) {
+function dataSize(d) {
+  // Returns total number of items across all collections — used to detect empty data
+  if (!d) return 0;
+  var t = d.tasks || {};
+  return (Array.isArray(t.expedicao) ? t.expedicao.length : 0) +
+         (Array.isArray(t.producao)  ? t.producao.length  : 0) +
+         (Array.isArray(d.compras)   ? d.compras.length   : 0) +
+         (Array.isArray(d.mural)     ? d.mural.length     : 0) +
+         (Array.isArray(d.agenda)    ? d.agenda.length    : 0) +
+         (Array.isArray(d.tabnutri)  ? d.tabnutri.length  : 0);
+}
+
+function applyParsed(parsed, forceMerge) {
   if (!parsed) return;
+  // Safety check: never overwrite existing local data with empty remote data
+  // unless explicitly forced (e.g. after a confirmed save)
+  if (!forceMerge) {
+    var currentSize = dataSize({
+      tasks: state.tasks, compras: state.compras, mural: state.mural,
+      agenda: state.agenda, tabnutri: state.tabnutri
+    });
+    var incomingSize = dataSize(parsed);
+    // If we have data locally and remote is empty, keep local data
+    if (currentSize > 0 && incomingSize === 0) {
+      console.warn('applyParsed: ignoring empty remote data (local has', currentSize, 'items)');
+      return;
+    }
+  }
   var t = parsed.tasks || {};
   state.tasks = {
     expedicao: Array.isArray(t.expedicao) ? t.expedicao : [],
@@ -371,9 +397,17 @@ async function loadState() {
     const resp = await fetch(FIREBASE_URL + '/data.json');
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const parsed = await resp.json();
-    if (parsed) {
-      applyParsed(parsed);
+    const localStr = localStorage.getItem('costa_state');
+    const localData = localStr ? JSON.parse(localStr) : null;
+    if (parsed && dataSize(parsed) > 0) {
+      // Firebase has data — use it (it's the shared source of truth)
+      applyParsed(parsed, true);
       localStorage.setItem('costa_state', JSON.stringify(parsed));
+    } else if (localData && dataSize(localData) > 0) {
+      // Firebase is empty but we have local data — push it to Firebase
+      console.log('Firebase empty, pushing local data to cloud...');
+      applyParsed(localData, true);
+      pushToCloud(localData);
     }
     showSyncStatus('✓ Pronto', 'var(--green)');
     setTimeout(() => showSyncStatus('', ''), 1500);
@@ -402,7 +436,8 @@ function startRealtimeSync() {
         // Não aplicar sem usuário logado ou se EU fui quem salvou (evita flicker)
         if (!state.currentUser || _isSaving) return;
 
-        applyParsed(incoming);
+        // SSE data is authoritative — use forceMerge=true
+        applyParsed(incoming, true);
         localStorage.setItem('costa_state', JSON.stringify(incoming));
 
         // Re-renderiza a página atual com os novos dados
@@ -488,6 +523,8 @@ async function pushToCloud(data) {
       body: JSON.stringify(data),
     });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    // After successful save, update localStorage so it matches Firebase
+    localStorage.setItem('costa_state', JSON.stringify(data));
     showSyncStatus('✓ Salvo', 'var(--green)');
     setTimeout(() => showSyncStatus('', ''), 1500);
   } catch(e) {

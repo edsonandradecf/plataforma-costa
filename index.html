@@ -345,12 +345,16 @@ function showSyncStatus(msg, color) {
 
 function applyParsed(parsed) {
   if (!parsed) return;
-  state.tasks    = parsed.tasks    || { expedicao: [], producao: [] };
-  state.compras  = parsed.compras  || [];
-  state.mural    = parsed.mural    || [];
-  state.agenda   = parsed.agenda   || [];
-  state.logs     = parsed.logs     || [];
-  state.tabnutri = parsed.tabnutri || [];
+  var t = parsed.tasks || {};
+  state.tasks = {
+    expedicao: Array.isArray(t.expedicao) ? t.expedicao : [],
+    producao:  Array.isArray(t.producao)  ? t.producao  : [],
+  };
+  state.compras  = Array.isArray(parsed.compras)  ? parsed.compras  : [];
+  state.mural    = Array.isArray(parsed.mural)    ? parsed.mural    : [];
+  state.agenda   = Array.isArray(parsed.agenda)   ? parsed.agenda   : [];
+  state.logs     = Array.isArray(parsed.logs)     ? parsed.logs     : [];
+  state.tabnutri = Array.isArray(parsed.tabnutri) ? parsed.tabnutri : [];
 }
 
 // ── Carrega dados do Firebase uma vez (no login) ──────────────────────────
@@ -518,8 +522,9 @@ function doLogin() {
     localStorage.removeItem('costa_saved_login');
   }
   state.currentUser = user;
+  console.log('Login OK:', user.login, 'role:', user.role);
   addLog('Fez login na plataforma');
-  startApp(); // startApp → startRealtimeSync busca dados da nuvem em background
+  startApp();
 }
 
 function doLogout() {
@@ -608,7 +613,9 @@ function getPagesLimited() {
 }
 
 function buildSidebar() {
+  if (!state.currentUser) return;
   const nav = document.getElementById('sidebar-nav');
+  if (!nav) return;
   nav.innerHTML = '';
   const pages = state.currentUser.role === 'admin' ? getPagesAdmin() : getPagesLimited();
   pages.forEach(p => {
@@ -619,8 +626,10 @@ function buildSidebar() {
     el.onclick = () => navigate(p.id);
     nav.appendChild(el);
   });
-  document.getElementById('sidebar-username').textContent = state.currentUser.login;
-  document.getElementById('sidebar-role').textContent = state.currentUser.role === 'admin' ? '(Admin)' : '';
+  const unEl = document.getElementById('sidebar-username');
+  const roEl = document.getElementById('sidebar-role');
+  if (unEl) unEl.textContent = state.currentUser.login;
+  if (roEl) roEl.textContent = state.currentUser.role === 'admin' ? '(Admin)' : '';
   // Update logout button icon when collapsed
   const collapsed = document.querySelector('.sidebar').classList.contains('collapsed');
   const logoutBtn = document.getElementById('btn-logout-el');
@@ -643,6 +652,8 @@ function cleanOldTasks() {
   const todayStr = new Date().toISOString().slice(0,10);
   let changed = false;
   ['expedicao','producao'].forEach(area => {
+    if (!state.tasks) state.tasks = {};
+    if (!Array.isArray(state.tasks[area])) state.tasks[area] = [];
     const before = state.tasks[area].length;
     state.tasks[area] = state.tasks[area].filter(t => !(t.done && t.date < todayStr));
     if (state.tasks[area].length !== before) changed = true;
@@ -651,6 +662,7 @@ function cleanOldTasks() {
 }
 
 function startApp() {
+  if (!state.currentUser) { console.error('startApp called without currentUser!'); return; }
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   // Restore sidebar collapsed state

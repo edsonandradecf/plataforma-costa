@@ -666,42 +666,35 @@ function startApp() {
 }
 
 function renderPage() {
-  const titles = { inicio:'Início', expedicao:'Expedição', producao:'Produção', compras:'Compras', mural:'Mural', etiquetas:'Gerador de Etiquetas', agenda:'Agenda', tabnutri:'Tabela Nutricional', logs:'Logs' };
-  document.getElementById('page-title').textContent = titles[state.currentPage] || '';
-  const c = document.getElementById('page-content');
-  switch(state.currentPage) {
-    case 'inicio':    c.innerHTML = renderInicio(); break;
-    case 'expedicao': c.innerHTML = renderTasks('expedicao'); break;
-    case 'producao':  c.innerHTML = renderTasks('producao'); break;
-    case 'compras':   c.innerHTML = renderCompras(); setupCompras(); break;
-    case 'mural':     c.innerHTML = renderMural(); setupMural(); break;
-    case 'etiquetas': c.innerHTML = renderEtiquetas(); break;
-    case 'agenda':    c.innerHTML = renderAgenda(); break;
-    case 'tabnutri':  c.innerHTML = renderTabNutri(); setupTabNutri(); break;
-    case 'logs':      c.innerHTML = renderLogs(); break;
-  }
+  if (!state.currentUser) return;
+  var titles = { inicio:'Início', expedicao:'Expedição', producao:'Produção', compras:'Compras', mural:'Mural', etiquetas:'Gerador de Etiquetas', agenda:'Agenda', tabnutri:'Tabela Nutricional', logs:'Logs' };
+  var titleEl = document.getElementById('page-title');
+  if (titleEl) titleEl.textContent = titles[state.currentPage] || '';
+  var c = document.getElementById('page-content');
+  if (!c) return;
+  var pg = state.currentPage;
+  if (pg === 'inicio')    { c.innerHTML = renderInicio(); return; }
+  if (pg === 'expedicao') { c.innerHTML = renderTasks('expedicao'); return; }
+  if (pg === 'producao')  { c.innerHTML = renderTasks('producao'); return; }
+  if (pg === 'compras')   { c.innerHTML = renderCompras(); setupCompras(); return; }
+  if (pg === 'mural')     { c.innerHTML = renderMural(); setupMural(); return; }
+  if (pg === 'etiquetas') { c.innerHTML = renderEtiquetas(); return; }
+  if (pg === 'agenda')    { c.innerHTML = renderAgenda(); return; }
+  if (pg === 'tabnutri')  { c.innerHTML = renderTabNutri(); setupTabNutri(); return; }
+  if (pg === 'logs')      { c.innerHTML = renderLogs(); return; }
 }
 
-// safeRenderPage: chamado pelo sync em tempo real.
-// Só re-renderiza páginas de dados. Nunca muda a página atual.
-// Ignora páginas que têm estado de formulário ativo (etiquetas, tabnutri).
-const _SYNC_RENDERABLE = ['inicio','expedicao','producao','compras','mural','agenda','logs'];
-let _lastNavigateTime = 0;
 function navigate(page) {
-  _lastNavigateTime = Date.now();
+  if (!state.currentUser) return;
   state.currentPage = page;
   buildSidebar();
   renderPage();
 }
 
+// safeRenderPage: called by SSE sync — only updates data, never changes page
 function safeRenderPage() {
-  // Nunca renderiza sem usuário logado
   if (!state.currentUser) return;
-  // Não atualiza se o usuário navegou nos últimos 2 segundos
-  if (Date.now() - _lastNavigateTime < 2000) return;
-  if (!_SYNC_RENDERABLE.includes(state.currentPage)) return;
-  // Não re-renderiza se o usuário está com um input focado
-  const active = document.activeElement;
+  var active = document.activeElement;
   if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) return;
   renderPage();
 }

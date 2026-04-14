@@ -337,6 +337,7 @@ let _saveTimer = null;
 let _isSaving = false;
 let _pendingSave = false;
 let _sseSource = null;  // SSE listener para tempo real
+let _firebaseReady = false; // só salva no Firebase após receber dados dele
 
 function showSyncStatus(msg, color) {
   const el = document.getElementById('sync-status');
@@ -400,14 +401,19 @@ async function loadState() {
     const localStr = localStorage.getItem('costa_state');
     const localData = localStr ? JSON.parse(localStr) : null;
     if (parsed && dataSize(parsed) > 0) {
-      // Firebase has data — use it (it's the shared source of truth)
+      // Firebase tem dados — usa como fonte de verdade
       applyParsed(parsed, true);
       localStorage.setItem('costa_state', JSON.stringify(parsed));
+      _firebaseReady = true;
     } else if (localData && dataSize(localData) > 0) {
-      // Firebase is empty but we have local data — push it to Firebase
-      console.log('Firebase empty, pushing local data to cloud...');
+      // Firebase vazio mas temos dados locais — envia para Firebase
+      console.log('Firebase vazio, enviando dados locais para a nuvem...');
       applyParsed(localData, true);
+      _firebaseReady = true;
       pushToCloud(localData);
+    } else {
+      // Ambos vazios — Firebase pronto para receber dados novos
+      _firebaseReady = true;
     }
     showSyncStatus('✓ Pronto', 'var(--green)');
     setTimeout(() => showSyncStatus('', ''), 1500);
@@ -437,6 +443,7 @@ function startRealtimeSync() {
         if (!state.currentUser || _isSaving) return;
 
         // SSE data is authoritative — use forceMerge=true
+        _firebaseReady = true;
         applyParsed(incoming, true);
         localStorage.setItem('costa_state', JSON.stringify(incoming));
 
@@ -513,6 +520,11 @@ function saveState() {
 }
 
 async function pushToCloud(data) {
+  // Nunca sobrescreve o Firebase antes de ter recebido os dados dele
+  if (!_firebaseReady) {
+    console.warn('pushToCloud bloqueado: Firebase ainda não confirmado');
+    return;
+  }
   if (_isSaving) { _pendingSave = true; return; }
   _isSaving = true;
   showSyncStatus('⬆ Salvando...', 'var(--text3)');
@@ -695,7 +707,8 @@ function cleanOldTasks() {
     state.tasks[area] = state.tasks[area].filter(t => !(t.done && t.date < todayStr));
     if (state.tasks[area].length !== before) changed = true;
   });
-  if (changed) saveState();
+  // Não salva aqui — evita sobrescrever Firebase com dados locais ainda não sincronizados
+  // Os dados serão salvos na próxima ação real do usuário
 }
 
 function startApp() {

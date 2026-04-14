@@ -336,8 +336,9 @@ const FIREBASE_URL = 'https://plataforma-costa-default-rtdb.firebaseio.com';
 let _saveTimer = null;
 let _isSaving = false;
 let _pendingSave = false;
-let _sseSource = null;  // SSE listener para tempo real
-let _firebaseReady = false; // só salva no Firebase após receber dados dele
+let _sseSource = null;
+let _firebaseReady = false;
+let _loginTime = 0; // momento do login — primeiros 10s bloqueiam pushToCloud
 
 function showSyncStatus(msg, color) {
   const el = document.getElementById('sync-status');
@@ -520,7 +521,16 @@ function saveState() {
 }
 
 async function pushToCloud(data) {
-  // Nunca sobrescreve o Firebase antes de ter recebido os dados dele
+  // Bloqueia os primeiros 10 segundos após login para o Firebase sincronizar primeiro
+  var secondsSinceLogin = (Date.now() - _loginTime) / 1000;
+  if (secondsSinceLogin < 10) {
+    console.log('pushToCloud aguardando sync inicial (' + secondsSinceLogin.toFixed(1) + 's < 10s)');
+    // Agenda para tentar de novo após o delay passar
+    if (_saveTimer) clearTimeout(_saveTimer);
+    var remaining = Math.ceil(10000 - (Date.now() - _loginTime));
+    _saveTimer = setTimeout(() => pushToCloud(data), remaining + 200);
+    return;
+  }
   if (!_firebaseReady) {
     console.warn('pushToCloud bloqueado: Firebase ainda não confirmado');
     return;
@@ -577,6 +587,8 @@ function doLogin() {
     localStorage.removeItem('costa_saved_login');
   }
   state.currentUser = user;
+  _loginTime = Date.now();
+  _firebaseReady = false;
   console.log('Login OK:', user.login, 'role:', user.role);
   addLog('Fez login na plataforma');
   startApp();

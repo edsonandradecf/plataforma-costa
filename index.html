@@ -548,6 +548,7 @@ async function pushToCloud(data) {
 }
 
 function addLog(action) {
+  if (!state.currentUser) return;
   const now = new Date();
   state.logs.unshift({
     time: now.toLocaleString('pt-BR'),
@@ -555,7 +556,12 @@ function addLog(action) {
     action,
   });
   if (state.logs.length > 500) state.logs = state.logs.slice(0, 500);
-  saveState();
+  // Não chama saveState aqui — evita sobrescrever Firebase antes de sincronizar.
+  // Os logs são salvos junto com a próxima ação real do usuário.
+  localStorage.setItem('costa_state', JSON.stringify({
+    tasks: state.tasks, compras: state.compras, mural: state.mural,
+    agenda: state.agenda, logs: state.logs, tabnutri: state.tabnutri,
+  }));
 }
 
 // ─── AUTH ──────────────────────────────────────────────────────────────────────
@@ -579,6 +585,7 @@ function doLogin() {
 function doLogout() {
   addLog('Saiu da plataforma');
   stopSync();
+  _firebaseReady = false; // reset — próximo login não pode salvar antes de sincronizar
   state.currentUser = null;
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';

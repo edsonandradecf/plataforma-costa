@@ -2039,13 +2039,13 @@ async function mlFetchVendas() {
   var dayData = await mlGet('/orders/search?seller=' + userId +
     '&order.date_created.from=' + encodeURIComponent(dayFrom) +
     '&order.date_created.to='   + encodeURIComponent(dayTo) +
-    '&order.status=paid&sort=date_desc&limit=50');
+    '&order.status=paid&sort=date_desc&limit=51');
 
   // Fetch month orders (up to 100 for ranking)
   var monthData = await mlGet('/orders/search?seller=' + userId +
     '&order.date_created.from=' + encodeURIComponent(monthFrom) +
     '&order.date_created.to='   + encodeURIComponent(monthTo) +
-    '&order.status=paid&sort=date_desc&limit=50');
+    '&order.status=paid&sort=date_desc&limit=51');
 
   return {
     orders:       dayData.results  || [],

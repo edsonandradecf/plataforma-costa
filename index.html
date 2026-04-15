@@ -678,7 +678,7 @@ function getPagesAdmin() {
   ];
 }
 function getPagesLimited() {
-  return getPagesAdmin().filter(p => p.id !== 'logs');
+  return getPagesAdmin().filter(p => p.id !== 'logs' && p.id !== 'vendas');
 }
 
 function buildSidebar() {
@@ -850,7 +850,8 @@ function renderInicio() {
     </div>
     ${muralHtml}
   </div>
-  <div class="card"><p class="text-muted text-sm">Bem-vindo(a), <strong>${state.currentUser ? state.currentUser.login : ''}</strong>! Use o menu lateral para navegar pela plataforma.</p></div>`;
+  <div class="card"><p class="text-muted text-sm">Bem-vindo(a), <strong>${state.currentUser ? state.currentUser.login : ''}</strong>! Use o menu lateral para navegar pela plataforma.</p></div>
+  ${state.currentUser && state.currentUser.role !== 'admin' ? renderVendasResumo() : ''}`;
 }
 
 // ─── TASKS ─────────────────────────────────────────────────────────────────────
@@ -1944,24 +1945,41 @@ async function mlGet(path) {
 }
 
 async function mlFetchVendas() {
-  // Get user ID
   var me = await mlGet('/users/me');
   var userId = me.id;
-
-  // Today's date range in ISO format
   var now = new Date();
-  var start = new Date(now); start.setHours(0,0,0,0);
-  var end   = new Date(now); end.setHours(23,59,59,999);
-  var dateFrom = start.toISOString().slice(0,19) + '.000-03:00';
-  var dateTo   = end.toISOString().slice(0,19)   + '.999-03:00';
 
-  var path = '/orders/search?seller=' + userId +
-    '&order.date_created.from=' + encodeURIComponent(dateFrom) +
-    '&order.date_created.to='   + encodeURIComponent(dateTo) +
-    '&order.status=paid&sort=date_desc&limit=50';
+  // Today
+  var dayStart = new Date(now); dayStart.setHours(0,0,0,0);
+  var dayEnd   = new Date(now); dayEnd.setHours(23,59,59,999);
+  var dayFrom  = dayStart.toISOString().slice(0,19) + '.000-03:00';
+  var dayTo    = dayEnd.toISOString().slice(0,19)   + '.999-03:00';
 
-  var data = await mlGet(path);
-  return { orders: data.results || [], total: data.paging ? data.paging.total : 0, me: me };
+  // This month
+  var monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  var monthEnd   = new Date(now.getFullYear(), now.getMonth()+1, 0, 23, 59, 59);
+  var monthFrom  = monthStart.toISOString().slice(0,19) + '.000-03:00';
+  var monthTo    = monthEnd.toISOString().slice(0,19)   + '.999-03:00';
+
+  // Fetch today orders
+  var dayData = await mlGet('/orders/search?seller=' + userId +
+    '&order.date_created.from=' + encodeURIComponent(dayFrom) +
+    '&order.date_created.to='   + encodeURIComponent(dayTo) +
+    '&order.status=paid&sort=date_desc&limit=50');
+
+  // Fetch month orders (up to 100 for ranking)
+  var monthData = await mlGet('/orders/search?seller=' + userId +
+    '&order.date_created.from=' + encodeURIComponent(monthFrom) +
+    '&order.date_created.to='   + encodeURIComponent(monthTo) +
+    '&order.status=paid&sort=date_desc&limit=100');
+
+  return {
+    orders:       dayData.results  || [],
+    totalDay:     dayData.paging   ? dayData.paging.total   : 0,
+    ordersMonth:  monthData.results || [],
+    totalMonth:   monthData.paging  ? monthData.paging.total : 0,
+    me: me,
+  };
 }
 
 function renderVendas() {
@@ -2028,77 +2046,169 @@ function mlErrorHtml(msg) {
   '</div>';
 }
 
-function mlDashHtml(result) {
-  var orders = result.orders;
-  var me = result.me;
-
-  // Calculate totals
-  var totalPedidos = result.total;
-  var totalVendido = orders.reduce(function(sum, o) { return sum + (o.total_amount || 0); }, 0);
-  var totalItens   = orders.reduce(function(sum, o) {
-    return sum + (o.order_items ? o.order_items.reduce(function(s, i) { return s + (i.quantity || 0); }, 0) : 0);
-  }, 0);
-
-  // Product frequency
-  var prodMap = {};
+function mlProdMap(orders) {
+  var map = {};
   orders.forEach(function(o) {
     if (!o.order_items) return;
     o.order_items.forEach(function(item) {
       var title = item.item ? item.item.title : 'Produto';
-      prodMap[title] = (prodMap[title] || 0) + (item.quantity || 1);
+      map[title] = (map[title] || 0) + (item.quantity || 1);
     });
   });
-  var topProds = Object.entries(prodMap).sort(function(a,b){ return b[1]-a[1]; }).slice(0,5);
+  return map;
+}
+
+function mlDashHtml(result) {
+  var orders      = result.orders;
+  var ordersMonth = result.ordersMonth;
+  var me          = result.me;
+  var now         = new Date();
+  var monthName   = now.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+
+  // Day stats
+  var totalPedidosDia = result.totalDay;
+  var totalVendidoDia = orders.reduce(function(s,o){ return s+(o.total_amount||0); }, 0);
+  var totalItensDia   = orders.reduce(function(s,o){
+    return s+(o.order_items ? o.order_items.reduce(function(ss,i){ return ss+(i.quantity||0); },0) : 0);
+  }, 0);
+
+  // Month stats
+  var totalPedidosMes = result.totalMonth;
+  var totalVendidoMes = ordersMonth.reduce(function(s,o){ return s+(o.total_amount||0); }, 0);
+
+  // Monthly chart data — orders per day of month
+  var daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  var chartData = new Array(daysInMonth).fill(0);
+  ordersMonth.forEach(function(o) {
+    if (!o.date_created) return;
+    var d = new Date(o.date_created).getDate() - 1;
+    if (d >= 0 && d < daysInMonth) chartData[d]++;
+  });
+  var maxVal = Math.max.apply(null, chartData) || 1;
+
+  // Top 5 month products
+  var monthProdMap = mlProdMap(ordersMonth);
+  var topMes = Object.entries(monthProdMap).sort(function(a,b){ return b[1]-a[1]; }).slice(0,5);
+  var maxProd = topMes.length ? topMes[0][1] : 1;
+
+  // Top 5 day products
+  var dayProdMap = mlProdMap(orders);
+  var topDia = Object.entries(dayProdMap).sort(function(a,b){ return b[1]-a[1]; }).slice(0,5);
 
   var html = '<div style="margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center">' +
-    '<div>' +
-      '<span style="font-size:0.85rem;color:var(--text3)">Olá, <b>' + esc(me.nickname || me.first_name || '') + '</b> · Mercado Livre conectado ✓</span>' +
-    '</div>' +
+    '<span style="font-size:0.85rem;color:var(--text3)">Olá, <b>' + esc(me.nickname||me.first_name||'') + '</b> · Mercado Livre ✓</span>' +
     '<div style="display:flex;gap:8px">' +
       '<button class="btn btn-sm" onclick="bindVendas()">🔄 Atualizar</button>' +
       '<button class="btn btn-sm btn-red" onclick="mlDesconectar()">Desconectar</button>' +
     '</div>' +
   '</div>' +
 
-  // Stats
+  // Day cards
+  '<div style="margin-bottom:0.5rem;font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Hoje — ' + now.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'}) + '</div>' +
   '<div class="stats-grid" style="margin-bottom:1.25rem">' +
-    '<div class="stat-card"><div class="stat-icon">🛍️</div><div class="stat-label">Pedidos Hoje</div><div class="stat-value">' + totalPedidos + '</div></div>' +
-    '<div class="stat-card"><div class="stat-icon">💰</div><div class="stat-label">Total Vendido</div><div class="stat-value">R$ ' + totalVendido.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) + '</div></div>' +
-    '<div class="stat-card"><div class="stat-icon">📦</div><div class="stat-label">Itens Vendidos</div><div class="stat-value">' + totalItens + '</div></div>' +
-  '</div>';
+    '<div class="stat-card"><div class="stat-icon">🛍️</div><div class="stat-label">Pedidos Hoje</div><div class="stat-value">' + totalPedidosDia + '</div></div>' +
+    '<div class="stat-card"><div class="stat-icon">💰</div><div class="stat-label">Faturado Hoje</div><div class="stat-value">R$ ' + totalVendidoDia.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</div></div>' +
+    '<div class="stat-card"><div class="stat-icon">📦</div><div class="stat-label">Itens Hoje</div><div class="stat-value">' + totalItensDia + '</div></div>' +
+  '</div>' +
 
-  // Top products
-  if (topProds.length) {
-    html += '<div class="card" style="margin-bottom:1.25rem"><div class="card-header"><span class="card-title">🏆 Produtos Mais Vendidos Hoje</span></div>';
-    topProds.forEach(function(p, i) {
-      html += '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">' +
-        '<span style="font-size:1.1rem;font-weight:700;color:var(--text3);min-width:24px">' + (i+1) + '</span>' +
-        '<span style="flex:1;font-size:0.9rem">' + esc(p[0]) + '</span>' +
-        '<span class="task-badge" style="background:var(--green);color:#fff;border:none">' + p[1] + ' un.</span>' +
+  // Month cards
+  '<div style="margin-bottom:0.5rem;font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">' + monthName.charAt(0).toUpperCase()+monthName.slice(1) + '</div>' +
+  '<div class="stats-grid" style="margin-bottom:1.25rem">' +
+    '<div class="stat-card"><div class="stat-icon">📅</div><div class="stat-label">Pedidos no Mês</div><div class="stat-value">' + totalPedidosMes + '</div></div>' +
+    '<div class="stat-card"><div class="stat-icon">💵</div><div class="stat-label">Faturado no Mês</div><div class="stat-value">R$ ' + totalVendidoMes.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</div></div>' +
+  '</div>' +
+
+  // Monthly chart
+  '<div class="card" style="margin-bottom:1.25rem">' +
+    '<div class="card-header"><span class="card-title">📈 Pedidos por Dia — ' + monthName.charAt(0).toUpperCase()+monthName.slice(1) + '</span></div>' +
+    '<div style="display:flex;align-items:flex-end;gap:3px;height:100px;padding:8px 0">';
+
+  chartData.forEach(function(val, idx) {
+    var barH = Math.round((val / maxVal) * 84);
+    var isToday = idx === now.getDate() - 1;
+    var color = isToday ? 'var(--green)' : 'var(--blue,#3b82f6)';
+    if (barH === 0) barH = 2;
+    html += '<div style="display:flex;flex-direction:column;align-items:center;flex:1;gap:2px">' +
+      '<div style="font-size:9px;color:var(--text3)">' + (val||'') + '</div>' +
+      '<div style="width:100%;background:' + color + ';border-radius:3px 3px 0 0;height:' + barH + 'px;opacity:' + (isToday?'1':'0.7') + '" title="Dia ' + (idx+1) + ': ' + val + ' pedidos"></div>' +
+      '<div style="font-size:8px;color:' + (isToday?'var(--green)':'var(--text3)') + ';font-weight:' + (isToday?'700':'400') + '">' + (idx+1) + '</div>' +
+    '</div>';
+  });
+
+  html += '</div></div>' +
+
+  // Two columns: ranking + orders list
+  '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem">' +
+
+  // Top 5 month ranking
+  '<div class="card">' +
+    '<div class="card-header"><span class="card-title">🏆 Top 5 do Mês</span></div>';
+
+  if (!topMes.length) {
+    html += '<div class="empty-state" style="padding:1rem">' + iconEmpty() + '<p>Sem dados</p></div>';
+  } else {
+    var medals = ['🥇','🥈','🥉','4️⃣','5️⃣'];
+    topMes.forEach(function(p, i) {
+      var barW = Math.round((p[1]/maxProd)*100);
+      html += '<div style="margin-bottom:10px">' +
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">' +
+          '<span style="font-size:1rem">' + medals[i] + '</span>' +
+          '<span style="flex:1;font-size:0.8rem;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(p[0]) + '">' + esc(p[0]) + '</span>' +
+          '<span style="font-size:0.8rem;font-weight:700;color:var(--green);white-space:nowrap">' + p[1] + ' un.</span>' +
+        '</div>' +
+        '<div style="background:var(--bg3);border-radius:99px;height:6px">' +
+          '<div style="background:var(--green);border-radius:99px;height:6px;width:' + barW + '%"></div>' +
+        '</div>' +
       '</div>';
     });
-    html += '</div>';
   }
+  html += '</div>' +
 
-  // Orders list
-  html += '<div class="card"><div class="card-header"><span class="card-title">📋 Pedidos do Dia</span></div>';
+  // Top 5 today
+  '<div class="card">' +
+    '<div class="card-header"><span class="card-title">⚡ Top 5 Hoje</span></div>';
+
+  if (!topDia.length) {
+    html += '<div class="empty-state" style="padding:1rem">' + iconEmpty() + '<p>Sem vendas hoje</p></div>';
+  } else {
+    var maxDia = topDia[0][1];
+    var medalsDia = ['🥇','🥈','🥉','4️⃣','5️⃣'];
+    topDia.forEach(function(p, i) {
+      var barW = Math.round((p[1]/maxDia)*100);
+      html += '<div style="margin-bottom:10px">' +
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">' +
+          '<span style="font-size:1rem">' + medalsDia[i] + '</span>' +
+          '<span style="flex:1;font-size:0.8rem;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(p[0]) + '">' + esc(p[0]) + '</span>' +
+          '<span style="font-size:0.8rem;font-weight:700;color:var(--green);white-space:nowrap">' + p[1] + ' un.</span>' +
+        '</div>' +
+        '<div style="background:var(--bg3);border-radius:99px;height:6px">' +
+          '<div style="background:var(--amber,#f59e0b);border-radius:99px;height:6px;width:' + barW + '%"></div>' +
+        '</div>' +
+      '</div>';
+    });
+  }
+  html += '</div></div>' +
+
+  // Orders list today
+  '<div class="card"><div class="card-header"><span class="card-title">📋 Pedidos de Hoje</span></div>';
+
   if (!orders.length) {
     html += '<div class="empty-state">' + iconEmpty() + '<p>Nenhum pedido hoje ainda</p></div>';
   } else {
     orders.forEach(function(o) {
-      var items = o.order_items ? o.order_items.map(function(i){ return (i.quantity||1) + 'x ' + (i.item ? i.item.title : ''); }).join(', ') : '';
+      var items = o.order_items ? o.order_items.map(function(i){ return (i.quantity||1)+'x '+(i.item?i.item.title:''); }).join(', ') : '';
       var hora = o.date_created ? new Date(o.date_created).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '';
-      var statusColor = { paid:'var(--green)', cancelled:'var(--red)', pending:'var(--amber)' };
-      var statusLabel = { paid:'Pago', cancelled:'Cancelado', pending:'Pendente' };
-      var st = o.status || 'paid';
+      var statusColor = {paid:'var(--green)',cancelled:'var(--red)',pending:'var(--amber)'};
+      var statusLabel = {paid:'Pago',cancelled:'Cancelado',pending:'Pendente'};
+      var st = o.status||'paid';
       html += '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">' +
         '<span style="font-size:0.75rem;color:var(--text3);min-width:40px">' + hora + '</span>' +
-        '<div style="flex:1">' +
-          '<div style="font-size:0.85rem;font-weight:500">' + esc(items) + '</div>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-size:0.85rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(items) + '</div>' +
           '<div style="font-size:0.75rem;color:var(--text3)">Pedido #' + o.id + '</div>' +
         '</div>' +
         '<span style="font-size:0.8rem;font-weight:600;color:' + (statusColor[st]||'var(--text2)') + '">' + (statusLabel[st]||st) + '</span>' +
-        '<span style="font-size:0.85rem;font-weight:600">R$ ' + (o.total_amount||0).toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</span>' +
+        '<span style="font-size:0.85rem;font-weight:700;white-space:nowrap">R$ ' + (o.total_amount||0).toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</span>' +
       '</div>';
     });
   }
@@ -2110,6 +2220,61 @@ function mlDesconectar() {
   localStorage.removeItem('ml_token');
   _mlToken = null;
   navigate('vendas');
+}
+
+// ─── VENDAS RESUMO (para funcionários na tela Início) ────────────────────────
+function renderVendasResumo() {
+  if (!mlTokenValid()) return ''; // só mostra se já conectado
+  // Trigger async load into placeholder
+  setTimeout(function() { mlLoadResumo(); }, 100);
+  return '<div class="card" style="margin-top:1rem" id="vendas-resumo-card">' +
+    '<div class="card-header"><span class="card-title">📊 Vendas Mercado Livre</span></div>' +
+    '<div id="vendas-resumo-content" style="color:var(--text3);font-size:0.85rem;padding:0.5rem 0">Carregando...</div>' +
+  '</div>';
+}
+
+async function mlLoadResumo() {
+  var el = document.getElementById('vendas-resumo-content');
+  if (!el) return;
+  try {
+    var result = await mlFetchVendas();
+    var orders = result.orders;
+    var ordersMonth = result.ordersMonth;
+    var totalDia = result.totalDay;
+    var fatDia   = orders.reduce(function(s,o){ return s+(o.total_amount||0); }, 0);
+    var totalMes = result.totalMonth;
+    var topMes   = Object.entries(mlProdMap(ordersMonth)).sort(function(a,b){ return b[1]-a[1]; }).slice(0,5);
+    var maxProd  = topMes.length ? topMes[0][1] : 1;
+    var medals   = ['🥇','🥈','🥉','4️⃣','5️⃣'];
+
+    var html = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;margin-bottom:1rem">' +
+      '<div class="stat-card"><div class="stat-label">Pedidos Hoje</div><div class="stat-value" style="font-size:1.4rem">' + totalDia + '</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Faturado Hoje</div><div class="stat-value" style="font-size:1.1rem">R$ ' + fatDia.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Pedidos no Mês</div><div class="stat-value" style="font-size:1.4rem">' + totalMes + '</div></div>' +
+    '</div>' +
+    '<div style="font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:0.5rem">🏆 Top 5 do Mês</div>';
+
+    if (!topMes.length) {
+      html += '<p style="color:var(--text3);font-size:0.85rem">Sem dados do mês</p>';
+    } else {
+      topMes.forEach(function(p, i) {
+        var barW = Math.round((p[1]/maxProd)*100);
+        html += '<div style="margin-bottom:8px">' +
+          '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">' +
+            '<span>' + medals[i] + '</span>' +
+            '<span style="flex:1;font-size:0.82rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(p[0]) + '</span>' +
+            '<span style="font-size:0.82rem;font-weight:700;color:var(--green)">' + p[1] + ' un.</span>' +
+          '</div>' +
+          '<div style="background:var(--bg3);border-radius:99px;height:5px">' +
+            '<div style="background:var(--green);border-radius:99px;height:5px;width:' + barW + '%"></div>' +
+          '</div>' +
+        '</div>';
+      });
+    }
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = '<span style="color:var(--text3);font-size:0.82rem">Dados indisponíveis</span>';
+  }
 }
 
 // ─── LOGS ─────────────────────────────────────────────────────────────────────
@@ -2128,6 +2293,7 @@ function renderLogs() {
   html += `</div>`;
   return html;
 }
+
 function clearLogs() {
   if (!confirm('Limpar todos os logs?')) return;
   state.logs = [];

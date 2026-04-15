@@ -2067,13 +2067,13 @@ async function mlFetchVendas() {
   var userId = me.id;
   var now = new Date();
 
-  // Today
-  var dayStart = new Date(now); dayStart.setHours(0,0,0,0);
-  var dayEnd   = new Date(now); dayEnd.setHours(23,59,59,999);
-  // ML API uses ISO 8601 format
   function toMLDate(d) {
     return d.toISOString().slice(0,19) + '.000Z';
   }
+
+  // Today
+  var dayStart = new Date(now); dayStart.setHours(0,0,0,0);
+  var dayEnd   = new Date(now); dayEnd.setHours(23,59,59,999);
   var dayFrom  = toMLDate(dayStart);
   var dayTo    = toMLDate(dayEnd);
 
@@ -2083,23 +2083,38 @@ async function mlFetchVendas() {
   var monthFrom  = toMLDate(monthStart);
   var monthTo    = toMLDate(monthEnd);
 
-  // Fetch today orders
+  // Fetch today orders (max 51)
   var dayData = await mlGet('/orders/search?seller=' + userId +
     '&order.date_created.from=' + encodeURIComponent(dayFrom) +
     '&order.date_created.to='   + encodeURIComponent(dayTo) +
     '&order.status=paid&sort=date_desc&limit=51');
 
-  // Fetch month orders (up to 100 for ranking)
-  var monthData = await mlGet('/orders/search?seller=' + userId +
-    '&order.date_created.from=' + encodeURIComponent(monthFrom) +
-    '&order.date_created.to='   + encodeURIComponent(monthTo) +
-    '&order.status=paid&sort=date_desc&limit=51');
+  // Fetch ALL month orders paginated (for chart accuracy + ranking)
+  // Each page = 51 orders, fetch up to 15 pages (765 orders max) or until exhausted
+  var allMonthOrders = [];
+  var monthTotal = 0;
+  var offset = 0;
+  var maxPages = 15;
+  for (var page = 0; page < maxPages; page++) {
+    var monthData = await mlGet('/orders/search?seller=' + userId +
+      '&order.date_created.from=' + encodeURIComponent(monthFrom) +
+      '&order.date_created.to='   + encodeURIComponent(monthTo) +
+      '&order.status=paid&sort=date_asc&limit=51&offset=' + offset);
+    var results = monthData.results || [];
+    if (page === 0) monthTotal = monthData.paging ? monthData.paging.total : results.length;
+    allMonthOrders = allMonthOrders.concat(results);
+    offset += results.length;
+    // Stop if we got all or no more results
+    if (results.length < 51 || allMonthOrders.length >= monthTotal) break;
+    // Small delay to avoid rate limiting
+    await new Promise(function(r){ setTimeout(r, 150); });
+  }
 
   return {
-    orders:       dayData.results  || [],
-    totalDay:     dayData.paging   ? dayData.paging.total   : 0,
-    ordersMonth:  monthData.results || [],
-    totalMonth:   monthData.paging  ? monthData.paging.total : 0,
+    orders:      dayData.results || [],
+    totalDay:    dayData.paging  ? dayData.paging.total : 0,
+    ordersMonth: allMonthOrders,
+    totalMonth:  monthTotal,
     me: me,
   };
 }

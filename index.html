@@ -673,6 +673,7 @@ function getPagesAdmin() {
     { id: 'etiquetas', label: 'Gerador de Etiquetas',  icon: iconLabel() },
     { id: 'agenda',    label: 'Agenda',                icon: iconCal() },
     { id: 'tabnutri',  label: 'Tabela Nutricional',    icon: iconTabNutri() },
+    { id: 'vendas',    label: 'Vendas',                icon: iconVendas() },
     { id: 'logs',      label: 'Logs',                  icon: iconLog() },
   ];
 }
@@ -748,7 +749,7 @@ function startApp() {
 
 function renderPage() {
   if (!state.currentUser) return;
-  var titles = { inicio:'Início', expedicao:'Expedição', producao:'Produção', compras:'Compras', mural:'Mural', etiquetas:'Gerador de Etiquetas', agenda:'Agenda', tabnutri:'Tabela Nutricional', logs:'Logs' };
+  var titles = { inicio:'Início', expedicao:'Expedição', producao:'Produção', compras:'Compras', mural:'Mural', etiquetas:'Gerador de Etiquetas', agenda:'Agenda', tabnutri:'Tabela Nutricional', vendas:'Vendas', logs:'Logs' };
   var titleEl = document.getElementById('page-title');
   if (titleEl) titleEl.textContent = titles[state.currentPage] || '';
   var c = document.getElementById('page-content');
@@ -762,6 +763,7 @@ function renderPage() {
   if (pg === 'etiquetas') { c.innerHTML = renderEtiquetas(); return; }
   if (pg === 'agenda')    { c.innerHTML = renderAgenda(); return; }
   if (pg === 'tabnutri')  { c.innerHTML = renderTabNutri(); setupTabNutri(); return; }
+  if (pg === 'vendas')    { c.innerHTML = renderVendas(); bindVendas(); return; }
   if (pg === 'logs')      { c.innerHTML = renderLogs(); return; }
 }
 
@@ -1860,6 +1862,249 @@ function tnGeneratePDF() {
 }
 
 
+// ─── VENDAS — MERCADO LIVRE ───────────────────────────────────────────────────
+const ML_CLIENT_ID     = '3307309227859868';
+const ML_CLIENT_SECRET = 'c2yBzHKBjJNFbM3JIlh6ppld3JgE5k5u';
+const ML_REDIRECT_URI  = 'https://edsonandradecf.github.io/plataforma-costa';
+
+let _mlToken = null;   // { access_token, refresh_token, expires_at }
+
+function mlSaveToken(t) {
+  _mlToken = t;
+  localStorage.setItem('ml_token', JSON.stringify(t));
+}
+function mlLoadToken() {
+  if (_mlToken) return _mlToken;
+  try { _mlToken = JSON.parse(localStorage.getItem('ml_token')); } catch(e) {}
+  return _mlToken;
+}
+function mlTokenValid() {
+  var t = mlLoadToken();
+  return t && t.access_token && Date.now() < (t.expires_at || 0);
+}
+
+async function mlExchangeCode(code) {
+  var resp = await fetch('https://api.mercadolibre.com/oauth/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+    body: new URLSearchParams({
+      grant_type: 'authorization_code',
+      client_id: ML_CLIENT_ID,
+      client_secret: ML_CLIENT_SECRET,
+      code: code,
+      redirect_uri: ML_REDIRECT_URI,
+    })
+  });
+  if (!resp.ok) throw new Error('Erro ao obter token: ' + resp.status);
+  var data = await resp.json();
+  mlSaveToken({ access_token: data.access_token, refresh_token: data.refresh_token, expires_at: Date.now() + (data.expires_in * 1000) });
+  return data;
+}
+
+async function mlRefreshToken() {
+  var t = mlLoadToken();
+  if (!t || !t.refresh_token) throw new Error('Sem refresh token');
+  var resp = await fetch('https://api.mercadolibre.com/oauth/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      client_id: ML_CLIENT_ID,
+      client_secret: ML_CLIENT_SECRET,
+      refresh_token: t.refresh_token,
+    })
+  });
+  if (!resp.ok) throw new Error('Erro ao renovar token: ' + resp.status);
+  var data = await resp.json();
+  mlSaveToken({ access_token: data.access_token, refresh_token: data.refresh_token, expires_at: Date.now() + (data.expires_in * 1000) });
+  return data;
+}
+
+async function mlGet(path) {
+  if (!mlTokenValid()) await mlRefreshToken();
+  var t = mlLoadToken();
+  var resp = await fetch('https://api.mercadolibre.com' + path, {
+    headers: { 'Authorization': 'Bearer ' + t.access_token }
+  });
+  if (resp.status === 401) {
+    await mlRefreshToken();
+    t = mlLoadToken();
+    resp = await fetch('https://api.mercadolibre.com' + path, {
+      headers: { 'Authorization': 'Bearer ' + t.access_token }
+    });
+  }
+  if (!resp.ok) throw new Error('ML API erro ' + resp.status);
+  return await resp.json();
+}
+
+async function mlFetchVendas() {
+  // Get user ID
+  var me = await mlGet('/users/me');
+  var userId = me.id;
+
+  // Today's date range in ISO format
+  var now = new Date();
+  var start = new Date(now); start.setHours(0,0,0,0);
+  var end   = new Date(now); end.setHours(23,59,59,999);
+  var dateFrom = start.toISOString().slice(0,19) + '.000-03:00';
+  var dateTo   = end.toISOString().slice(0,19)   + '.999-03:00';
+
+  var path = '/orders/search?seller=' + userId +
+    '&order.date_created.from=' + encodeURIComponent(dateFrom) +
+    '&order.date_created.to='   + encodeURIComponent(dateTo) +
+    '&order.status=paid&sort=date_desc&limit=50';
+
+  var data = await mlGet(path);
+  return { orders: data.results || [], total: data.paging ? data.paging.total : 0, me: me };
+}
+
+function renderVendas() {
+  return '<div id="vendas-content"><div class="card" style="text-align:center;padding:2rem">' +
+    '<div style="font-size:2rem;margin-bottom:1rem">📊</div>' +
+    '<p style="color:var(--text2);margin-bottom:1rem">Carregando dados de vendas...</p>' +
+    '<div id="vendas-loading" style="color:var(--text3);font-size:0.85rem"></div>' +
+  '</div></div>';
+}
+
+async function bindVendas() {
+  var el = document.getElementById('vendas-content');
+  if (!el) return;
+
+  // Check for OAuth code in URL
+  var urlParams = new URLSearchParams(window.location.search);
+  var code = urlParams.get('code');
+  if (code && !mlTokenValid()) {
+    try {
+      document.getElementById('vendas-loading').textContent = 'Autenticando com Mercado Livre...';
+      await mlExchangeCode(code);
+      // Clean URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } catch(e) {
+      el.innerHTML = mlErrorHtml('Erro na autenticação: ' + e.message);
+      return;
+    }
+  }
+
+  if (!mlTokenValid()) {
+    el.innerHTML = mlAuthHtml();
+    return;
+  }
+
+  try {
+    document.getElementById('vendas-loading') && (document.getElementById('vendas-loading').textContent = 'Buscando pedidos do dia...');
+    var result = await mlFetchVendas();
+    el.innerHTML = mlDashHtml(result);
+  } catch(e) {
+    if (e.message.includes('401') || e.message.includes('token')) {
+      localStorage.removeItem('ml_token'); _mlToken = null;
+      el.innerHTML = mlAuthHtml();
+    } else {
+      el.innerHTML = mlErrorHtml('Erro ao buscar vendas: ' + e.message);
+    }
+  }
+}
+
+function mlAuthHtml() {
+  var authUrl = 'https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=' + ML_CLIENT_ID + '&redirect_uri=' + encodeURIComponent(ML_REDIRECT_URI);
+  return '<div class="card" style="max-width:480px;margin:0 auto;text-align:center;padding:2.5rem">' +
+    '<div style="font-size:2.5rem;margin-bottom:1rem">🔐</div>' +
+    '<h3 style="margin-bottom:0.5rem">Conectar Mercado Livre</h3>' +
+    '<p style="color:var(--text2);font-size:0.9rem;margin-bottom:1.5rem">Clique abaixo para autorizar a Plataforma Costa a acessar seus pedidos.</p>' +
+    '<a href="' + authUrl + '" class="btn btn-green" style="display:inline-flex;padding:0.75rem 2rem;font-size:1rem;text-decoration:none">🔗 Conectar com Mercado Livre</a>' +
+  '</div>';
+}
+
+function mlErrorHtml(msg) {
+  return '<div class="card" style="border-color:var(--red);text-align:center;padding:2rem">' +
+    '<div style="color:var(--red);font-size:0.95rem">⚠ ' + esc(msg) + '</div>' +
+    '<button class="btn btn-sm" style="margin-top:1rem" onclick="navigate(\'vendas\')">Tentar novamente</button>' +
+  '</div>';
+}
+
+function mlDashHtml(result) {
+  var orders = result.orders;
+  var me = result.me;
+
+  // Calculate totals
+  var totalPedidos = result.total;
+  var totalVendido = orders.reduce(function(sum, o) { return sum + (o.total_amount || 0); }, 0);
+  var totalItens   = orders.reduce(function(sum, o) {
+    return sum + (o.order_items ? o.order_items.reduce(function(s, i) { return s + (i.quantity || 0); }, 0) : 0);
+  }, 0);
+
+  // Product frequency
+  var prodMap = {};
+  orders.forEach(function(o) {
+    if (!o.order_items) return;
+    o.order_items.forEach(function(item) {
+      var title = item.item ? item.item.title : 'Produto';
+      prodMap[title] = (prodMap[title] || 0) + (item.quantity || 1);
+    });
+  });
+  var topProds = Object.entries(prodMap).sort(function(a,b){ return b[1]-a[1]; }).slice(0,5);
+
+  var html = '<div style="margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center">' +
+    '<div>' +
+      '<span style="font-size:0.85rem;color:var(--text3)">Olá, <b>' + esc(me.nickname || me.first_name || '') + '</b> · Mercado Livre conectado ✓</span>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px">' +
+      '<button class="btn btn-sm" onclick="bindVendas()">🔄 Atualizar</button>' +
+      '<button class="btn btn-sm btn-red" onclick="mlDesconectar()">Desconectar</button>' +
+    '</div>' +
+  '</div>' +
+
+  // Stats
+  '<div class="stats-grid" style="margin-bottom:1.25rem">' +
+    '<div class="stat-card"><div class="stat-icon">🛍️</div><div class="stat-label">Pedidos Hoje</div><div class="stat-value">' + totalPedidos + '</div></div>' +
+    '<div class="stat-card"><div class="stat-icon">💰</div><div class="stat-label">Total Vendido</div><div class="stat-value">R$ ' + totalVendido.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) + '</div></div>' +
+    '<div class="stat-card"><div class="stat-icon">📦</div><div class="stat-label">Itens Vendidos</div><div class="stat-value">' + totalItens + '</div></div>' +
+  '</div>';
+
+  // Top products
+  if (topProds.length) {
+    html += '<div class="card" style="margin-bottom:1.25rem"><div class="card-header"><span class="card-title">🏆 Produtos Mais Vendidos Hoje</span></div>';
+    topProds.forEach(function(p, i) {
+      html += '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">' +
+        '<span style="font-size:1.1rem;font-weight:700;color:var(--text3);min-width:24px">' + (i+1) + '</span>' +
+        '<span style="flex:1;font-size:0.9rem">' + esc(p[0]) + '</span>' +
+        '<span class="task-badge" style="background:var(--green);color:#fff;border:none">' + p[1] + ' un.</span>' +
+      '</div>';
+    });
+    html += '</div>';
+  }
+
+  // Orders list
+  html += '<div class="card"><div class="card-header"><span class="card-title">📋 Pedidos do Dia</span></div>';
+  if (!orders.length) {
+    html += '<div class="empty-state">' + iconEmpty() + '<p>Nenhum pedido hoje ainda</p></div>';
+  } else {
+    orders.forEach(function(o) {
+      var items = o.order_items ? o.order_items.map(function(i){ return (i.quantity||1) + 'x ' + (i.item ? i.item.title : ''); }).join(', ') : '';
+      var hora = o.date_created ? new Date(o.date_created).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}) : '';
+      var statusColor = { paid:'var(--green)', cancelled:'var(--red)', pending:'var(--amber)' };
+      var statusLabel = { paid:'Pago', cancelled:'Cancelado', pending:'Pendente' };
+      var st = o.status || 'paid';
+      html += '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">' +
+        '<span style="font-size:0.75rem;color:var(--text3);min-width:40px">' + hora + '</span>' +
+        '<div style="flex:1">' +
+          '<div style="font-size:0.85rem;font-weight:500">' + esc(items) + '</div>' +
+          '<div style="font-size:0.75rem;color:var(--text3)">Pedido #' + o.id + '</div>' +
+        '</div>' +
+        '<span style="font-size:0.8rem;font-weight:600;color:' + (statusColor[st]||'var(--text2)') + '">' + (statusLabel[st]||st) + '</span>' +
+        '<span style="font-size:0.85rem;font-weight:600">R$ ' + (o.total_amount||0).toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</span>' +
+      '</div>';
+    });
+  }
+  html += '</div>';
+  return '<div id="vendas-content">' + html + '</div>';
+}
+
+function mlDesconectar() {
+  localStorage.removeItem('ml_token');
+  _mlToken = null;
+  navigate('vendas');
+}
+
 // ─── LOGS ─────────────────────────────────────────────────────────────────────
 function renderLogs() {
   if (!state.logs.length) return `<div class="card"><div class="empty-state">${iconEmpty()}<p>Nenhuma atividade registrada</p></div></div>`;
@@ -1900,6 +2145,7 @@ function iconLabel() { return `<svg viewBox="0 0 24 24" fill="none" stroke="curr
 function iconCal() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`; }
 function iconLog() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`; }
 function iconTabNutri() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/></svg>`; }
+function iconVendas() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`; }
 function iconEmpty() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`; }
 </script>
 </body>

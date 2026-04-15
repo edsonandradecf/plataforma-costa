@@ -831,6 +831,15 @@ function safeRenderPage() {
   if (!state.currentUser) return;
   var active = document.activeElement;
   if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) return;
+  // If on inicio, just refresh vendas slots without full re-render
+  if (state.currentPage === 'inicio') {
+    var chartEl = document.getElementById('inicio-chart-content');
+    if (chartEl) {
+      // DOM is ready, just reload vendas data
+      setTimeout(function() { mlLoadInicio(); }, 100);
+      return;
+    }
+  }
   renderPage();
 }
 
@@ -882,7 +891,13 @@ function renderInicio() {
   }
 
   // Dispara carregamento dos dados de vendas após renderizar o HTML
-  setTimeout(function() { mlLoadInicio(); }, 400);
+  // Aguarda Firebase sincronizar antes de buscar dados de vendas
+  setTimeout(function() {
+    mlLoadInicio().catch(function() {
+      // Retry after 3 more seconds if first attempt fails
+      setTimeout(function() { mlLoadInicio(); }, 3000);
+    });
+  }, 1500);
 
   return `
   <!-- Linha 1: 4 cards de métricas -->
@@ -2336,13 +2351,18 @@ async function mlLoadInicio() {
   var rankEl  = document.getElementById('inicio-ranking-content');
   if (!chartEl) return;
 
+  // Try to refresh token if expired
   if (!mlTokenValid()) {
-    var noData = '<span style="color:var(--text3);font-size:0.8rem">Conecte o Mercado Livre em Vendas</span>';
-    if (chartEl) chartEl.innerHTML = noData;
-    if (rankEl)  rankEl.innerHTML  = noData;
-    if (diaEl)   diaEl.textContent = '—';
-    if (mesEl)   mesEl.textContent = '—';
-    return;
+    try {
+      await mlRefreshToken();
+    } catch(e) {
+      var noData = '<span style="color:var(--text3);font-size:0.8rem">Conecte o Mercado Livre em Vendas</span>';
+      if (chartEl) chartEl.innerHTML = noData;
+      if (rankEl)  rankEl.innerHTML  = noData;
+      if (diaEl)   diaEl.textContent = '—';
+      if (mesEl)   mesEl.textContent = '—';
+      return;
+    }
   }
 
   try {

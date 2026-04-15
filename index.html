@@ -324,6 +324,7 @@ let state = {
   agenda: [],
   logs: [],
   tabnutri: [],
+  mlToken: null,
   currentUser: null,
   currentPage: 'inicio',
   calMonth: new Date().getMonth(),
@@ -383,6 +384,11 @@ function applyParsed(parsed, forceMerge) {
   state.agenda   = Array.isArray(parsed.agenda)   ? parsed.agenda   : [];
   state.logs     = Array.isArray(parsed.logs)     ? parsed.logs     : [];
   state.tabnutri = Array.isArray(parsed.tabnutri) ? parsed.tabnutri : [];
+  if (parsed.mlToken) {
+    state.mlToken = parsed.mlToken;
+    // Sync to localStorage so mlLoadToken finds it
+    localStorage.setItem('ml_token', JSON.stringify(parsed.mlToken));
+  }
 }
 
 // ── Carrega dados do Firebase uma vez (no login) ──────────────────────────
@@ -514,6 +520,7 @@ function saveState() {
     agenda:   state.agenda,
     logs:     state.logs,
     tabnutri: state.tabnutri,
+    mlToken:  state.mlToken || null,
   };
   localStorage.setItem('costa_state', JSON.stringify(data));
   if (_saveTimer) clearTimeout(_saveTimer);
@@ -1879,10 +1886,16 @@ let _mlToken = null;   // { access_token, refresh_token, expires_at }
 function mlSaveToken(t) {
   _mlToken = t;
   localStorage.setItem('ml_token', JSON.stringify(t));
+  // Also save to shared Firebase state so all users can use it
+  state.mlToken = t;
+  saveState();
 }
 function mlLoadToken() {
   if (_mlToken) return _mlToken;
+  // Try localStorage first
   try { _mlToken = JSON.parse(localStorage.getItem('ml_token')); } catch(e) {}
+  // Fall back to shared Firebase state (set by admin on their device)
+  if (!_mlToken && state.mlToken) _mlToken = state.mlToken;
   return _mlToken;
 }
 function mlTokenValid() {
@@ -2219,12 +2232,14 @@ function mlDashHtml(result) {
 function mlDesconectar() {
   localStorage.removeItem('ml_token');
   _mlToken = null;
+  state.mlToken = null;
+  saveState();
   navigate('vendas');
 }
 
 // ─── VENDAS RESUMO (para funcionários na tela Início) ────────────────────────
 function renderVendasResumo() {
-  if (!mlTokenValid()) return ''; // só mostra se já conectado
+  // Always show — token comes from Firebase shared state
   // Trigger async load into placeholder
   setTimeout(function() { mlLoadResumo(); }, 100);
   return '<div class="card" style="margin-top:1rem" id="vendas-resumo-card">' +
@@ -2273,7 +2288,11 @@ async function mlLoadResumo() {
     }
     el.innerHTML = html;
   } catch(e) {
-    el.innerHTML = '<span style="color:var(--text3);font-size:0.82rem">Dados indisponíveis</span>';
+    if (!mlTokenValid()) {
+      el.innerHTML = '<span style="color:var(--text3);font-size:0.82rem">⚠ Admin precisa conectar o Mercado Livre na página Vendas</span>';
+    } else {
+      el.innerHTML = '<span style="color:var(--text3);font-size:0.82rem">Dados indisponíveis no momento</span>';
+    }
   }
 }
 
@@ -2300,6 +2319,7 @@ function clearLogs() {
   saveState();
   renderPage();
 }
+
 // ─── MODAL ────────────────────────────────────────────────────────────────────
 function closeModal() { document.getElementById('modal').style.display = 'none'; }
 function closeModalOutside(e) { if(e.target.id === 'modal') closeModal(); }

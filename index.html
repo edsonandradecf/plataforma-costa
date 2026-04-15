@@ -2045,7 +2045,7 @@ async function mlFetchVendas() {
   var monthData = await mlGet('/orders/search?seller=' + userId +
     '&order.date_created.from=' + encodeURIComponent(monthFrom) +
     '&order.date_created.to='   + encodeURIComponent(monthTo) +
-    '&order.status=paid&sort=date_desc&limit=100');
+    '&order.status=paid&sort=date_desc&limit=50');
 
   return {
     orders:       dayData.results  || [],

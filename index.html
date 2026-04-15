@@ -2414,13 +2414,28 @@ async function mlLoadInicio() {
     if (chartEl) {
       var daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
       var chartData = new Array(daysInMonth).fill(0);
-      ordersMonth.forEach(function(o) {
+      // Also add today's orders from dayData (avoids timezone issues for current day)
+      var allForChart = ordersMonth.concat(orders);
+      // Deduplicate by order id
+      var seenIds = {};
+      allForChart = allForChart.filter(function(o) {
+        if (!o.id || seenIds[o.id]) return false;
+        seenIds[o.id] = true;
+        return true;
+      });
+      allForChart.forEach(function(o) {
         if (!o.date_created) return;
-        var d = new Date(o.date_created).getDate() - 1;
-        if (d >= 0 && d < daysInMonth) chartData[d]++;
+        // Use Brazil timezone (UTC-3) to get correct day
+        var d = new Date(new Date(o.date_created).getTime() - 3*60*60*1000);
+        var day = d.getUTCDate() - 1;
+        var month = d.getUTCMonth();
+        var year = d.getUTCFullYear();
+        if (year === now.getFullYear() && month === now.getMonth() && day >= 0 && day < daysInMonth) {
+          chartData[day]++;
+        }
       });
       var maxVal = Math.max.apply(null, chartData) || 1;
-      var W = 560, H = 160, padL = 32, padR = 8, padT = 20, padB = 28;
+      var W = 580, H = 170, padL = 38, padR = 10, padT = 20, padB = 30;
       var iW = W - padL - padR, iH = H - padT - padB;
       var pts = chartData.map(function(v, i) {
         var x = padL + (i / Math.max(daysInMonth-1,1)) * iW;

@@ -903,7 +903,7 @@ function renderInicio() {
     ${muralHtml}
   </div>
   <div class="card"><p class="text-muted text-sm">Bem-vindo(a), <strong>${state.currentUser ? state.currentUser.login : ''}</strong>! Use o menu lateral para navegar pela plataforma.</p></div>
-`;
+  ${renderVendasResumo()}`;
 }
 
 // ─── TASKS ─────────────────────────────────────────────────────────────────────
@@ -2314,9 +2314,8 @@ async function mlLoadResumo() {
     var maxProd  = topMes.length ? topMes[0][1] : 1;
     var medals   = ['🥇','🥈','🥉','4️⃣','5️⃣'];
 
-    var html = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;margin-bottom:1rem">' +
+    var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1rem">' +
       '<div class="stat-card"><div class="stat-label">Pedidos Hoje</div><div class="stat-value" style="font-size:1.4rem">' + totalDia + '</div></div>' +
-      '<div class="stat-card"><div class="stat-label">Faturado Hoje</div><div class="stat-value" style="font-size:1.1rem">R$ ' + fatDia.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</div></div>' +
       '<div class="stat-card"><div class="stat-label">Pedidos no Mês</div><div class="stat-value" style="font-size:1.4rem">' + totalMes + '</div></div>' +
     '</div>' +
     '<div style="font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:0.5rem">🏆 Top 5 do Mês</div>';

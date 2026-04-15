@@ -881,6 +881,9 @@ function renderInicio() {
     '</div>';
   }
 
+  // Dispara carregamento dos dados de vendas após renderizar o HTML
+  setTimeout(function() { mlLoadInicio(); }, 400);
+
   return `
   <!-- Linha 1: 4 cards de métricas -->
   <div class="stats-grid" style="margin-bottom:1rem">

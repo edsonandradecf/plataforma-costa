@@ -996,15 +996,27 @@ function renderTasks(area) {
     html += `<div class="empty-state">${iconEmpty()}<p>Nenhuma tarefa cadastrada</p></div>`;
   } else {
     html += `<div class="task-list">`;
+    const todayStr = today.toISOString().slice(0,10);
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+    const tomorrowStr = tomorrow.toISOString().slice(0,10);
+
     tasks.forEach((t) => {
       const i = t._origIdx;
-      const isLate = !t.done && t.date < today.toISOString().slice(0,10);
+      const isLate     = !t.done && t.date < todayStr;
+      const isToday    = !t.done && t.date === todayStr;
+      const isTomorrow = !t.done && t.date === tomorrowStr;
       const dateStr = new Date(t.date + 'T12:00:00').toLocaleDateString('pt-BR') + (t.time ? ' ' + t.time : ' · Sem horário');
+
+      let badge = '';
+      if (isLate)     badge = '<span class="task-badge">⚠ Atraso</span>';
+      else if (isToday)    badge = '<span class="task-badge" style="background:var(--green);color:#fff;border:none">Hoje</span>';
+      else if (isTomorrow) badge = '<span class="task-badge" style="background:#3b82f6;color:#fff;border:none">Amanhã</span>';
+
       html += `<div class="task-item ${t.done?'done':''}">
         <div class="task-check ${t.done?'checked':''}" onclick="toggleTask('${area}',${i})"></div>
         <div class="task-text">${esc(t.text)}</div>
         <span class="task-meta">${dateStr}</span>
-        ${isLate ? `<span class="task-badge">⚠ Atraso</span>` : ''}
+        ${badge}
         ${isAdmin ? `<button class="task-delete" onclick="deleteTask('${area}',${i})" title="Excluir">✕</button>` : ''}
       </div>`;
     });

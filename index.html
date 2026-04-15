@@ -2032,9 +2032,12 @@ async function bindVendas() {
     var result = await mlFetchVendas();
     el.innerHTML = mlDashHtml(result);
   } catch(e) {
-    // Qualquer erro de fetch/auth → limpa token e pede reconexão
-    localStorage.removeItem('ml_token'); _mlToken = null;
-    if (e.message.includes('Failed to fetch') || e.message.includes('401') || e.message.includes('token')) {
+    // Erros de autenticação → limpa token e pede reconexão
+    var isAuthError = e.message.includes('400') || e.message.includes('401') || 
+                      e.message.includes('token') || e.message.includes('Failed to fetch');
+    if (isAuthError) {
+      localStorage.removeItem('ml_token'); _mlToken = null;
+      state.mlToken = null;
       el.innerHTML = mlAuthHtml();
     } else {
       el.innerHTML = mlErrorHtml('Erro ao buscar vendas: ' + e.message);

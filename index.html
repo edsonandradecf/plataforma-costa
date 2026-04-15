@@ -1866,6 +1866,12 @@ function tnGeneratePDF() {
 const ML_CLIENT_ID     = '3307309227859868';
 const ML_CLIENT_SECRET = 'c2yBzHKBjJNFbM3JIlh6ppld3JgE5k5u';
 const ML_REDIRECT_URI  = 'https://edsonandradecf.github.io/plataforma-costa';
+const ML_PROXY         = 'https://ml-proxy.costanaturelife.workers.dev';
+
+// Wraps a URL through the CORS proxy
+function mlProxyUrl(url) {
+  return ML_PROXY + '?url=' + encodeURIComponent(url);
+}
 
 let _mlToken = null;   // { access_token, refresh_token, expires_at }
 
@@ -1884,7 +1890,7 @@ function mlTokenValid() {
 }
 
 async function mlExchangeCode(code) {
-  var resp = await fetch('https://api.mercadolibre.com/oauth/token', {
+  var resp = await fetch(mlProxyUrl('https://api.mercadolibre.com/oauth/token'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
     body: new URLSearchParams({
@@ -1904,7 +1910,7 @@ async function mlExchangeCode(code) {
 async function mlRefreshToken() {
   var t = mlLoadToken();
   if (!t || !t.refresh_token) throw new Error('Sem refresh token');
-  var resp = await fetch('https://api.mercadolibre.com/oauth/token', {
+  var resp = await fetch(mlProxyUrl('https://api.mercadolibre.com/oauth/token'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
     body: new URLSearchParams({
@@ -1923,13 +1929,13 @@ async function mlRefreshToken() {
 async function mlGet(path) {
   if (!mlTokenValid()) await mlRefreshToken();
   var t = mlLoadToken();
-  var resp = await fetch('https://api.mercadolibre.com' + path, {
+  var resp = await fetch(mlProxyUrl('https://api.mercadolibre.com' + path), {
     headers: { 'Authorization': 'Bearer ' + t.access_token }
   });
   if (resp.status === 401) {
     await mlRefreshToken();
     t = mlLoadToken();
-    resp = await fetch('https://api.mercadolibre.com' + path, {
+    resp = await fetch(mlProxyUrl('https://api.mercadolibre.com' + path), {
       headers: { 'Authorization': 'Bearer ' + t.access_token }
     });
   }

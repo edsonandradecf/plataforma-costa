@@ -848,38 +848,38 @@ function renderInicio() {
   const prodPendente = countTasks('producao');
   const comprasPendente = state.compras.filter(t => !t.done).length;
   const muralTotal = state.mural.length;
+  const dateLabel = now.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
 
   // Agenda hoje
   const todayEvents = state.agenda.filter(e => e.date === todayStr).sort((a,b) => (a.time||'').localeCompare(b.time||''));
   let agendaHtml = '';
   if (!todayEvents.length) {
-    agendaHtml = '<p style="color:rgba(255,255,255,0.4);font-size:0.875rem;padding:1rem 0;text-align:center">Nenhum compromisso para hoje</p>';
+    agendaHtml = '<p style="color:var(--text3);font-size:0.875rem;padding:1rem 0;text-align:center">Nenhum compromisso para hoje</p>';
   } else {
     agendaHtml = todayEvents.map(e => {
-      const hora = e.time ? '<span style="font-size:0.75rem;background:rgba(255,255,255,0.1);padding:2px 8px;border-radius:99px;margin-right:8px;color:rgba(255,255,255,0.7)">' + e.time + '</span>' : '';
-      return '<div style="display:flex;align-items:center;padding:0.6rem 0;border-bottom:1px solid rgba(255,255,255,0.08)">' +
+      const hora = e.time ? '<span style="font-size:0.75rem;background:var(--bg3);padding:2px 8px;border-radius:99px;margin-right:8px;color:var(--text3)">' + e.time + '</span>' : '';
+      return '<div style="display:flex;align-items:center;padding:0.6rem 0;border-bottom:1px solid var(--border)">' +
         '<span style="width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;margin-right:10px"></span>' +
-        hora + '<span style="font-size:0.9rem;flex:1;color:#fff">' + esc(e.title) + '</span>' +
-        (e.desc ? '<span style="font-size:0.75rem;color:rgba(255,255,255,0.4)">' + esc(e.desc) + '</span>' : '') +
+        hora + '<span style="font-size:0.9rem;flex:1">' + esc(e.title) + '</span>' +
+        (e.desc ? '<span style="font-size:0.75rem;color:var(--text3)">' + esc(e.desc) + '</span>' : '') +
       '</div>';
     }).join('');
   }
 
-  // Mural
+  // Mural — post-its estilo original
   let muralHtml = '';
   if (!state.mural.length) {
-    muralHtml = '<p style="color:rgba(255,255,255,0.4);font-size:0.875rem;padding:1rem 0;text-align:center">Nenhum recado no mural</p>';
+    muralHtml = '<p style="color:var(--text3);font-size:0.875rem;padding:1rem 0;text-align:center">Nenhum recado no mural</p>';
   } else {
-    muralHtml = state.mural.slice(0,5).map(m =>
-      '<div style="padding:0.6rem 0;border-bottom:1px solid rgba(255,255,255,0.08)">' +
-        '<div style="font-size:0.7rem;color:rgba(255,255,255,0.4);margin-bottom:3px">' + esc(m.author) + ' · ' + m.time + '</div>' +
-        '<div style="font-size:0.88rem;color:#fff">' + esc(m.text) + '</div>' +
-      '</div>'
-    ).join('');
+    muralHtml = '<div class="mural-grid" style="margin-top:0.5rem">' +
+      state.mural.slice(0,6).map(m =>
+        '<div class="mural-note">' +
+          '<div class="mural-note-author">' + esc(m.author) + ' · ' + m.time + '</div>' +
+          '<div class="mural-note-text">' + esc(m.text) + '</div>' +
+        '</div>'
+      ).join('') +
+    '</div>';
   }
-
-  const darkCard = 'background:#1a1f2e;border-radius:12px;padding:1.5rem;color:#fff;';
-  const dateLabel = now.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
 
   return `
   <!-- Linha 1: 4 cards de métricas -->
@@ -892,41 +892,45 @@ function renderInicio() {
 
   <!-- Linha 2: Agenda + Mural -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
-    <div style="${darkCard}min-height:200px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
-        <span style="font-size:1rem;font-weight:700;color:#fff">📅 Agenda</span>
-        <span style="font-size:0.75rem;color:rgba(255,255,255,0.4)">${dateLabel}</span>
+    <div class="card" style="min-height:200px">
+      <div class="card-header" style="margin-bottom:0.75rem">
+        <span class="card-title">📅 Agenda</span>
+        <span style="font-size:0.8rem;color:var(--text3)">${dateLabel}</span>
       </div>
       ${agendaHtml}
     </div>
-    <div style="${darkCard}min-height:200px">
-      <div style="margin-bottom:1rem">
-        <span style="font-size:1rem;font-weight:700;color:#fff">📌 Mural de Recados</span>
+    <div class="card" style="min-height:200px">
+      <div class="card-header" style="margin-bottom:0.5rem">
+        <span class="card-title">📌 Mural de Recados</span>
       </div>
       ${muralHtml}
     </div>
   </div>
 
   <!-- Linha 3: Gráfico + Pedidos + Ranking -->
-  <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:1rem" id="inicio-vendas-row">
-    <div style="${darkCard}min-height:220px" id="inicio-chart-card">
-      <div style="font-size:1rem;font-weight:700;color:#fff;margin-bottom:1rem">📈 Pedidos por Dia</div>
-      <div id="inicio-chart-content" style="color:rgba(255,255,255,0.4);font-size:0.85rem;text-align:center;padding-top:2rem">Carregando...</div>
+  <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:1rem">
+    <div class="card" style="min-height:220px" id="inicio-chart-card">
+      <div class="card-header" style="margin-bottom:0.75rem">
+        <span class="card-title">📈 Pedidos por Dia</span>
+      </div>
+      <div id="inicio-chart-content" style="color:var(--text3);font-size:0.85rem;text-align:center;padding-top:1.5rem">Carregando...</div>
     </div>
-    <div style="${darkCard}min-height:220px;min-width:160px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.5rem" id="inicio-counts-card">
+    <div class="card" style="min-height:220px;min-width:160px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.5rem">
       <div style="text-align:center">
-        <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,0.4);margin-bottom:4px">Pedidos Hoje</div>
+        <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:4px">Pedidos Hoje</div>
         <div id="inicio-pedidos-dia" style="font-size:2.5rem;font-weight:800;color:var(--green)">—</div>
       </div>
-      <div style="width:40px;height:1px;background:rgba(255,255,255,0.1)"></div>
+      <div style="width:40px;height:1px;background:var(--border)"></div>
       <div style="text-align:center">
-        <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,0.4);margin-bottom:4px">Pedidos no Mês</div>
-        <div id="inicio-pedidos-mes" style="font-size:2.5rem;font-weight:800;color:#fff">—</div>
+        <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:4px">Pedidos no Mês</div>
+        <div id="inicio-pedidos-mes" style="font-size:2.5rem;font-weight:800;color:var(--text)">—</div>
       </div>
     </div>
-    <div style="${darkCard}min-height:220px;overflow:hidden" id="inicio-ranking-card">
-      <div style="font-size:1rem;font-weight:700;color:#fff;margin-bottom:1rem">🏆 Top 10 do Mês</div>
-      <div id="inicio-ranking-content" style="color:rgba(255,255,255,0.4);font-size:0.85rem;text-align:center;padding-top:1rem">Carregando...</div>
+    <div class="card" style="min-height:220px;overflow:hidden">
+      <div class="card-header" style="margin-bottom:0.75rem">
+        <span class="card-title">🏆 Top 10 do Mês</span>
+      </div>
+      <div id="inicio-ranking-content" style="color:var(--text3);font-size:0.85rem;text-align:center;padding-top:1rem">Carregando...</div>
     </div>
   </div>`;
 }
@@ -2323,34 +2327,32 @@ function renderVendasResumo() {
 }
 
 async function mlLoadInicio() {
-  // Fill in the three vendas slots in the new inicio layout
-  var chartEl   = document.getElementById('inicio-chart-content');
-  var diaEl     = document.getElementById('inicio-pedidos-dia');
-  var mesEl     = document.getElementById('inicio-pedidos-mes');
-  var rankEl    = document.getElementById('inicio-ranking-content');
-
-  if (!chartEl) return; // not on inicio page
+  var chartEl = document.getElementById('inicio-chart-content');
+  var diaEl   = document.getElementById('inicio-pedidos-dia');
+  var mesEl   = document.getElementById('inicio-pedidos-mes');
+  var rankEl  = document.getElementById('inicio-ranking-content');
+  if (!chartEl) return;
 
   if (!mlTokenValid()) {
-    var msg = '<span style="color:rgba(255,255,255,0.3);font-size:0.8rem">Sem dados de vendas</span>';
-    if (chartEl) chartEl.innerHTML = msg;
-    if (rankEl)  rankEl.innerHTML  = msg;
+    var noData = '<span style="color:var(--text3);font-size:0.8rem">Conecte o Mercado Livre em Vendas</span>';
+    if (chartEl) chartEl.innerHTML = noData;
+    if (rankEl)  rankEl.innerHTML  = noData;
     if (diaEl)   diaEl.textContent = '—';
     if (mesEl)   mesEl.textContent = '—';
     return;
   }
 
   try {
-    var result = await mlFetchVendas();
+    var result      = await mlFetchVendas();
     var orders      = result.orders;
     var ordersMonth = result.ordersMonth;
     var now         = new Date();
 
     // Counts
-    if (diaEl)  diaEl.textContent  = result.totalDay;
-    if (mesEl)  mesEl.textContent  = result.totalMonth;
+    if (diaEl) diaEl.textContent = result.totalDay;
+    if (mesEl) mesEl.textContent = result.totalMonth;
 
-    // Chart — line chart using SVG
+    // Chart SVG
     if (chartEl) {
       var daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
       var chartData = new Array(daysInMonth).fill(0);
@@ -2360,68 +2362,65 @@ async function mlLoadInicio() {
         if (d >= 0 && d < daysInMonth) chartData[d]++;
       });
       var maxVal = Math.max.apply(null, chartData) || 1;
-      var W = 400, H = 120, padL = 20, padR = 10, padT = 15, padB = 20;
+      var W = 500, H = 130, padL = 24, padR = 8, padT = 20, padB = 24;
       var iW = W - padL - padR, iH = H - padT - padB;
       var pts = chartData.map(function(v, i) {
-        var x = padL + (i / (daysInMonth-1)) * iW;
+        var x = padL + (i / Math.max(daysInMonth-1,1)) * iW;
         var y = padT + iH - (v / maxVal) * iH;
         return x.toFixed(1) + ',' + y.toFixed(1);
-      });
+      }).join(' ');
       var todayIdx = now.getDate() - 1;
-      var tx = padL + (todayIdx / (daysInMonth-1)) * iW;
-      var ty = padT + iH - (chartData[todayIdx] / maxVal) * iH;
+      var tx = (padL + (todayIdx / Math.max(daysInMonth-1,1)) * iW).toFixed(1);
+      var ty = (padT + iH - (chartData[todayIdx] / maxVal) * iH).toFixed(1);
 
-      // X axis labels (every 5 days)
       var xLabels = '';
       for (var i = 0; i < daysInMonth; i += 5) {
-        var lx = padL + (i / (daysInMonth-1)) * iW;
-        xLabels += '<text x="' + lx.toFixed(1) + '" y="' + (H-4) + '" fill="rgba(255,255,255,0.3)" font-size="8" text-anchor="middle">' + (i+1) + '</text>';
+        var lx = (padL + (i / Math.max(daysInMonth-1,1)) * iW).toFixed(1);
+        xLabels += '<text x="' + lx + '" y="' + (H-6) + '" fill="var(--text3)" font-size="8" text-anchor="middle">' + (i+1) + '</text>';
       }
 
-      chartEl.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto">' +
-        // Grid lines
-        '<line x1="' + padL + '" y1="' + padT + '" x2="' + padL + '" y2="' + (padT+iH) + '" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>' +
-        '<line x1="' + padL + '" y1="' + (padT+iH) + '" x2="' + (padL+iW) + '" y2="' + (padT+iH) + '" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>' +
-        // Area fill
-        '<polyline points="' + pts.join(' ') + '" fill="none" stroke="var(--green)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' +
-        // Today dot
-        '<circle cx="' + tx.toFixed(1) + '" cy="' + ty.toFixed(1) + '" r="4" fill="var(--green)"/>' +
-        '<text x="' + tx.toFixed(1) + '" y="' + (ty - 7).toFixed(1) + '" fill="var(--green)" font-size="9" text-anchor="middle" font-weight="bold">' + chartData[todayIdx] + '</text>' +
-        xLabels +
-      '</svg>';
+      chartEl.innerHTML =
+        '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block">' +
+          '<line x1="' + padL + '" y1="' + padT + '" x2="' + padL + '" y2="' + (padT+iH) + '" stroke="var(--border)" stroke-width="1"/>' +
+          '<line x1="' + padL + '" y1="' + (padT+iH) + '" x2="' + (padL+iW) + '" y2="' + (padT+iH) + '" stroke="var(--border)" stroke-width="1"/>' +
+          '<polyline points="' + pts + '" fill="none" stroke="var(--green)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' +
+          '<circle cx="' + tx + '" cy="' + ty + '" r="4" fill="var(--green)"/>' +
+          '<text x="' + tx + '" y="' + (parseFloat(ty)-8) + '" fill="var(--green)" font-size="9" text-anchor="middle" font-weight="bold">' + chartData[todayIdx] + '</text>' +
+          xLabels +
+        '</svg>';
     }
 
     // Ranking top 10
     if (rankEl) {
       var prodMap = mlProdMap(ordersMonth);
       var top10 = Object.entries(prodMap).sort(function(a,b){ return b[1]-a[1]; }).slice(0,10);
-      var maxQ = top10.length ? top10[0][1] : 1;
-      var medals = ['🥇','🥈','🥉'];
-
       if (!top10.length) {
-        rankEl.innerHTML = '<span style="color:rgba(255,255,255,0.3);font-size:0.8rem">Sem dados do mês</span>';
+        rankEl.innerHTML = '<span style="color:var(--text3);font-size:0.8rem">Sem dados do mês</span>';
       } else {
+        var maxQ = top10[0][1];
+        var medals = ['🥇','🥈','🥉'];
         var html = '<div style="overflow-y:auto;max-height:170px;padding-right:4px">';
         top10.forEach(function(p, i) {
           var bar = Math.round((p[1]/maxQ)*100);
-          var icon = i < 3 ? medals[i] : '<span style="font-size:0.75rem;color:rgba(255,255,255,0.4);min-width:18px;display:inline-block;text-align:center">' + (i+1) + '</span>';
-          html += '<div style="margin-bottom:8px">' +
-            '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">' +
-              '<span>' + icon + '</span>' +
-              '<span style="flex:1;font-size:0.78rem;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(p[0]) + '">' + esc(p[0]) + '</span>' +
-              '<span style="font-size:0.78rem;font-weight:700;color:var(--green);white-space:nowrap">' + p[1] + ' un.</span>' +
-            '</div>' +
-            '<div style="background:rgba(255,255,255,0.1);border-radius:99px;height:4px">' +
-              '<div style="background:var(--green);border-radius:99px;height:4px;width:' + bar + '%"></div>' +
-            '</div>' +
-          '</div>';
+          var icon = i < 3 ? medals[i] : '<span style="font-size:0.75rem;color:var(--text3);min-width:18px;display:inline-block;text-align:center">' + (i+1) + '</span>';
+          html +=
+            '<div style="margin-bottom:8px">' +
+              '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">' +
+                '<span>' + icon + '</span>' +
+                '<span style="flex:1;font-size:0.78rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(p[0]) + '">' + esc(p[0]) + '</span>' +
+                '<span style="font-size:0.78rem;font-weight:700;color:var(--green);white-space:nowrap">' + p[1] + ' un.</span>' +
+              '</div>' +
+              '<div style="background:var(--bg3);border-radius:99px;height:4px">' +
+                '<div style="background:var(--green);border-radius:99px;height:4px;width:' + bar + '%"></div>' +
+              '</div>' +
+            '</div>';
         });
         html += '</div>';
         rankEl.innerHTML = html;
       }
     }
   } catch(e) {
-    var errMsg = '<span style="color:rgba(255,255,255,0.3);font-size:0.8rem">Indisponível</span>';
+    var errMsg = '<span style="color:var(--text3);font-size:0.8rem">Indisponível no momento</span>';
     if (chartEl) chartEl.innerHTML = errMsg;
     if (rankEl)  rankEl.innerHTML  = errMsg;
   }

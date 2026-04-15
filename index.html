@@ -903,7 +903,7 @@ function renderInicio() {
     ${muralHtml}
   </div>
   <div class="card"><p class="text-muted text-sm">Bem-vindo(a), <strong>${state.currentUser ? state.currentUser.login : ''}</strong>! Use o menu lateral para navegar pela plataforma.</p></div>
-  ${state.currentUser && state.currentUser.role !== 'admin' ? renderVendasResumo() : ''}`;
+`;
 }
 
 // ─── TASKS ─────────────────────────────────────────────────────────────────────

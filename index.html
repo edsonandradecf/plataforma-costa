@@ -1915,7 +1915,10 @@ async function mlExchangeCode(code) {
       redirect_uri: ML_REDIRECT_URI,
     })
   });
-  if (!resp.ok) throw new Error('Erro ao obter token: ' + resp.status);
+  if (!resp.ok) {
+    var eb = ''; try { var ej = await resp.json(); eb = ej.message || ej.error || JSON.stringify(ej); } catch(e2) {}
+    throw new Error('Erro ao obter token (' + resp.status + '): ' + eb);
+  }
   var data = await resp.json();
   mlSaveToken({ access_token: data.access_token, refresh_token: data.refresh_token, expires_at: Date.now() + (data.expires_in * 1000) });
   return data;
@@ -1934,7 +1937,12 @@ async function mlRefreshToken() {
       refresh_token: t.refresh_token,
     })
   });
-  if (!resp.ok) throw new Error('Erro ao renovar token: ' + resp.status);
+  if (!resp.ok) {
+    var rb = ''; try { var rj = await resp.json(); rb = rj.message || rj.error || JSON.stringify(rj); } catch(e2) {}
+    // Clear bad token so next login shows connect button
+    localStorage.removeItem('ml_token'); _mlToken = null; state.mlToken = null;
+    throw new Error('Token expirado (' + resp.status + '). Reconecte o Mercado Livre.');
+  }
   var data = await resp.json();
   mlSaveToken({ access_token: data.access_token, refresh_token: data.refresh_token, expires_at: Date.now() + (data.expires_in * 1000) });
   return data;
@@ -1953,7 +1961,11 @@ async function mlGet(path) {
       headers: { 'Authorization': 'Bearer ' + t.access_token }
     });
   }
-  if (!resp.ok) throw new Error('ML API erro ' + resp.status);
+  if (!resp.ok) {
+    var errBody = '';
+    try { var errJson = await resp.json(); errBody = errJson.message || errJson.error || ''; } catch(e2) {}
+    throw new Error('ML API erro ' + resp.status + (errBody ? ': ' + errBody : ''));
+  }
   return await resp.json();
 }
 
@@ -1965,14 +1977,18 @@ async function mlFetchVendas() {
   // Today
   var dayStart = new Date(now); dayStart.setHours(0,0,0,0);
   var dayEnd   = new Date(now); dayEnd.setHours(23,59,59,999);
-  var dayFrom  = dayStart.toISOString().slice(0,19) + '.000-03:00';
-  var dayTo    = dayEnd.toISOString().slice(0,19)   + '.999-03:00';
+  // ML API uses ISO 8601 format
+  function toMLDate(d) {
+    return d.toISOString().slice(0,19) + '.000Z';
+  }
+  var dayFrom  = toMLDate(dayStart);
+  var dayTo    = toMLDate(dayEnd);
 
   // This month
   var monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   var monthEnd   = new Date(now.getFullYear(), now.getMonth()+1, 0, 23, 59, 59);
-  var monthFrom  = monthStart.toISOString().slice(0,19) + '.000-03:00';
-  var monthTo    = monthEnd.toISOString().slice(0,19)   + '.999-03:00';
+  var monthFrom  = toMLDate(monthStart);
+  var monthTo    = toMLDate(monthEnd);
 
   // Fetch today orders
   var dayData = await mlGet('/orders/search?seller=' + userId +
@@ -2033,8 +2049,9 @@ async function bindVendas() {
     el.innerHTML = mlDashHtml(result);
   } catch(e) {
     // Erros de autenticação → limpa token e pede reconexão
-    var isAuthError = e.message.includes('400') || e.message.includes('401') || 
-                      e.message.includes('token') || e.message.includes('Failed to fetch');
+    var isAuthError = e.message.includes('401') || e.message.includes('Token expirado') ||
+                      e.message.includes('token') || e.message.includes('Failed to fetch') ||
+                      e.message.includes('invalid_grant') || e.message.includes('invalid_token');
     if (isAuthError) {
       localStorage.removeItem('ml_token'); _mlToken = null;
       state.mlToken = null;

@@ -599,6 +599,19 @@ function doLogin() {
   console.log('Login OK:', user.login, 'role:', user.role);
   addLog('Fez login na plataforma');
   startApp();
+  // Check if there's a pending ML code from before login
+  const pendingCode = localStorage.getItem('ml_pending_code');
+  if (pendingCode) {
+    localStorage.removeItem('ml_pending_code');
+    setTimeout(async function() {
+      try {
+        await mlExchangeCode(pendingCode);
+        navigate('vendas');
+      } catch(e) {
+        navigate('vendas');
+      }
+    }, 500);
+  }
 }
 
 function doLogout() {
@@ -639,11 +652,16 @@ function toggleTheme() {
 
 // Try saved login
 (function checkSavedLogin() {
-  // Load local cache only — Firebase sync happens after login
+  // Load local cache
   try {
     const s = localStorage.getItem('costa_state');
     if (s) applyParsed(JSON.parse(s));
   } catch(e) {}
+
+  // Check if Mercado Livre returned a code in the URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const mlCode = urlParams.get('code');
+
   // Restore saved credentials
   const saved = localStorage.getItem('costa_saved_login');
   if (saved) {
@@ -654,8 +672,35 @@ function toggleTheme() {
         document.getElementById('login-user').value = login;
         document.getElementById('login-pass').value = senha;
         document.getElementById('login-remember').checked = true;
+
+        // If there's an ML code AND user has saved credentials → auto-login and process code
+        if (mlCode) {
+          state.currentUser = user;
+          _loginTime = Date.now();
+          _firebaseReady = false;
+          // Clean URL immediately
+          window.history.replaceState({}, document.title, window.location.pathname);
+          // Start app and process the ML code
+          startApp();
+          // Process ML auth code after app loads
+          setTimeout(async function() {
+            try {
+              await mlExchangeCode(mlCode);
+              navigate('vendas');
+            } catch(e) {
+              navigate('vendas');
+            }
+          }, 500);
+          return; // Skip showing login screen
+        }
       }
     } catch(e) {}
+  }
+
+  // If ML code but no saved login → store code and show login
+  if (mlCode) {
+    localStorage.setItem('ml_pending_code', mlCode);
+    window.history.replaceState({}, document.title, window.location.pathname);
   }
 })();
 
@@ -2023,20 +2068,7 @@ async function bindVendas() {
   var el = document.getElementById('vendas-content');
   if (!el) return;
 
-  // Check for OAuth code in URL
-  var urlParams = new URLSearchParams(window.location.search);
-  var code = urlParams.get('code');
-  if (code && !mlTokenValid()) {
-    try {
-      document.getElementById('vendas-loading').textContent = 'Autenticando com Mercado Livre...';
-      await mlExchangeCode(code);
-      // Clean URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-    } catch(e) {
-      el.innerHTML = mlErrorHtml('Erro na autenticação: ' + e.message);
-      return;
-    }
-  }
+  // Code is handled at page load in checkSavedLogin — nothing to do here
 
   if (!mlTokenValid()) {
     el.innerHTML = mlAuthHtml();

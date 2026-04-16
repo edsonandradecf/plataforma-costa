@@ -1176,8 +1176,21 @@ function deleteMural(i) {
 }
 
 // ─── ETIQUETAS ────────────────────────────────────────────────────────────────
+function etqSetTab(tab) {
+  _etqTab = tab;
+  navigate('etiquetas');
+}
+
 function renderEtiquetas() {
-  return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;max-width:900px">
+  var isZpl = _etqTab === 'zpl';
+  var tabBar =
+    '<div style="display:flex;border-bottom:2px solid var(--border);margin-bottom:1.25rem">' +
+      '<button onclick="etqSetTab(&quot;zpl&quot;)" style="padding:0.65rem 1.5rem;background:none;border:none;border-bottom:' + (isZpl ? '3px solid var(--green);color:var(--green);font-weight:600' : 'none;color:var(--text2)') + ';cursor:pointer;font-size:0.95rem;margin-bottom:-2px;transition:all 0.15s">🏷️ Gerador ZPL</button>' +
+      '<button onclick="etqSetTab(&quot;transportadora&quot;)" style="padding:0.65rem 1.5rem;background:none;border:none;border-bottom:' + (!isZpl ? '3px solid var(--green);color:var(--green);font-weight:600' : 'none;color:var(--text2)') + ';cursor:pointer;font-size:0.95rem;margin-bottom:-2px;transition:all 0.15s">🚚 Etiqueta para Transportadora</button>' +
+    '</div>';
+
+  if (isZpl) {
+    return tabBar + `<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;max-width:900px">
     <div class="card">
       <div class="card-header"><span class="card-title">Configurações</span></div>
       <div class="label-form">
@@ -1186,16 +1199,9 @@ function renderEtiquetas() {
           <textarea id="zpl-input" placeholder="Cole o código ZPL aqui...&#10;^XA&#10;^FO50,50^ADN,36,20^FDOlá Mundo^FS&#10;^XZ" style="min-height:180px"></textarea>
         </div>
         <div class="dim-grid">
-          <div>
-            <label>Largura (mm)</label>
-            <input type="number" id="lbl-w" value="100" min="10" max="400">
-          </div>
-          <div>
-            <label>Altura (mm)</label>
-            <input type="number" id="lbl-h" value="150" min="10" max="400">
-          </div>
-          <div>
-            <label>DPI</label>
+          <div><label>Largura (mm)</label><input type="number" id="lbl-w" value="100" min="10" max="400"></div>
+          <div><label>Altura (mm)</label><input type="number" id="lbl-h" value="150" min="10" max="400"></div>
+          <div><label>DPI</label>
             <select id="lbl-dpi">
               <option value="6dpmm">152 DPI</option>
               <option value="8dpmm" selected>203 DPI</option>
@@ -1219,9 +1225,139 @@ function renderEtiquetas() {
       <div id="lbl-pages" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"></div>
     </div>
   </div>`;
+  }
+
+  // ── ETIQUETA TRANSPORTADORA ──────────────────────────────────────────
+  return tabBar +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;max-width:960px">' +
+      '<div class="card">' +
+        '<div class="card-header"><span class="card-title">🚚 Dados da Entrega</span></div>' +
+        '<div class="label-form">' +
+          '<div><label>Nome / Destinatário</label><input type="text" id="etq-nome" placeholder="Ex: João da Silva" style="width:100%"></div>' +
+          '<div><label>Endereço Completo</label><textarea id="etq-endereco" placeholder="Rua, número, bairro, cidade - UF" rows="3" style="width:100%;resize:vertical"></textarea></div>' +
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+            '<div><label>CEP</label><input type="text" id="etq-cep" placeholder="00000-000" maxlength="9" oninput="etqMaskCep(this)"></div>' +
+            '<div><label>Nota Fiscal</label><input type="text" id="etq-nf" placeholder="Ex: 12345"></div>' +
+          '</div>' +
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+            '<div><label>Volumes (total)</label><input type="number" id="etq-volumes" placeholder="Ex: 10" min="1" max="999"></div>' +
+            '<div><label>Observação</label><input type="text" id="etq-obs" placeholder="Opcional"></div>' +
+          '</div>' +
+          '<div style="display:flex;gap:8px;margin-top:4px">' +
+            '<button class="btn btn-green" style="flex:1;padding:0.65rem" onclick="etqPreview()">👁 Prévia</button>' +
+            '<button class="btn btn-green" style="flex:1;padding:0.65rem" onclick="etqGerarPDF()">⬇ Gerar PDF</button>' +
+          '</div>' +
+          '<div id="etq-status" style="color:var(--text2);font-size:0.85rem;text-align:center;min-height:1.2em;margin-top:6px"></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="card" style="display:flex;flex-direction:column">' +
+        '<div class="card-header"><span class="card-title">Prévia — Volume 1</span></div>' +
+        '<div id="etq-preview" style="flex:1;display:flex;align-items:center;justify-content:center;background:var(--bg3);border-radius:8px;min-height:280px;overflow:auto;padding:12px">' +
+          '<span style="color:var(--text3);font-size:0.85rem">Preencha os dados e clique em Prévia</span>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
 }
 
 function bindEtiquetas() {}
+
+function etqMaskCep(el) {
+  var v = el.value.replace(/[^0-9]/g,'').slice(0,8);
+  if (v.length > 5) v = v.slice(0,5) + '-' + v.slice(5);
+  el.value = v;
+}
+
+function etqBuildLabel(vol, totalVols, data) {
+  // Returns HTML string for one shipping label
+  return '<div style="width:340px;min-height:200px;border:2px solid #000;padding:16px;font-family:Arial,sans-serif;background:#fff;color:#000;box-sizing:border-box">' +
+    '<div style="text-align:center;font-weight:800;font-size:1.1rem;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:10px">ETIQUETA DE ENVIO</div>' +
+    '<div style="margin-bottom:8px">' +
+      '<div style="font-size:0.7rem;text-transform:uppercase;color:#555;margin-bottom:2px">Destinatário</div>' +
+      '<div style="font-weight:700;font-size:1rem">' + esc(data.nome) + '</div>' +
+    '</div>' +
+    '<div style="margin-bottom:8px">' +
+      '<div style="font-size:0.7rem;text-transform:uppercase;color:#555;margin-bottom:2px">Endereço</div>' +
+      '<div style="font-size:0.9rem">' + esc(data.endereco).replace(/\n/g,'<br>') + '</div>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">' +
+      '<div><div style="font-size:0.7rem;text-transform:uppercase;color:#555;margin-bottom:2px">CEP</div><div style="font-weight:600">' + esc(data.cep) + '</div></div>' +
+      '<div><div style="font-size:0.7rem;text-transform:uppercase;color:#555;margin-bottom:2px">Nota Fiscal</div><div style="font-weight:600">' + esc(data.nf) + '</div></div>' +
+    '</div>' +
+    (data.obs ? '<div style="margin-bottom:8px"><div style="font-size:0.7rem;text-transform:uppercase;color:#555;margin-bottom:2px">Observação</div><div style="font-size:0.85rem">' + esc(data.obs) + '</div></div>' : '') +
+    '<div style="border-top:2px solid #000;margin-top:10px;padding-top:8px;display:flex;justify-content:space-between;align-items:center">' +
+      '<div style="font-size:0.75rem;color:#555">Costa Nature Life</div>' +
+      '<div style="font-size:1.4rem;font-weight:900;background:#000;color:#fff;padding:4px 14px;border-radius:4px">' + vol + '/' + totalVols + '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function etqGetData() {
+  return {
+    nome:     (document.getElementById('etq-nome')    ||{}).value || '',
+    endereco: (document.getElementById('etq-endereco')||{}).value || '',
+    cep:      (document.getElementById('etq-cep')     ||{}).value || '',
+    nf:       (document.getElementById('etq-nf')      ||{}).value || '',
+    volumes:  parseInt((document.getElementById('etq-volumes')||{}).value) || 1,
+    obs:      (document.getElementById('etq-obs')     ||{}).value || '',
+  };
+}
+
+function etqPreview() {
+  var data = etqGetData();
+  var prev = document.getElementById('etq-preview');
+  if (!prev) return;
+  if (!data.nome || !data.endereco) {
+    prev.innerHTML = '<span style="color:var(--red)">Preencha ao menos Nome e Endereço</span>';
+    return;
+  }
+  prev.innerHTML = etqBuildLabel(1, data.volumes, data);
+  document.querySelector('#etq-preview').previousElementSibling.textContent = 'Prévia — Volume 1/' + data.volumes;
+}
+
+async function etqGerarPDF() {
+  var data = etqGetData();
+  if (!data.nome || !data.endereco) {
+    document.getElementById('etq-status').textContent = '⚠ Preencha Nome e Endereço.';
+    return;
+  }
+  var status = document.getElementById('etq-status');
+  var total = data.volumes;
+  status.textContent = 'Gerando ' + total + ' etiquetas...';
+
+  // Build all labels as HTML, convert to PDF using jsPDF
+  var doc = new jspdf.jsPDF({ unit: 'mm', format: [100, 150], orientation: 'portrait' });
+
+  for (var i = 1; i <= total; i++) {
+    if (i > 1) doc.addPage();
+    status.textContent = 'Gerando etiqueta ' + i + '/' + total + '...';
+
+    // Render label to canvas via HTML
+    var container = document.createElement('div');
+    container.style.cssText = 'position:fixed;left:-9999px;top:0;background:#fff';
+    container.innerHTML = etqBuildLabel(i, total, data);
+    document.body.appendChild(container);
+
+    // Wait a frame for render
+    await new Promise(r => setTimeout(r, 30));
+
+    try {
+      var canvas = await html2canvas(container.firstChild, { scale: 2, backgroundColor: '#fff', logging: false });
+      var imgData = canvas.toDataURL('image/jpeg', 0.95);
+      doc.addImage(imgData, 'JPEG', 0, 0, 100, 150);
+    } catch(e) {
+      // Fallback: draw text directly
+      doc.setFontSize(10);
+      doc.text('Volume ' + i + '/' + total, 10, 20);
+      doc.text(data.nome, 10, 30);
+      doc.text(data.endereco, 10, 40);
+    }
+    document.body.removeChild(container);
+  }
+
+  doc.save('etiquetas-transportadora.pdf');
+  status.textContent = '✓ ' + total + ' etiquetas geradas com sucesso!';
+  setTimeout(function(){ status.textContent = ''; }, 4000);
+}
 
 function getLabelaryDpi(sel) {
   return sel || '8dpmm';
@@ -1686,6 +1822,7 @@ function renderTabNutri() {
 }
 
 var _tnTab = 'biblioteca';
+var _etqTab = 'zpl'; // 'zpl' or 'transportadora'
 var _tnSearch = '';
 
 function tnSearchFilter(val) {

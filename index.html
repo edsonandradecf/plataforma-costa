@@ -1360,47 +1360,166 @@ async function etqGerarPDF() {
   }
   var status = document.getElementById('etq-status');
   var total = data.volumes;
-  status.textContent = 'Gerando ' + total + ' etiquetas...';
+  status.textContent = 'Gerando ' + total + ' etiqueta(s)...';
 
-  // Build all labels as HTML, convert to PDF using jsPDF
-  var doc = new jspdf.jsPDF({ unit: 'mm', format: [100, 150], orientation: 'portrait' });
+  var jsPDFLib = window.jspdf;
+  var doc = new jsPDFLib.jsPDF({ unit: 'mm', format: [100, 150], orientation: 'portrait' });
   doc.setProperties({ title: 'Etiquetas Transportadora - Costa Nature Life' });
+
+  var W = 100, H = 150;
+
+  function etqDrawPage(vol, totalVols) {
+    var x = 0, y = 0;
+
+    // ── Header negro ──────────────────────────────────────────
+    doc.setFillColor(0, 0, 0);
+    doc.rect(x, y, W, 14, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('COSTA NATURE LIFE', x + 4, y + 6);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.text('44.168.874/0001-28', x + 4, y + 10.5);
+
+    doc.setFontSize(6.5);
+    doc.text('SAC: (16) 99755-9693', x + W - 4, y + 8, { align: 'right' });
+
+    y += 14;
+
+    // ── Faixa VOLUME ──────────────────────────────────────────
+    doc.setFillColor(240, 240, 240);
+    doc.rect(x, y, W, 22, 'F');
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.5);
+    doc.line(x, y, x + W, y);
+    doc.line(x, y + 22, x + W, y + 22);
+
+    doc.setTextColor(60, 60, 60);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.text('VOLUME', x + 4, y + 7);
+
+    // Badge preto com volume
+    var badge = vol + '/' + totalVols;
+    doc.setFillColor(0, 0, 0);
+    doc.roundedRect(x + W - 4 - 38, y + 3, 38, 16, 2, 2, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.text(badge, x + W - 4 - 19, y + 15, { align: 'center' });
+
+    y += 22;
+
+    // ── Destinatário ──────────────────────────────────────────
+    doc.setTextColor(0, 0, 0);
+    y += 5;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6);
+    doc.setTextColor(100, 100, 100);
+    doc.text('▼ DESTINATÁRIO', x + 4, y);
+    y += 4;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(0, 0, 0);
+    var nomeLines = doc.splitTextToSize(data.nome, W - 8);
+    doc.text(nomeLines, x + 4, y);
+    y += nomeLines.length * 6 + 2;
+
+    // ── Endereço ──────────────────────────────────────────────
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6);
+    doc.setTextColor(100, 100, 100);
+    doc.text('ENDEREÇO', x + 4, y);
+    y += 4;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(0, 0, 0);
+    var endLines = doc.splitTextToSize(data.endereco.replace(/\n/g, ' '), W - 8);
+    doc.text(endLines, x + 4, y);
+    y += endLines.length * 5 + 4;
+
+    // ── CEP + NF ──────────────────────────────────────────────
+    var boxH = 14, boxW = (W - 12) / 2;
+
+    // CEP box
+    doc.setDrawColor(180, 180, 180);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(x + 4, y, boxW, boxH, 1, 1);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6);
+    doc.setTextColor(100, 100, 100);
+    doc.text('CEP', x + 6, y + 4.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(0, 0, 0);
+    doc.text(data.cep || '—', x + 6, y + 11);
+
+    // NF box
+    doc.setDrawColor(180, 180, 180);
+    doc.roundedRect(x + 4 + boxW + 4, y, boxW, boxH, 1, 1);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(6);
+    doc.setTextColor(100, 100, 100);
+    doc.text('NOTA FISCAL', x + 4 + boxW + 6, y + 4.5);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(0, 0, 0);
+    doc.text(data.nf || '—', x + 4 + boxW + 6, y + 11);
+
+    y += boxH + 4;
+
+    // ── Observação (se houver) ────────────────────────────────
+    if (data.obs) {
+      doc.setFillColor(255, 253, 231);
+      doc.setDrawColor(220, 200, 0);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(x + 4, y, W - 8, 10, 1, 1, 'FD');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(6);
+      doc.setTextColor(100, 100, 100);
+      doc.text('OBSERVAÇÃO', x + 6, y + 4);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7.5);
+      doc.setTextColor(0, 0, 0);
+      var obsLines = doc.splitTextToSize(data.obs, W - 14);
+      doc.text(obsLines[0] || '', x + 6, y + 8.5);
+      y += 12;
+    }
+
+    // ── Footer ────────────────────────────────────────────────
+    doc.setFillColor(249, 249, 249);
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.5);
+    doc.line(x, H - 10, x + W, H - 10);
+    doc.rect(x, H - 10, W, 10, 'F');
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(80, 80, 80);
+    doc.text('costanaturelife.com.br', x + 4, H - 4);
+    doc.text('CNPJ: 44.168.874/0001-28', x + W - 4, H - 4, { align: 'right' });
+
+    // Borda geral
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(0.6);
+    doc.rect(0, 0, W, H);
+  }
 
   for (var i = 1; i <= total; i++) {
     if (i > 1) doc.addPage();
     status.textContent = 'Gerando etiqueta ' + i + '/' + total + '...';
-
-    // Render label to canvas via HTML
-    var container = document.createElement('div');
-    container.style.cssText = 'position:fixed;left:-9999px;top:0;background:#fff';
-    container.innerHTML = etqBuildLabel(i, total, data);
-    document.body.appendChild(container);
-
-    // Wait a frame for render
-    await new Promise(r => setTimeout(r, 30));
-
-    try {
-      var canvas = await html2canvas(container.firstChild, {
-        scale: 3,
-        backgroundColor: '#fff',
-        logging: false,
-        width: 377,
-        height: 566,
-      });
-      var imgData = canvas.toDataURL('image/jpeg', 0.97);
-      doc.addImage(imgData, 'JPEG', 0, 0, 100, 150);
-    } catch(e) {
-      // Fallback: draw text directly
-      doc.setFontSize(10);
-      doc.text('Volume ' + i + '/' + total, 10, 20);
-      doc.text(data.nome, 10, 30);
-      doc.text(data.endereco, 10, 40);
-    }
-    document.body.removeChild(container);
+    etqDrawPage(i, total);
+    // Yield para não travar o browser em muitas páginas
+    if (i % 10 === 0) await new Promise(r => setTimeout(r, 0));
   }
 
   doc.save('etiquetas-transportadora.pdf');
-  status.textContent = '✓ ' + total + ' etiquetas geradas com sucesso!';
+  status.textContent = '✓ ' + total + ' etiqueta(s) gerada(s) com sucesso!';
   setTimeout(function(){ status.textContent = ''; }, 4000);
 }
 

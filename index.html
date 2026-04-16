@@ -1577,42 +1577,71 @@ function renderTabNutri() {
       '</div>' +
 
       '<div class="tn-section">Informação Nutricional (por porção)</div>' +
-      '<div style="background:var(--bg3);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:0.78rem;color:var(--text3)">Preencha os valores por porção. VD = % do Valor Diário de Referência.</div>' +
+      '<div style="background:var(--bg3);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:0.78rem;color:var(--text3)">Preencha os valores para 100g e por porção. %VD = % do Valor Diário de Referência.</div>' +
 
-      '<div class="tn-form-grid" style="margin-bottom:8px">' +
-        '<div><label class="tn-label">Valor Energético (kcal)</label><input class="tn-input" id="tn-energia" value="100" oninput="tnLiveUpdate()"></div>' +
-        '<div><label class="tn-label">%VD Energia</label><input class="tn-input" id="tn-vce_energia" value="5" oninput="tnLiveUpdate()"></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 0.8fr;gap:4px;margin-bottom:4px;font-size:0.7rem;font-weight:700;color:var(--text3);padding:0 2px">' +
+        '<span>Nutriente</span><span style="text-align:center">100g</span><span style="text-align:center">Porção</span><span style="text-align:center">%VD</span>' +
       '</div>' +
-      '<div class="tn-form-grid" style="margin-bottom:8px">' +
-        '<div><label class="tn-label">Carboidratos (g)</label><input class="tn-input" id="tn-carboidratos" value="20" oninput="tnLiveUpdate()"></div>' +
-        '<div><label class="tn-label">%VD Carboidratos</label><input class="tn-input" id="tn-carboidratos_vd" value="7" oninput="tnLiveUpdate()"></div>' +
+
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 0.8fr;gap:4px;margin-bottom:4px;align-items:center">' +
+        '<label class="tn-label" style="margin:0">Valor Energético (kcal)</label>' +
+        '<input class="tn-input" id="tn-kcal100" placeholder="100g" oninput="tnLiveUpdate()" style="margin:0">' +
+        '<input class="tn-input" id="tn-energia" placeholder="porção" oninput="tnLiveUpdate()" style="margin:0">' +
+        '<input class="tn-input" id="tn-vce_energia" placeholder="%VD" oninput="tnLiveUpdate()" style="margin:0">' +
       '</div>' +
-      '<div class="tn-form-grid" style="margin-bottom:8px">' +
-        '<div><label class="tn-label">Açúcares Totais (g)</label><input class="tn-input" id="tn-acucares" value="5" oninput="tnLiveUpdate()"></div>' +
-        '<div><label class="tn-label">Açúcares Adicionados (g)</label><input class="tn-input" id="tn-acucares_ad" value="0" oninput="tnLiveUpdate()"></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 0.8fr;gap:4px;margin-bottom:4px;align-items:center">' +
+        '<label class="tn-label" style="margin:0">Carboidratos (g)</label>' +
+        '<input class="tn-input" id="tn-carb100" placeholder="100g" oninput="tnLiveUpdate()" style="margin:0">' +
+        '<input class="tn-input" id="tn-carboidratos" placeholder="porção" oninput="tnLiveUpdate()" style="margin:0">' +
+        '<input class="tn-input" id="tn-carboidratos_vd" placeholder="%VD" oninput="tnLiveUpdate()" style="margin:0">' +
       '</div>' +
-      '<div class="tn-form-grid" style="margin-bottom:8px">' +
-        '<div><label class="tn-label">Gorduras Totais (g)</label><input class="tn-input" id="tn-gorduras_totais" value="3" oninput="tnLiveUpdate()"></div>' +
-        '<div><label class="tn-label">%VD Gorduras Totais</label><input class="tn-input" id="tn-gorduras_totais_vd" value="4" oninput="tnLiveUpdate()"></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 0.8fr;gap:4px;margin-bottom:4px;align-items:center">' +
+        '<label class="tn-label" style="margin:0;padding-left:8px">Açúcares Totais (g)</label>' +
+        '<input class="tn-input" id="tn-acucar100" placeholder="100g" oninput="tnLiveUpdate()" style="margin:0">' +
+        '<input class="tn-input" id="tn-acucares" placeholder="porção" oninput="tnLiveUpdate()" style="margin:0">' +
+        '<input class="tn-input" id="tn-acucar_vd" placeholder="**" oninput="tnLiveUpdate()" style="margin:0">' +
       '</div>' +
-      '<div class="tn-form-grid" style="margin-bottom:8px">' +
-        '<div><label class="tn-label">Gorduras Saturadas (g)</label><input class="tn-input" id="tn-gorduras_sat" value="1" oninput="tnLiveUpdate()"></div>' +
-        '<div><label class="tn-label">%VD Gord. Saturadas</label><input class="tn-input" id="tn-gorduras_sat_vd" value="5" oninput="tnLiveUpdate()"></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 0.8fr;gap:4px;margin-bottom:4px;align-items:center">' +
+        '<label class="tn-label" style="margin:0;padding-left:16px">Açúcares Adicionados (g)</label>' +
+        '<input class="tn-input" id="tn-acucar_ad100" placeholder="100g" oninput="tnLiveUpdate()" style="margin:0">' +
+        '<input class="tn-input" id="tn-acucares_ad" placeholder="porção" oninput="tnLiveUpdate()" style="margin:0">' +
+        '<input class="tn-input" id="tn-acucar_ad_vd" placeholder="%VD" oninput="tnLiveUpdate()" style="margin:0">' +
       '</div>' +
-      '<div class="tn-form-grid" style="margin-bottom:8px">' +
-        '<div><label class="tn-label">Gorduras Trans (g)</label><input class="tn-input" id="tn-gorduras_trans" value="0" oninput="tnLiveUpdate()"></div>' +
-        '<div><label class="tn-label">Fibras Alimentares (g)</label><input class="tn-input" id="tn-fibras" value="1" oninput="tnLiveUpdate()"></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 0.8fr;gap:4px;margin-bottom:4px;align-items:center">' +
+        '<label class="tn-label" style="margin:0">Proteínas (g)</label>' +
+        '<input class="tn-input" id="tn-prot100" placeholder="100g" oninput="tnLiveUpdate()" style="margin:0">' +
+        '<input class="tn-input" id="tn-proteinas" placeholder="porção" oninput="tnLiveUpdate()" style="margin:0">' +
+        '<input class="tn-input" id="tn-proteinas_vd" placeholder="%VD" oninput="tnLiveUpdate()" style="margin:0">' +
       '</div>' +
-      '<div class="tn-form-grid" style="margin-bottom:8px">' +
-        '<div><label class="tn-label">%VD Fibras</label><input class="tn-input" id="tn-fibras_vd" value="4" oninput="tnLiveUpdate()"></div>' +
-        '<div><label class="tn-label">Sódio (mg)</label><input class="tn-input" id="tn-sodio" value="50" oninput="tnLiveUpdate()"></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 0.8fr;gap:4px;margin-bottom:4px;align-items:center">' +
+        '<label class="tn-label" style="margin:0">Gorduras Totais (g)</label>' +
+        '<input class="tn-input" id="tn-gord100" placeholder="100g" oninput="tnLiveUpdate()" style="margin:0">' +
+        '<input class="tn-input" id="tn-gorduras_totais" placeholder="porção" oninput="tnLiveUpdate()" style="margin:0">' +
+        '<input class="tn-input" id="tn-gorduras_totais_vd" placeholder="%VD" oninput="tnLiveUpdate()" style="margin:0">' +
       '</div>' +
-      '<div class="tn-form-grid" style="margin-bottom:8px">' +
-        '<div><label class="tn-label">%VD Sódio</label><input class="tn-input" id="tn-sodio_vd" value="2" oninput="tnLiveUpdate()"></div>' +
-        '<div><label class="tn-label">Proteínas (g)</label><input class="tn-input" id="tn-proteinas" value="2" oninput="tnLiveUpdate()"></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 0.8fr;gap:4px;margin-bottom:4px;align-items:center">' +
+        '<label class="tn-label" style="margin:0;padding-left:8px">Gorduras Saturadas (g)</label>' +
+        '<input class="tn-input" id="tn-gordsat100" placeholder="100g" oninput="tnLiveUpdate()" style="margin:0">' +
+        '<input class="tn-input" id="tn-gorduras_sat" placeholder="porção" oninput="tnLiveUpdate()" style="margin:0">' +
+        '<input class="tn-input" id="tn-gorduras_sat_vd" placeholder="%VD" oninput="tnLiveUpdate()" style="margin:0">' +
       '</div>' +
-      '<div class="tn-form-grid" style="margin-bottom:8px">' +
-        '<div><label class="tn-label">%VD Proteínas</label><input class="tn-input" id="tn-proteinas_vd" value="3" oninput="tnLiveUpdate()"></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 0.8fr;gap:4px;margin-bottom:4px;align-items:center">' +
+        '<label class="tn-label" style="margin:0;padding-left:8px">Gorduras Trans (g)</label>' +
+        '<input class="tn-input" id="tn-gordtrans100" placeholder="100g" oninput="tnLiveUpdate()" style="margin:0">' +
+        '<input class="tn-input" id="tn-gorduras_trans" placeholder="porção" oninput="tnLiveUpdate()" style="margin:0">' +
+        '<span style="font-size:0.75rem;color:var(--text3);text-align:center">**</span>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 0.8fr;gap:4px;margin-bottom:4px;align-items:center">' +
+        '<label class="tn-label" style="margin:0">Fibra Alimentar (g)</label>' +
+        '<input class="tn-input" id="tn-fibra100" placeholder="100g" oninput="tnLiveUpdate()" style="margin:0">' +
+        '<input class="tn-input" id="tn-fibras" placeholder="porção" oninput="tnLiveUpdate()" style="margin:0">' +
+        '<input class="tn-input" id="tn-fibras_vd" placeholder="%VD" oninput="tnLiveUpdate()" style="margin:0">' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 0.8fr;gap:4px;margin-bottom:12px;align-items:center">' +
+        '<label class="tn-label" style="margin:0">Sódio (mg)</label>' +
+        '<input class="tn-input" id="tn-sodio100" placeholder="100g" oninput="tnLiveUpdate()" style="margin:0">' +
+        '<input class="tn-input" id="tn-sodio" placeholder="porção" oninput="tnLiveUpdate()" style="margin:0">' +
+        '<input class="tn-input" id="tn-sodio_vd" placeholder="%VD" oninput="tnLiveUpdate()" style="margin:0">' +
       '</div>' +
 
       '<div class="tn-section">Ingredientes e Alérgenos</div>' +
@@ -1697,10 +1726,17 @@ function setupTabNutri() {
 }
 
 function tnGetFormData() {
-  var fields = ['nome','descricao','porcao','porcoes','peso','energia','vce_energia',
-    'carboidratos','carboidratos_vd','acucares','acucares_ad','gorduras_totais','gorduras_totais_vd',
-    'gorduras_sat','gorduras_sat_vd','gorduras_trans','fibras','fibras_vd',
-    'sodio','sodio_vd','proteinas','proteinas_vd',
+  var fields = ['nome','descricao','porcao','porcoes','peso',
+    'kcal100','energia','vce_energia',
+    'carb100','carboidratos','carboidratos_vd',
+    'acucar100','acucares','acucar_vd',
+    'acucar_ad100','acucares_ad','acucar_ad_vd',
+    'prot100','proteinas','proteinas_vd',
+    'gord100','gorduras_totais','gorduras_totais_vd',
+    'gordsat100','gorduras_sat','gorduras_sat_vd',
+    'gordtrans100','gorduras_trans',
+    'fibra100','fibras','fibras_vd',
+    'sodio100','sodio','sodio_vd',
     'ingredientes','alergicos','validade','lote','cnpj','sac','ean'];
   var data = {};
   fields.forEach(function(f) {

@@ -2794,18 +2794,18 @@ async function mlFetchVendas() {
   var dayData = await mlGet('/orders/search?seller=' + userId +
     '&order.date_created.from=' + encodeURIComponent(dayFrom) +
     '&order.date_created.to='   + encodeURIComponent(dayTo) +
-    '&order.status=paid&sort=date_desc&limit=51');
+    '&order.status=paid&sort=date_desc&limit=50');
 
   // Fetch ALL month orders paginated
   var allMonthOrders = [];
   var monthTotal = 0;
   var offset = 0;
-  var maxPages = 40;
+  var maxPages = 150; // 150 × 50 = 7500 pedidos máximos
   for (var page = 0; page < maxPages; page++) {
     var monthData = await mlGet('/orders/search?seller=' + userId +
       '&order.date_created.from=' + encodeURIComponent(monthFrom) +
       '&order.date_created.to='   + encodeURIComponent(monthTo) +
-      '&order.status=paid&sort=date_asc&limit=51&offset=' + offset);
+      '&order.status=paid&sort=date_asc&limit=50&offset=' + offset);
     var results = monthData.results || [];
     if (page === 0) monthTotal = monthData.paging ? monthData.paging.total : results.length;
     allMonthOrders = allMonthOrders.concat(results);
@@ -2813,7 +2813,7 @@ async function mlFetchVendas() {
     // Update progress bar if visible
     var pct = monthTotal > 0 ? Math.round((allMonthOrders.length / monthTotal) * 100) : 0;
     mlUpdateProgress(pct, allMonthOrders.length, monthTotal);
-    if (results.length < 51 || allMonthOrders.length >= monthTotal) break;
+    if (results.length === 0 || allMonthOrders.length >= monthTotal) break;
     await new Promise(function(r){ setTimeout(r, 150); });
   }
 

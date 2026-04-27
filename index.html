@@ -324,6 +324,7 @@ let state = {
   agenda: [],
   logs: [],
   tabnutri: [],
+  estoque: { produtos: [], movimentacoes: [] },
   mlToken: null,
   currentUser: null,
   currentPage: 'inicio',
@@ -347,15 +348,16 @@ function showSyncStatus(msg, color) {
 }
 
 function dataSize(d) {
-  // Returns total number of items across all collections — used to detect empty data
   if (!d) return 0;
   var t = d.tasks || {};
-  return (Array.isArray(t.expedicao) ? t.expedicao.length : 0) +
-         (Array.isArray(t.producao)  ? t.producao.length  : 0) +
-         (Array.isArray(d.compras)   ? d.compras.length   : 0) +
-         (Array.isArray(d.mural)     ? d.mural.length     : 0) +
-         (Array.isArray(d.agenda)    ? d.agenda.length    : 0) +
-         (Array.isArray(d.tabnutri)  ? d.tabnutri.length  : 0);
+  var est = d.estoque || {};
+  return (Array.isArray(t.expedicao)         ? t.expedicao.length         : 0) +
+         (Array.isArray(t.producao)           ? t.producao.length          : 0) +
+         (Array.isArray(d.compras)            ? d.compras.length           : 0) +
+         (Array.isArray(d.mural)              ? d.mural.length             : 0) +
+         (Array.isArray(d.agenda)             ? d.agenda.length            : 0) +
+         (Array.isArray(d.tabnutri)           ? d.tabnutri.length          : 0) +
+         (Array.isArray(est.produtos)         ? est.produtos.length        : 0);
 }
 
 function applyParsed(parsed, forceMerge) {
@@ -384,6 +386,11 @@ function applyParsed(parsed, forceMerge) {
   state.agenda   = Array.isArray(parsed.agenda)   ? parsed.agenda   : [];
   state.logs     = Array.isArray(parsed.logs)     ? parsed.logs     : [];
   state.tabnutri = Array.isArray(parsed.tabnutri) ? parsed.tabnutri : [];
+  var est = parsed.estoque || {};
+  state.estoque = {
+    produtos:       Array.isArray(est.produtos)       ? est.produtos       : [],
+    movimentacoes:  Array.isArray(est.movimentacoes)  ? est.movimentacoes  : [],
+  };
   if (parsed.mlToken) {
     state.mlToken = parsed.mlToken;
     // Sync to localStorage so mlLoadToken finds it
@@ -520,6 +527,7 @@ function saveState() {
     agenda:   state.agenda,
     logs:     state.logs,
     tabnutri: state.tabnutri,
+    estoque:  state.estoque,
     mlToken:  state.mlToken || null,
   };
   localStorage.setItem('costa_state', JSON.stringify(data));
@@ -721,6 +729,7 @@ function getPagesAdmin() {
     { id: 'expedicao', label: 'Expedição',             icon: iconTruck() },
     { id: 'producao',  label: 'Produção',              icon: iconFactory() },
     { id: 'compras',   label: 'Compras',               icon: iconCart() },
+    { id: 'estoque',   label: 'Estoque',               icon: iconEstoque() },
     { id: 'mural',     label: 'Mural',                 icon: iconMural() },
     { id: 'etiquetas', label: 'Gerador de Etiquetas',  icon: iconLabel() },
     { id: 'agenda',    label: 'Agenda',                icon: iconCal() },
@@ -801,7 +810,7 @@ function startApp() {
 
 function renderPage() {
   if (!state.currentUser) return;
-  var titles = { inicio:'Início', expedicao:'Expedição', producao:'Produção', compras:'Compras', mural:'Mural', etiquetas:'Gerador de Etiquetas', agenda:'Agenda', tabnutri:'Tabela Nutricional', vendas:'Vendas', logs:'Logs' };
+  var titles = { inicio:'Início', expedicao:'Expedição', producao:'Produção', compras:'Compras', estoque:'Estoque', mural:'Mural', etiquetas:'Gerador de Etiquetas', agenda:'Agenda', tabnutri:'Tabela Nutricional', vendas:'Vendas', logs:'Logs' };
   var titleEl = document.getElementById('page-title');
   if (titleEl) titleEl.textContent = titles[state.currentPage] || '';
   var c = document.getElementById('page-content');
@@ -815,6 +824,7 @@ function renderPage() {
   if (pg === 'etiquetas') { c.innerHTML = renderEtiquetas(); return; }
   if (pg === 'agenda')    { c.innerHTML = renderAgenda(); return; }
   if (pg === 'tabnutri')  { c.innerHTML = renderTabNutri(); setupTabNutri(); return; }
+  if (pg === 'estoque')   { c.innerHTML = renderEstoque(); setupEstoque(); return; }
   if (pg === 'vendas')    { c.innerHTML = renderVendas(); bindVendas(); return; }
   if (pg === 'logs')      { c.innerHTML = renderLogs(); return; }
 }
@@ -2266,6 +2276,287 @@ function tnGeneratePDF(qtdEtiquetas) {
 }
 
 
+// ─── ESTOQUE ──────────────────────────────────────────────────────────────────
+var _estoqueTab = 'estoque'; // 'estoque' | 'movimentacao'
+
+function isAdmin() {
+  return state.currentUser && state.currentUser.role === 'admin';
+}
+
+function renderEstoque() {
+  var tab = _estoqueTab;
+  var isEst = tab === 'estoque';
+
+  var tabBar =
+    '<div style="display:flex;border-bottom:2px solid var(--border);margin-bottom:1.5rem">' +
+      '<button onclick="estoqueSetTab(\'estoque\')" style="padding:0.65rem 1.5rem;background:none;border:none;border-bottom:' + (isEst ? '3px solid var(--green);color:var(--green);font-weight:600' : 'none;color:var(--text2)') + ';cursor:pointer;font-size:0.95rem;margin-bottom:-2px;transition:all 0.15s">📦 Estoque</button>' +
+      '<button onclick="estoqueSetTab(\'movimentacao\')" style="padding:0.65rem 1.5rem;background:none;border:none;border-bottom:' + (!isEst ? '3px solid var(--green);color:var(--green);font-weight:600' : 'none;color:var(--text2)') + ';cursor:pointer;font-size:0.95rem;margin-bottom:-2px;transition:all 0.15s">↕ Entrada / Saída</button>' +
+    '</div>';
+
+  if (isEst) {
+    return tabBar + renderEstoqueCards();
+  } else {
+    return tabBar + renderEstoqueMovimentacao();
+  }
+}
+
+function renderEstoqueCards() {
+  var produtos = state.estoque.produtos;
+  var html = '';
+
+  // Header com botão de novo produto (admin only)
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem">' +
+    '<div style="font-size:0.85rem;color:var(--text3)">' + produtos.length + ' produto(s) cadastrado(s)</div>' +
+    (isAdmin() ? '<button class="btn btn-green" onclick="estoqueAbrirModalProduto(null)">+ Novo Produto</button>' : '') +
+  '</div>';
+
+  if (!produtos.length) {
+    return html + '<div class="empty-state">' + iconEmpty() + '<p>' + (isAdmin() ? 'Nenhum produto cadastrado. Clique em "+ Novo Produto" para começar.' : 'Nenhum produto no estoque.') + '</p></div>';
+  }
+
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:1rem">';
+  produtos.forEach(function(p, i) {
+    var baixo = p.qtd <= (p.minimo || 0);
+    var zerado = p.qtd <= 0;
+    var cor = zerado ? 'var(--red)' : (baixo ? 'var(--amber)' : 'var(--green)');
+    var badge = zerado ? '🔴 Zerado' : (baixo ? '🟡 Baixo' : '🟢 OK');
+    html +=
+      '<div class="card" style="padding:1rem;position:relative">' +
+        (isAdmin() ?
+          '<div style="position:absolute;top:10px;right:10px;display:flex;gap:4px">' +
+            '<button class="btn btn-sm" onclick="estoqueAbrirModalProduto(' + i + ')" title="Editar">✏️</button>' +
+            '<button class="btn btn-sm btn-red" onclick="estoqueExcluirProduto(' + i + ')" title="Excluir">✕</button>' +
+          '</div>'
+        : '') +
+        '<div style="font-size:1rem;font-weight:700;margin-bottom:2px;padding-right:' + (isAdmin() ? '60px' : '0') + '">' + esc(p.nome) + '</div>' +
+        (p.unidade ? '<div style="font-size:0.75rem;color:var(--text3);margin-bottom:10px">' + esc(p.unidade) + '</div>' : '<div style="margin-bottom:10px"></div>') +
+        '<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:8px">' +
+          '<div>' +
+            '<div style="font-size:2rem;font-weight:800;line-height:1;color:' + cor + '">' + p.qtd + '</div>' +
+            '<div style="font-size:0.7rem;color:var(--text3);margin-top:2px">em estoque' + (p.minimo ? ' · mín. ' + p.minimo : '') + '</div>' +
+          '</div>' +
+          '<div style="font-size:0.75rem;font-weight:600;color:' + cor + ';background:' + cor + '18;padding:3px 8px;border-radius:20px">' + badge + '</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:6px">' +
+          (isAdmin() ? '<button class="btn btn-sm btn-green" style="flex:1" onclick="estoqueAbrirModalMov(' + i + ',\'entrada\')">＋ Entrada</button>' : '') +
+          '<button class="btn btn-sm btn-red" style="flex:1" onclick="estoqueAbrirModalMov(' + i + ',\'saida\')">－ Saída</button>' +
+        '</div>' +
+      '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function renderEstoqueMovimentacao() {
+  var produtos = state.estoque.produtos;
+  var movs = state.estoque.movimentacoes;
+  var isAdm = isAdmin();
+  var html = '';
+
+  // Formulário de movimentação
+  html +=
+    '<div class="card" style="padding:1.25rem;margin-bottom:1.5rem">' +
+      '<div class="card-header" style="margin-bottom:1rem"><span class="card-title">Registrar Movimentação</span></div>' +
+      '<div style="display:grid;grid-template-columns:' + (isAdm ? '1fr 1fr 120px 1fr' : '1fr 100px 1fr') + ';gap:10px;align-items:end">' +
+        '<div><label style="font-size:0.78rem;color:var(--text2);margin-bottom:4px;display:block">Produto</label>' +
+          '<select id="est-mov-produto" style="width:100%;padding:0.6rem 0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem">' +
+            '<option value="">Selecione...</option>' +
+            produtos.map(function(p,i){ return '<option value="' + i + '">' + esc(p.nome) + ' (' + p.qtd + ' ' + esc(p.unidade||'un') + ')</option>'; }).join('') +
+          '</select>' +
+        '</div>' +
+        (isAdm ?
+          '<div><label style="font-size:0.78rem;color:var(--text2);margin-bottom:4px;display:block">Tipo</label>' +
+            '<select id="est-mov-tipo" style="width:100%;padding:0.6rem 0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem">' +
+              '<option value="entrada">📥 Entrada</option>' +
+              '<option value="saida">📤 Saída</option>' +
+            '</select>' +
+          '</div>'
+        : '<input type="hidden" id="est-mov-tipo" value="saida">') +
+        '<div><label style="font-size:0.78rem;color:var(--text2);margin-bottom:4px;display:block">Quantidade</label>' +
+          '<input type="number" id="est-mov-qtd" min="1" value="1" style="width:100%;padding:0.6rem 0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem">' +
+        '</div>' +
+        '<div><label style="font-size:0.78rem;color:var(--text2);margin-bottom:4px;display:block">Observação</label>' +
+          '<input type="text" id="est-mov-obs" placeholder="Opcional" style="width:100%;padding:0.6rem 0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem">' +
+        '</div>' +
+      '</div>' +
+      '<div style="margin-top:10px;display:flex;gap:8px;align-items:center">' +
+        '<button class="btn btn-green" onclick="estoqueRegistrarMov()">✓ Registrar</button>' +
+        '<span id="est-mov-status" style="font-size:0.85rem;color:var(--text2)"></span>' +
+      '</div>' +
+    '</div>';
+
+  // Lista de movimentações
+  html += '<div class="card" style="padding:1.25rem">';
+  html += '<div class="card-header"><span class="card-title">Histórico de Movimentações</span>';
+  if (movs.length) html += '<button class="btn btn-sm btn-red" onclick="estoqueLimparHistorico()">Limpar histórico</button>';
+  html += '</div>';
+
+  if (!movs.length) {
+    html += '<div class="empty-state" style="padding:2rem 0">' + iconEmpty() + '<p>Nenhuma movimentação registrada ainda.</p></div>';
+  } else {
+    html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">' +
+      '<thead><tr style="background:var(--bg3);border-bottom:2px solid var(--border)">' +
+        '<th style="text-align:left;padding:8px 10px">Data/Hora</th>' +
+        '<th style="text-align:left;padding:8px 10px">Produto</th>' +
+        '<th style="text-align:center;padding:8px 10px">Tipo</th>' +
+        '<th style="text-align:center;padding:8px 10px">Qtd</th>' +
+        '<th style="text-align:left;padding:8px 10px">Saldo</th>' +
+        '<th style="text-align:left;padding:8px 10px">Usuário</th>' +
+        '<th style="text-align:left;padding:8px 10px">Obs.</th>' +
+      '</tr></thead><tbody>';
+    movs.slice().reverse().forEach(function(m, ri) {
+      var isEnt = m.tipo === 'entrada';
+      html += '<tr style="border-bottom:1px solid var(--border)' + (ri % 2 === 1 ? ';background:var(--bg3)' : '') + '">' +
+        '<td style="padding:7px 10px;color:var(--text3);white-space:nowrap">' + esc(m.data) + '</td>' +
+        '<td style="padding:7px 10px;font-weight:600">' + esc(m.produto) + '</td>' +
+        '<td style="padding:7px 10px;text-align:center">' +
+          '<span style="padding:2px 8px;border-radius:12px;font-size:0.75rem;font-weight:700;background:' + (isEnt ? 'var(--green)' : 'var(--red)') + '18;color:' + (isEnt ? 'var(--green)' : 'var(--red)') + '">' +
+            (isEnt ? '📥 Entrada' : '📤 Saída') +
+          '</span>' +
+        '</td>' +
+        '<td style="padding:7px 10px;text-align:center;font-weight:700;color:' + (isEnt ? 'var(--green)' : 'var(--red)') + '">' + (isEnt ? '+' : '-') + m.qtd + '</td>' +
+        '<td style="padding:7px 10px;color:var(--text2)">' + (m.saldoApos !== undefined ? m.saldoApos : '—') + '</td>' +
+        '<td style="padding:7px 10px;color:var(--text3)">' + esc(m.usuario || '—') + '</td>' +
+        '<td style="padding:7px 10px;color:var(--text2)">' + esc(m.obs || '—') + '</td>' +
+      '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function setupEstoque() {}
+
+function estoqueSetTab(tab) {
+  _estoqueTab = tab;
+  navigate('estoque');
+}
+
+function estoqueRegistrarMov() {
+  var idxEl  = document.getElementById('est-mov-produto');
+  var tipoEl = document.getElementById('est-mov-tipo');
+  var qtdEl  = document.getElementById('est-mov-qtd');
+  var obsEl  = document.getElementById('est-mov-obs');
+  var status = document.getElementById('est-mov-status');
+
+  var idx  = idxEl  ? parseInt(idxEl.value)  : -1;
+  var tipo = tipoEl ? tipoEl.value           : 'saida';
+  var qtd  = qtdEl  ? parseInt(qtdEl.value)  : 0;
+  var obs  = obsEl  ? obsEl.value.trim()     : '';
+
+  if (isNaN(idx) || idx < 0 || !state.estoque.produtos[idx]) { if(status) status.textContent = '⚠ Selecione um produto.'; return; }
+  if (!qtd || qtd < 1) { if(status) status.textContent = '⚠ Informe uma quantidade válida.'; return; }
+
+  var p = state.estoque.produtos[idx];
+  if (tipo === 'saida' && qtd > p.qtd) { if(status) status.textContent = '⚠ Quantidade maior que o estoque (' + p.qtd + ').'; return; }
+
+  var anterior = p.qtd;
+  p.qtd = tipo === 'entrada' ? p.qtd + qtd : p.qtd - qtd;
+
+  var now = new Date();
+  var dataStr = now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
+
+  state.estoque.movimentacoes.push({
+    id: Date.now(),
+    data: dataStr,
+    produto: p.nome,
+    tipo: tipo,
+    qtd: qtd,
+    saldoApos: p.qtd,
+    usuario: state.currentUser ? state.currentUser.login : '—',
+    obs: obs,
+  });
+
+  addLog((tipo === 'entrada' ? 'Entrada' : 'Saída') + ' de estoque: ' + qtd + 'x ' + p.nome + ' (antes: ' + anterior + ' → agora: ' + p.qtd + ')');
+  saveState();
+  if (status) { status.textContent = '✓ Registrado!'; setTimeout(function(){ status.textContent=''; }, 2000); }
+  navigate('estoque');
+}
+
+function estoqueAbrirModalMov(idx, tipo) {
+  _estoqueTab = 'movimentacao';
+  navigate('estoque');
+  setTimeout(function() {
+    var idxEl  = document.getElementById('est-mov-produto');
+    var tipoEl = document.getElementById('est-mov-tipo');
+    if (idxEl)  idxEl.value  = idx;
+    if (tipoEl) tipoEl.value = tipo;
+    var qtdEl = document.getElementById('est-mov-qtd');
+    if (qtdEl) { qtdEl.focus(); qtdEl.select(); }
+  }, 80);
+}
+
+function estoqueAbrirModalProduto(idx) {
+  var p = idx !== null ? state.estoque.produtos[idx] : null;
+  var modal = document.getElementById('modal');
+  var modalContent = document.getElementById('modal-content');
+  if (!modal || !modalContent) return;
+  modalContent.innerHTML =
+    '<div style="padding:1.5rem;min-width:300px;max-width:400px">' +
+      '<div style="font-size:1.1rem;font-weight:700;margin-bottom:1.25rem">' + (p ? '✏️ Editar Produto' : '+ Novo Produto') + '</div>' +
+      '<div style="margin-bottom:10px"><label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:4px">Nome do Produto *</label>' +
+        '<input id="est-p-nome" class="tn-input" placeholder="Ex: Granola Crunchy" value="' + esc(p ? p.nome : '') + '" style="width:100%;margin:0"></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">' +
+        '<div><label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:4px">Unidade</label>' +
+          '<input id="est-p-unidade" class="tn-input" placeholder="Ex: kg, un, cx" value="' + esc(p ? (p.unidade||'') : '') + '" style="width:100%;margin:0"></div>' +
+        '<div><label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:4px">Qtd. Inicial</label>' +
+          '<input id="est-p-qtd" type="number" class="tn-input" min="0" value="' + (p ? p.qtd : '0') + '" style="width:100%;margin:0"></div>' +
+      '</div>' +
+      '<div style="margin-bottom:1.25rem"><label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:4px">Estoque Mínimo (alerta)</label>' +
+        '<input id="est-p-minimo" type="number" class="tn-input" min="0" value="' + (p ? (p.minimo||0) : '0') + '" style="width:100%;margin:0"></div>' +
+      '<div style="display:flex;gap:8px">' +
+        '<button class="btn" style="flex:1" onclick="closeModal()">Cancelar</button>' +
+        '<button class="btn btn-green" style="flex:1" onclick="estoqueSalvarProduto(' + (idx !== null ? idx : 'null') + ')">💾 Salvar</button>' +
+      '</div>' +
+      '<div id="est-p-status" style="font-size:0.82rem;color:var(--red);text-align:center;margin-top:8px;min-height:1.2em"></div>' +
+    '</div>';
+  modal.style.display = 'flex';
+  setTimeout(function(){ var el = document.getElementById('est-p-nome'); if(el) el.focus(); }, 50);
+}
+
+function estoqueSalvarProduto(idx) {
+  var nome   = (document.getElementById('est-p-nome')    ||{}).value || '';
+  var unidade= (document.getElementById('est-p-unidade') ||{}).value || '';
+  var qtd    = parseInt((document.getElementById('est-p-qtd')    ||{}).value) || 0;
+  var minimo = parseInt((document.getElementById('est-p-minimo') ||{}).value) || 0;
+  var status = document.getElementById('est-p-status');
+
+  if (!nome.trim()) { if(status) status.textContent = 'Informe o nome do produto.'; return; }
+
+  if (idx === null || idx === 'null') {
+    state.estoque.produtos.push({ nome: nome.trim(), unidade: unidade.trim(), qtd: qtd, minimo: minimo });
+    addLog('Cadastrou produto no estoque: "' + nome.trim() + '"');
+  } else {
+    var p = state.estoque.produtos[idx];
+    p.nome = nome.trim(); p.unidade = unidade.trim(); p.minimo = minimo;
+    // Só atualiza qtd se mudou (não registra movimentação automática na edição)
+    p.qtd = qtd;
+    addLog('Editou produto no estoque: "' + nome.trim() + '"');
+  }
+  saveState();
+  closeModal();
+  navigate('estoque');
+}
+
+function estoqueExcluirProduto(idx) {
+  var p = state.estoque.produtos[idx];
+  if (!p) return;
+  if (!confirm('Excluir "' + p.nome + '" do estoque? Esta ação não pode ser desfeita.')) return;
+  addLog('Excluiu produto do estoque: "' + p.nome + '"');
+  state.estoque.produtos.splice(idx, 1);
+  saveState();
+  navigate('estoque');
+}
+
+function estoqueLimparHistorico() {
+  if (!confirm('Limpar todo o histórico de movimentações?')) return;
+  state.estoque.movimentacoes = [];
+  addLog('Limpou histórico de movimentações do estoque');
+  saveState();
+  navigate('estoque');
+}
+
 // ─── VENDAS — MERCADO LIVRE ───────────────────────────────────────────────────
 const ML_CLIENT_ID     = '3307309227859868';
 const ML_CLIENT_SECRET = 'c2yBzHKBjJNFbM3JIlh6ppld3JgE5k5u';
@@ -2852,6 +3143,7 @@ function closeModalOutside(e) { if(e.target.id === 'modal') closeModal(); }
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 function esc(str) { return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+function iconEstoque() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>`; }
 function iconHome() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`; }
 function iconTruck() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`; }
 function iconFactory() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 20V8l6-4v4l6-4v4l6-4v16H2z"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="10" y1="20" x2="10" y2="14"/><line x1="14" y1="20" x2="14" y2="14"/></svg>`; }

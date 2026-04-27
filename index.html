@@ -2343,10 +2343,10 @@ function renderEstoqueCards() {
           'Ordenar' + (ordem !== 'nome' ? ' <span style="color:var(--green);font-weight:700">•</span>' : '') +
         '</button>' +
         (ordemAberto ?
-          '<div style="position:absolute;right:0;top:calc(100% + 6px);background:var(--card-bg);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.18);z-index:100;min-width:200px;overflow:hidden">' +
+          '<div style="position:absolute;right:0;top:calc(100% + 6px);background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.22);z-index:999;min-width:210px;overflow:hidden">' +
             ['nome','qtd-asc','qtd-desc','status-asc','status-desc'].map(function(o){
               var ativo = ordem === o;
-              return '<div onclick="estoqueSetOrdem(\'' + o + '\')" style="padding:10px 16px;cursor:pointer;font-size:0.87rem;display:flex;align-items:center;justify-content:space-between;gap:8px;background:' + (ativo?'var(--bg3)':'transparent') + ';color:' + (ativo?'var(--green)':'var(--text)') + ';transition:background 0.1s" onmouseover="this.style.background=\'var(--bg3)\'" onmouseout="this.style.background=\'' + (ativo?'var(--bg3)':'transparent') + '\'">' +
+              return '<div onclick="estoqueSetOrdem(\'' + o + '\')" style="padding:10px 16px;cursor:pointer;font-size:0.87rem;display:flex;align-items:center;justify-content:space-between;gap:8px;color:' + (ativo?'var(--green)':'var(--text)') + ';font-weight:' + (ativo?'700':'400') + ';border-bottom:1px solid var(--border)">' +
                 '<span>' + ordemLabels[o] + '</span>' +
                 (ativo ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="width:14px;height:14px;flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg>' : '') +
               '</div>';

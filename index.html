@@ -2277,8 +2277,10 @@ function tnGeneratePDF(qtdEtiquetas) {
 
 
 // ─── ESTOQUE ──────────────────────────────────────────────────────────────────
-var _estoqueTab = 'estoque'; // 'estoque' | 'movimentacao'
-var _estoqueOrdem = 'nome';  // 'nome' | 'qtd-asc' | 'qtd-desc' | 'status-asc' | 'status-desc'
+var _estoqueTab = 'estoque';
+var _estoqueOrdem = 'nome';
+var _estoqueBusca = '';
+var _estoqueOrdemAberto = false;
 
 function isAdmin() {
   return state.currentUser && state.currentUser.role === 'admin';
@@ -2302,15 +2304,19 @@ function renderEstoque() {
 }
 
 function renderEstoqueCards() {
-  var produtos = state.estoque.produtos.slice();
-  var html = '';
-
-  // ── Ordenação ──────────────────────────────────────────────
+  var busca = (typeof _estoqueBusca !== 'undefined') ? _estoqueBusca.toLowerCase() : '';
   var ordem = (typeof _estoqueOrdem !== 'undefined') ? _estoqueOrdem : 'nome';
-  if (ordem === 'qtd-asc')       produtos.sort(function(a,b){ return a.qtd - b.qtd; });
-  else if (ordem === 'qtd-desc') produtos.sort(function(a,b){ return b.qtd - a.qtd; });
+  var ordemAberto = (typeof _estoqueOrdemAberto !== 'undefined') ? _estoqueOrdemAberto : false;
+
+  var produtos = state.estoque.produtos.slice();
+
+  // ── Filtro por busca ──────────────────────────────────────
+  if (busca) produtos = produtos.filter(function(p){ return p.nome.toLowerCase().indexOf(busca) !== -1; });
+
+  // ── Ordenação ─────────────────────────────────────────────
+  if (ordem === 'qtd-asc')         produtos.sort(function(a,b){ return a.qtd - b.qtd; });
+  else if (ordem === 'qtd-desc')   produtos.sort(function(a,b){ return b.qtd - a.qtd; });
   else if (ordem === 'status-asc') produtos.sort(function(a,b){
-    // zerado → baixo → ok
     function nivel(p){ return p.qtd <= 0 ? 0 : (p.qtd <= (p.minimo||0) ? 1 : 2); }
     return nivel(a) - nivel(b);
   });
@@ -2319,24 +2325,45 @@ function renderEstoqueCards() {
     return nivel(b) - nivel(a);
   });
 
+  var ordemLabels = { 'nome':'Padrão', 'qtd-asc':'↑ Qtd crescente', 'qtd-desc':'↓ Qtd decrescente', 'status-asc':'🔴→🟢 Zerado p/ OK', 'status-desc':'🟢→🔴 OK p/ Zerado' };
+
   // ── Header ────────────────────────────────────────────────
-  html +=
-    '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:1.25rem">' +
-      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
-        '<div style="font-size:0.85rem;color:var(--text3)">' + produtos.length + ' produto(s)</div>' +
-        '<div style="display:flex;gap:4px;flex-wrap:wrap">' +
-          ['qtd-asc','qtd-desc','status-asc','status-desc'].map(function(o){
-            var labels = { 'qtd-asc':'↑ Qtd','qtd-desc':'↓ Qtd','status-asc':'🔴→🟢','status-desc':'🟢→🔴' };
-            var ativo = ordem === o;
-            return '<button onclick="estoqueSetOrdem(\'' + o + '\')" style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:0.78rem;font-weight:' + (ativo?'700':'400') + ';background:' + (ativo?'var(--green)':'var(--bg2)') + ';color:' + (ativo?'#fff':'var(--text2)') + ';transition:all 0.15s">' + labels[o] + '</button>';
-          }).join('') +
-        '</div>' +
+  var html =
+    '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:1.25rem">' +
+      // Busca
+      '<div style="flex:1;min-width:180px;position:relative">' +
+        '<input id="est-busca" type="text" placeholder="🔍 Buscar produto..." value="' + esc(busca) + '" ' +
+          'oninput="estoqueSetBusca(this.value)" ' +
+          'style="width:100%;padding:0.55rem 0.9rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem">' +
       '</div>' +
-      (isAdmin() ? '<button class="btn btn-green" onclick="estoqueAbrirModalProduto(null)">+ Novo Produto</button>' : '') +
+      // Ordenar dropdown
+      '<div style="position:relative">' +
+        '<button onclick="estoqueToggleOrdem()" style="display:flex;align-items:center;gap:6px;padding:0.55rem 1rem;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text2);cursor:pointer;font-size:0.88rem;white-space:nowrap">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="9" y2="18"/></svg>' +
+          'Ordenar' + (ordem !== 'nome' ? ' <span style="color:var(--green);font-weight:700">•</span>' : '') +
+        '</button>' +
+        (ordemAberto ?
+          '<div style="position:absolute;right:0;top:calc(100% + 6px);background:var(--card-bg);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.18);z-index:100;min-width:200px;overflow:hidden">' +
+            ['nome','qtd-asc','qtd-desc','status-asc','status-desc'].map(function(o){
+              var ativo = ordem === o;
+              return '<div onclick="estoqueSetOrdem(\'' + o + '\')" style="padding:10px 16px;cursor:pointer;font-size:0.87rem;display:flex;align-items:center;justify-content:space-between;gap:8px;background:' + (ativo?'var(--bg3)':'transparent') + ';color:' + (ativo?'var(--green)':'var(--text)') + ';transition:background 0.1s" onmouseover="this.style.background=\'var(--bg3)\'" onmouseout="this.style.background=\'' + (ativo?'var(--bg3)':'transparent') + '\'">' +
+                '<span>' + ordemLabels[o] + '</span>' +
+                (ativo ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="width:14px;height:14px;flex-shrink:0"><polyline points="20 6 9 17 4 12"/></svg>' : '') +
+              '</div>';
+            }).join('') +
+          '</div>'
+        : '') +
+      '</div>' +
+      // Contador + Novo Produto
+      '<div style="font-size:0.82rem;color:var(--text3);white-space:nowrap">' + produtos.length + (busca ? ' resultado(s)' : ' produto(s)') + '</div>' +
+      (isAdmin() ? '<button class="btn btn-green" onclick="estoqueAbrirModalProduto(null)" style="white-space:nowrap">+ Novo Produto</button>' : '') +
     '</div>';
 
-  if (!produtos.length) {
+  if (!state.estoque.produtos.length) {
     return html + '<div class="empty-state">' + iconEmpty() + '<p>' + (isAdmin() ? 'Nenhum produto cadastrado. Clique em "+ Novo Produto" para começar.' : 'Nenhum produto no estoque.') + '</p></div>';
+  }
+  if (!produtos.length) {
+    return html + '<div class="empty-state">' + iconEmpty() + '<p>Nenhum produto encontrado para "<b>' + esc(busca) + '</b>".</p></div>';
   }
 
   html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem">';
@@ -2463,13 +2490,42 @@ function setupEstoque() {}
 
 function estoqueSetTab(tab) {
   _estoqueTab = tab;
+  _estoqueOrdemAberto = false;
   navigate('estoque');
 }
 
 function estoqueSetOrdem(ordem) {
   _estoqueOrdem = ordem;
+  _estoqueOrdemAberto = false;
   var c = document.getElementById('page-content');
   if (c) c.innerHTML = renderEstoque();
+}
+
+function estoqueToggleOrdem() {
+  _estoqueOrdemAberto = !_estoqueOrdemAberto;
+  var c = document.getElementById('page-content');
+  if (c) c.innerHTML = renderEstoque();
+  // Fecha se clicar fora
+  if (_estoqueOrdemAberto) {
+    setTimeout(function() {
+      document.addEventListener('click', function fechar(e) {
+        if (!e.target.closest || !e.target.closest('[data-est-ordem]')) {
+          _estoqueOrdemAberto = false;
+          var c2 = document.getElementById('page-content');
+          if (c2) c2.innerHTML = renderEstoque();
+          document.removeEventListener('click', fechar);
+        }
+      });
+    }, 50);
+  }
+}
+
+function estoqueSetBusca(val) {
+  _estoqueBusca = val || '';
+  var c = document.getElementById('page-content');
+  if (c) c.innerHTML = renderEstoque();
+  var inp = document.getElementById('est-busca');
+  if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
 }
 
 function estoqueRegistrarMov() {

@@ -2278,6 +2278,7 @@ function tnGeneratePDF(qtdEtiquetas) {
 
 // ─── ESTOQUE ──────────────────────────────────────────────────────────────────
 var _estoqueTab = 'estoque'; // 'estoque' | 'movimentacao'
+var _estoqueOrdem = 'nome';  // 'nome' | 'qtd-asc' | 'qtd-desc' | 'status-asc' | 'status-desc'
 
 function isAdmin() {
   return state.currentUser && state.currentUser.role === 'admin';
@@ -2301,42 +2302,74 @@ function renderEstoque() {
 }
 
 function renderEstoqueCards() {
-  var produtos = state.estoque.produtos;
+  var produtos = state.estoque.produtos.slice();
   var html = '';
 
-  // Header com botão de novo produto (admin only)
-  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem">' +
-    '<div style="font-size:0.85rem;color:var(--text3)">' + produtos.length + ' produto(s) cadastrado(s)</div>' +
-    (isAdmin() ? '<button class="btn btn-green" onclick="estoqueAbrirModalProduto(null)">+ Novo Produto</button>' : '') +
-  '</div>';
+  // ── Ordenação ──────────────────────────────────────────────
+  var ordem = (typeof _estoqueOrdem !== 'undefined') ? _estoqueOrdem : 'nome';
+  if (ordem === 'qtd-asc')       produtos.sort(function(a,b){ return a.qtd - b.qtd; });
+  else if (ordem === 'qtd-desc') produtos.sort(function(a,b){ return b.qtd - a.qtd; });
+  else if (ordem === 'status-asc') produtos.sort(function(a,b){
+    // zerado → baixo → ok
+    function nivel(p){ return p.qtd <= 0 ? 0 : (p.qtd <= (p.minimo||0) ? 1 : 2); }
+    return nivel(a) - nivel(b);
+  });
+  else if (ordem === 'status-desc') produtos.sort(function(a,b){
+    function nivel(p){ return p.qtd <= 0 ? 0 : (p.qtd <= (p.minimo||0) ? 1 : 2); }
+    return nivel(b) - nivel(a);
+  });
+
+  // ── Header ────────────────────────────────────────────────
+  html +=
+    '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:1.25rem">' +
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+        '<div style="font-size:0.85rem;color:var(--text3)">' + produtos.length + ' produto(s)</div>' +
+        '<div style="display:flex;gap:4px;flex-wrap:wrap">' +
+          ['qtd-asc','qtd-desc','status-asc','status-desc'].map(function(o){
+            var labels = { 'qtd-asc':'↑ Qtd','qtd-desc':'↓ Qtd','status-asc':'🔴→🟢','status-desc':'🟢→🔴' };
+            var ativo = ordem === o;
+            return '<button onclick="estoqueSetOrdem(\'' + o + '\')" style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:0.78rem;font-weight:' + (ativo?'700':'400') + ';background:' + (ativo?'var(--green)':'var(--bg2)') + ';color:' + (ativo?'#fff':'var(--text2)') + ';transition:all 0.15s">' + labels[o] + '</button>';
+          }).join('') +
+        '</div>' +
+      '</div>' +
+      (isAdmin() ? '<button class="btn btn-green" onclick="estoqueAbrirModalProduto(null)">+ Novo Produto</button>' : '') +
+    '</div>';
 
   if (!produtos.length) {
     return html + '<div class="empty-state">' + iconEmpty() + '<p>' + (isAdmin() ? 'Nenhum produto cadastrado. Clique em "+ Novo Produto" para começar.' : 'Nenhum produto no estoque.') + '</p></div>';
   }
 
-  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:1rem">';
-  produtos.forEach(function(p, i) {
-    var baixo = p.qtd <= (p.minimo || 0);
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem">';
+  produtos.forEach(function(p) {
+    // Busca índice real no array original (para passar ao modal/excluir)
+    var i = state.estoque.produtos.indexOf(p);
+    var baixo = p.qtd > 0 && p.qtd <= (p.minimo || 0);
     var zerado = p.qtd <= 0;
     var cor = zerado ? 'var(--red)' : (baixo ? 'var(--amber)' : 'var(--green)');
     var badge = zerado ? '🔴 Zerado' : (baixo ? '🟡 Baixo' : '🟢 OK');
     html +=
-      '<div class="card" style="padding:1rem;position:relative">' +
-        (isAdmin() ?
-          '<div style="position:absolute;top:10px;right:10px;display:flex;gap:4px">' +
-            '<button class="btn btn-sm" onclick="estoqueAbrirModalProduto(' + i + ')" title="Editar">✏️</button>' +
-            '<button class="btn btn-sm btn-red" onclick="estoqueExcluirProduto(' + i + ')" title="Excluir">✕</button>' +
-          '</div>'
-        : '') +
-        '<div style="font-size:1rem;font-weight:700;margin-bottom:2px;padding-right:' + (isAdmin() ? '60px' : '0') + '">' + esc(p.nome) + '</div>' +
+      '<div class="card" style="padding:1rem;display:flex;flex-direction:column;gap:0">' +
+        // Linha do topo: nome + botões lado a lado
+        '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:2px">' +
+          '<div style="font-size:0.95rem;font-weight:700;line-height:1.3;flex:1;min-width:0;word-break:break-word">' + esc(p.nome) + '</div>' +
+          (isAdmin() ?
+            '<div style="display:flex;gap:4px;flex-shrink:0">' +
+              '<button class="btn btn-sm" onclick="estoqueAbrirModalProduto(' + i + ')" title="Editar" style="padding:4px 7px">✏️</button>' +
+              '<button class="btn btn-sm btn-red" onclick="estoqueExcluirProduto(' + i + ')" title="Excluir" style="padding:4px 7px">✕</button>' +
+            '</div>'
+          : '') +
+        '</div>' +
+        // Unidade
         (p.unidade ? '<div style="font-size:0.75rem;color:var(--text3);margin-bottom:10px">' + esc(p.unidade) + '</div>' : '<div style="margin-bottom:10px"></div>') +
-        '<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:8px">' +
+        // Quantidade + badge
+        '<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:10px">' +
           '<div>' +
             '<div style="font-size:2rem;font-weight:800;line-height:1;color:' + cor + '">' + p.qtd + '</div>' +
             '<div style="font-size:0.7rem;color:var(--text3);margin-top:2px">em estoque' + (p.minimo ? ' · mín. ' + p.minimo : '') + '</div>' +
           '</div>' +
-          '<div style="font-size:0.75rem;font-weight:600;color:' + cor + ';background:' + cor + '18;padding:3px 8px;border-radius:20px">' + badge + '</div>' +
+          '<div style="font-size:0.72rem;font-weight:600;color:' + cor + ';background:' + cor + '18;padding:3px 8px;border-radius:20px;white-space:nowrap">' + badge + '</div>' +
         '</div>' +
+        // Botões entrada/saída
         '<div style="display:flex;gap:6px">' +
           (isAdmin() ? '<button class="btn btn-sm btn-green" style="flex:1" onclick="estoqueAbrirModalMov(' + i + ',\'entrada\')">＋ Entrada</button>' : '') +
           '<button class="btn btn-sm btn-red" style="flex:1" onclick="estoqueAbrirModalMov(' + i + ',\'saida\')">－ Saída</button>' +
@@ -2431,6 +2464,12 @@ function setupEstoque() {}
 function estoqueSetTab(tab) {
   _estoqueTab = tab;
   navigate('estoque');
+}
+
+function estoqueSetOrdem(ordem) {
+  _estoqueOrdem = ordem;
+  var c = document.getElementById('page-content');
+  if (c) c.innerHTML = renderEstoque();
 }
 
 function estoqueRegistrarMov() {

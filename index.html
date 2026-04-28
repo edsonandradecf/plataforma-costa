@@ -325,6 +325,7 @@ let state = {
   logs: [],
   tabnutri: [],
   estoque: { produtos: [], movimentacoes: [] },
+  ponto: { colaboradores: [], registros: [] },
   mlToken: null,
   currentUser: null,
   currentPage: 'inicio',
@@ -390,6 +391,11 @@ function applyParsed(parsed, forceMerge) {
   state.estoque = {
     produtos:       Array.isArray(est.produtos)       ? est.produtos       : [],
     movimentacoes:  Array.isArray(est.movimentacoes)  ? est.movimentacoes  : [],
+  };
+  var pt = parsed.ponto || {};
+  state.ponto = {
+    colaboradores: Array.isArray(pt.colaboradores) ? pt.colaboradores : [],
+    registros:     Array.isArray(pt.registros)     ? pt.registros     : [],
   };
   if (parsed.mlToken) {
     state.mlToken = parsed.mlToken;
@@ -528,6 +534,7 @@ function saveState() {
     logs:     state.logs,
     tabnutri: state.tabnutri,
     estoque:  state.estoque,
+    ponto:    state.ponto,
     mlToken:  state.mlToken || null,
   };
   localStorage.setItem('costa_state', JSON.stringify(data));
@@ -730,6 +737,7 @@ function getPagesAdmin() {
     { id: 'producao',  label: 'Produção',              icon: iconFactory() },
     { id: 'compras',   label: 'Compras',               icon: iconCart() },
     { id: 'estoque',   label: 'Estoque',               icon: iconEstoque() },
+    { id: 'ponto',     label: 'Ponto Virtual',         icon: iconPonto() },
     { id: 'mural',     label: 'Mural',                 icon: iconMural() },
     { id: 'etiquetas', label: 'Gerador de Etiquetas',  icon: iconLabel() },
     { id: 'agenda',    label: 'Agenda',                icon: iconCal() },
@@ -810,7 +818,7 @@ function startApp() {
 
 function renderPage() {
   if (!state.currentUser) return;
-  var titles = { inicio:'Início', expedicao:'Expedição', producao:'Produção', compras:'Compras', estoque:'Estoque', mural:'Mural', etiquetas:'Gerador de Etiquetas', agenda:'Agenda', tabnutri:'Tabela Nutricional', vendas:'Vendas', logs:'Logs' };
+  var titles = { inicio:'Início', expedicao:'Expedição', producao:'Produção', compras:'Compras', estoque:'Estoque', ponto:'Ponto Virtual', mural:'Mural', etiquetas:'Gerador de Etiquetas', agenda:'Agenda', tabnutri:'Tabela Nutricional', vendas:'Vendas', logs:'Logs' };
   var titleEl = document.getElementById('page-title');
   if (titleEl) titleEl.textContent = titles[state.currentPage] || '';
   var c = document.getElementById('page-content');
@@ -825,6 +833,7 @@ function renderPage() {
   if (pg === 'agenda')    { c.innerHTML = renderAgenda(); return; }
   if (pg === 'tabnutri')  { c.innerHTML = renderTabNutri(); setupTabNutri(); return; }
   if (pg === 'estoque')   { c.innerHTML = renderEstoque(); setupEstoque(); return; }
+  if (pg === 'ponto')     { c.innerHTML = renderPonto(); return; }
   if (pg === 'vendas')    { c.innerHTML = renderVendas(); bindVendas(); return; }
   if (pg === 'logs')      { c.innerHTML = renderLogs(); return; }
 }
@@ -2276,6 +2285,519 @@ function tnGeneratePDF(qtdEtiquetas) {
 }
 
 
+// ─── PONTO VIRTUAL ────────────────────────────────────────────────────────────
+
+var _pontoTab        = 'cards';   // 'cards' | 'historico'
+var _pontoColabSel   = null;      // índice do colaborador selecionado
+var _pontoSenhaOk    = false;     // senha validada no card aberto
+var _pontoHistFiltro = '';        // filtro de nome no histórico
+
+function renderPonto() {
+  if (isAdmin()) return renderPontoAdmin();
+  return renderPontoPublico();
+}
+
+// ── VISÃO PÚBLICA (todos os usuários) ────────────────────────────────────────
+function renderPontoPublico() {
+  var cols = state.ponto.colaboradores;
+
+  if (_pontoColabSel !== null && cols[_pontoColabSel]) {
+    return renderPontoColabAberto(_pontoColabSel);
+  }
+
+  var html = '<div style="margin-bottom:1.5rem">' +
+    '<div style="font-size:1rem;color:var(--text2);margin-bottom:1.5rem">Selecione seu perfil para registrar ponto:</div>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:1rem">';
+
+  if (!cols.length) {
+    html += '<div class="empty-state" style="width:100%">' + iconEmpty() + '<p>Nenhum colaborador cadastrado ainda.</p></div>';
+  } else {
+    cols.forEach(function(c, i) {
+      var status = pontoStatusHoje(i);
+      html += pontoCriarCard(c, i, status);
+    });
+  }
+
+  html += '</div></div>';
+  return html;
+}
+
+function pontoCriarCard(c, i, status) {
+  var corStatus = status === 'trabalhando' ? 'var(--green)' : (status === 'saiu' ? 'var(--blue)' : 'var(--text3)');
+  var labelStatus = status === 'trabalhando' ? '● Trabalhando' : (status === 'saiu' ? '✓ Saída efetuada' : '○ Sem registro hoje');
+  var inicialLetra = (c.nome || '?')[0].toUpperCase();
+  var corAvatar = ['#16a34a','#2563eb','#9333ea','#ea580c','#0891b2','#be185d'][i % 6];
+
+  return '<div onclick="pontoSelecionarColab(' + i + ')" style="width:160px;cursor:pointer;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.25rem 1rem;display:flex;flex-direction:column;align-items:center;gap:10px;box-shadow:var(--shadow);transition:transform 0.15s,box-shadow 0.15s" ' +
+    'onmouseover="this.style.transform=\'translateY(-3px)\';this.style.boxShadow=\'0 8px 24px rgba(0,0,0,0.13)\'" ' +
+    'onmouseout="this.style.transform=\'\';this.style.boxShadow=\'var(--shadow)\'">' +
+    // Avatar
+    '<div style="width:60px;height:60px;border-radius:50%;background:' + corAvatar + ';display:flex;align-items:center;justify-content:center;font-size:1.6rem;font-weight:700;color:#fff;flex-shrink:0">' + inicialLetra + '</div>' +
+    // Nome
+    '<div style="font-weight:700;font-size:0.9rem;text-align:center;line-height:1.3;word-break:break-word">' + esc(c.nome) + '</div>' +
+    // Cargo
+    (c.cargo ? '<div style="font-size:0.75rem;color:var(--text3);text-align:center">' + esc(c.cargo) + '</div>' : '') +
+    // Status hoje
+    '<div style="font-size:0.72rem;font-weight:600;color:' + corStatus + ';text-align:center">' + labelStatus + '</div>' +
+  '</div>';
+}
+
+function renderPontoColabAberto(idx) {
+  var c = state.ponto.colaboradores[idx];
+  if (!c) { _pontoColabSel = null; return renderPontoPublico(); }
+
+  var now       = new Date();
+  var mesAtual  = now.getMonth();
+  var anoAtual  = now.getFullYear();
+  var status    = pontoStatusHoje(idx);
+  var stats     = pontoCalcStats(idx, mesAtual, anoAtual);
+  var senhaOk   = _pontoSenhaOk;
+  var corAvatar = ['#16a34a','#2563eb','#9333ea','#ea580c','#0891b2','#be185d'][idx % 6];
+  var inicialLetra = (c.nome || '?')[0].toUpperCase();
+
+  var btnEntrada = status === 'livre';
+  var btnSaida   = status === 'trabalhando';
+  var nomesMes   = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+  var html =
+    // Botão voltar
+    '<button onclick="pontoVoltar()" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--text2);cursor:pointer;font-size:0.88rem;margin-bottom:1.25rem;padding:0">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="15 18 9 12 15 6"/></svg> Voltar' +
+    '</button>' +
+
+    '<div style="max-width:440px;margin:0 auto">' +
+
+    // Header do colaborador
+    '<div class="card" style="padding:1.5rem;margin-bottom:1rem;display:flex;align-items:center;gap:1rem">' +
+      '<div style="width:56px;height:56px;border-radius:50%;background:' + corAvatar + ';display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:700;color:#fff;flex-shrink:0">' + inicialLetra + '</div>' +
+      '<div>' +
+        '<div style="font-size:1.2rem;font-weight:700">' + esc(c.nome) + '</div>' +
+        (c.cargo ? '<div style="font-size:0.82rem;color:var(--text3)">' + esc(c.cargo) + '</div>' : '') +
+      '</div>' +
+    '</div>' +
+
+    // Stats do mês
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:1rem">' +
+      pontoStatCard('⏱', 'Horas ' + nomesMes[mesAtual], stats.horasFormatado) +
+      pontoStatCard('📅', 'Dias trabalhados', String(stats.diasTrabalhados)) +
+      pontoStatCard('❌', 'Faltas', String(stats.faltas)) +
+    '</div>' +
+
+    // Card de registro de ponto
+    '<div class="card" style="padding:1.5rem">' +
+      '<div style="font-weight:700;font-size:1rem;margin-bottom:1.25rem">🕐 Registrar Ponto</div>' +
+
+      // Status atual
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:1.25rem;padding:10px 14px;background:var(--bg3);border-radius:8px">' +
+        '<div style="width:10px;height:10px;border-radius:50%;background:' + (status==='trabalhando'?'var(--green)':'var(--text3)') + ';flex-shrink:0"></div>' +
+        '<div style="font-size:0.88rem;color:var(--text2)">' +
+          (status === 'trabalhando' ? 'Entrada registrada — você está trabalhando' :
+           status === 'saiu'        ? 'Ponto finalizado por hoje' :
+           'Nenhum registro hoje') +
+        '</div>' +
+      '</div>' +
+
+      // Último registro hoje
+      (pontoUltimoHoje(idx) ? '<div style="font-size:0.8rem;color:var(--text3);margin-bottom:1.25rem">Último registro: ' + esc(pontoUltimoHoje(idx)) + '</div>' : '') +
+
+      // Campo de senha
+      '<div style="margin-bottom:1rem">' +
+        '<label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:6px;font-weight:600">🔒 Senha</label>' +
+        '<div style="display:flex;gap:8px">' +
+          '<input type="password" id="ponto-senha" placeholder="Digite sua senha" ' +
+            'style="flex:1;padding:0.65rem 1rem;border:1px solid ' + (senhaOk?'var(--green)':'var(--border)') + ';border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.95rem" ' +
+            'oninput="pontoVerificarSenha(this.value,' + idx + ')">' +
+          (senhaOk ? '<div style="display:flex;align-items:center;color:var(--green);font-size:1.2rem">✓</div>' : '') +
+        '</div>' +
+        (!senhaOk ? '<div style="font-size:0.75rem;color:var(--text3);margin-top:4px">Digite sua senha para liberar o registro</div>' : '<div style="font-size:0.75rem;color:var(--green);margin-top:4px">Senha correta! Registre seu ponto abaixo.</div>') +
+      '</div>' +
+
+      // Botões de entrada/saída
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+        '<button onclick="pontoRegistrar(' + idx + ',\'entrada\')" ' +
+          ((!senhaOk || !btnEntrada) ? 'disabled ' : '') +
+          'style="padding:0.75rem;border:none;border-radius:10px;font-size:0.95rem;font-weight:700;cursor:' + (senhaOk&&btnEntrada?'pointer':'not-allowed') + ';background:' + (senhaOk&&btnEntrada?'var(--green)':'var(--border)') + ';color:' + (senhaOk&&btnEntrada?'#fff':'var(--text3)') + ';transition:all 0.2s">' +
+          '▶ Entrada' +
+        '</button>' +
+        '<button onclick="pontoRegistrar(' + idx + ',\'saida\')" ' +
+          ((!senhaOk || !btnSaida) ? 'disabled ' : '') +
+          'style="padding:0.75rem;border:none;border-radius:10px;font-size:0.95rem;font-weight:700;cursor:' + (senhaOk&&btnSaida?'pointer':'not-allowed') + ';background:' + (senhaOk&&btnSaida?'var(--blue)':'var(--border)') + ';color:' + (senhaOk&&btnSaida?'#fff':'var(--text3)') + ';transition:all 0.2s">' +
+          '■ Saída' +
+        '</button>' +
+      '</div>' +
+
+      '<div id="ponto-status" style="font-size:0.85rem;text-align:center;margin-top:10px;min-height:1.2em"></div>' +
+    '</div>' + // card registro
+    '</div>'; // max-width
+
+  return html;
+}
+
+function pontoStatCard(icon, label, valor) {
+  return '<div class="card" style="padding:1rem;text-align:center">' +
+    '<div style="font-size:1.4rem;margin-bottom:4px">' + icon + '</div>' +
+    '<div style="font-size:1.4rem;font-weight:800;color:var(--text)">' + valor + '</div>' +
+    '<div style="font-size:0.72rem;color:var(--text3);margin-top:2px">' + label + '</div>' +
+  '</div>';
+}
+
+// ── VISÃO ADMIN ───────────────────────────────────────────────────────────────
+function renderPontoAdmin() {
+  var isCards = _pontoTab === 'cards';
+  var tabBar =
+    '<div style="display:flex;border-bottom:2px solid var(--border);margin-bottom:1.5rem">' +
+      '<button onclick="pontoAdminSetTab(\'cards\')" style="padding:0.65rem 1.5rem;background:none;border:none;border-bottom:' + (isCards?'3px solid var(--green);color:var(--green);font-weight:600':'none;color:var(--text2)') + ';cursor:pointer;font-size:0.95rem;margin-bottom:-2px">👥 Colaboradores</button>' +
+      '<button onclick="pontoAdminSetTab(\'historico\')" style="padding:0.65rem 1.5rem;background:none;border:none;border-bottom:' + (!isCards?'3px solid var(--green);color:var(--green);font-weight:600':'none;color:var(--text2)') + ';cursor:pointer;font-size:0.95rem;margin-bottom:-2px">📋 Histórico</button>' +
+    '</div>';
+
+  if (isCards) return tabBar + renderPontoAdminColabs();
+  return tabBar + renderPontoAdminHistorico();
+}
+
+function renderPontoAdminColabs() {
+  var cols = state.ponto.colaboradores;
+  var now  = new Date();
+
+  var html = '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:1.25rem">' +
+    '<div style="font-size:0.85rem;color:var(--text3)">' + cols.length + ' colaborador(es)</div>' +
+    '<button class="btn btn-green" onclick="pontoAbrirModalColab(null)">+ Novo Colaborador</button>' +
+  '</div>';
+
+  if (!cols.length) {
+    return html + '<div class="empty-state">' + iconEmpty() + '<p>Nenhum colaborador cadastrado. Clique em "+ Novo Colaborador" para começar.</p></div>';
+  }
+
+  // Resumo geral do mês
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;margin-bottom:1.5rem">';
+  cols.forEach(function(c, i) {
+    var status = pontoStatusHoje(i);
+    var stats  = pontoCalcStats(i, now.getMonth(), now.getFullYear());
+    var corStatus = status==='trabalhando'?'var(--green)':(status==='saiu'?'var(--blue)':'var(--text3)');
+    var labelStatus = status==='trabalhando'?'● Trabalhando':(status==='saiu'?'✓ Saída efetuada':'○ Sem registro hoje');
+    var corAvatar = ['#16a34a','#2563eb','#9333ea','#ea580c','#0891b2','#be185d'][i % 6];
+    var inicialLetra = (c.nome||'?')[0].toUpperCase();
+
+    html += '<div class="card" style="padding:1rem">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">' +
+        '<div style="display:flex;align-items:center;gap:10px">' +
+          '<div style="width:42px;height:42px;border-radius:50%;background:' + corAvatar + ';display:flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:700;color:#fff;flex-shrink:0">' + inicialLetra + '</div>' +
+          '<div>' +
+            '<div style="font-weight:700;font-size:0.9rem">' + esc(c.nome) + '</div>' +
+            (c.cargo ? '<div style="font-size:0.72rem;color:var(--text3)">' + esc(c.cargo) + '</div>' : '') +
+          '</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:4px">' +
+          '<button class="btn btn-sm" onclick="pontoAbrirModalColab(' + i + ')" title="Editar">✏️</button>' +
+          '<button class="btn btn-sm btn-red" onclick="pontoExcluirColab(' + i + ')" title="Excluir">✕</button>' +
+        '</div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px">' +
+        '<div style="text-align:center;background:var(--bg3);border-radius:6px;padding:6px">' +
+          '<div style="font-size:1rem;font-weight:700">' + stats.horasFormatado + '</div>' +
+          '<div style="font-size:0.65rem;color:var(--text3)">Horas/mês</div>' +
+        '</div>' +
+        '<div style="text-align:center;background:var(--bg3);border-radius:6px;padding:6px">' +
+          '<div style="font-size:1rem;font-weight:700">' + stats.diasTrabalhados + '</div>' +
+          '<div style="font-size:0.65rem;color:var(--text3)">Dias trab.</div>' +
+        '</div>' +
+        '<div style="text-align:center;background:var(--bg3);border-radius:6px;padding:6px">' +
+          '<div style="font-size:1rem;font-weight:700;color:' + (stats.faltas>0?'var(--red)':'var(--text)') + '">' + stats.faltas + '</div>' +
+          '<div style="font-size:0.65rem;color:var(--text3)">Faltas</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="font-size:0.75rem;font-weight:600;color:' + corStatus + '">' + labelStatus + '</div>' +
+    '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function renderPontoAdminHistorico() {
+  var registros = state.ponto.registros;
+  var cols      = state.ponto.colaboradores;
+  var filtro    = _pontoHistFiltro.toLowerCase();
+
+  var html = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:1.25rem">' +
+    '<input type="text" placeholder="🔍 Filtrar por colaborador..." value="' + esc(filtro) + '" oninput="pontoSetFiltro(this.value)" ' +
+      'style="flex:1;min-width:180px;padding:0.55rem 0.9rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem">' +
+    (registros.length ? '<button class="btn btn-sm btn-red" onclick="pontoLimparHistorico()">Limpar histórico</button>' : '') +
+  '</div>';
+
+  var lista = registros.slice().reverse();
+  if (filtro) lista = lista.filter(function(r){ return r.nomeColab.toLowerCase().indexOf(filtro) !== -1; });
+
+  if (!lista.length) {
+    return html + '<div class="empty-state">' + iconEmpty() + '<p>' + (filtro ? 'Nenhum registro para "' + esc(filtro) + '".' : 'Nenhum registro de ponto ainda.') + '</p></div>';
+  }
+
+  html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">' +
+    '<thead><tr style="background:var(--bg3);border-bottom:2px solid var(--border)">' +
+      '<th style="text-align:left;padding:9px 12px">Data</th>' +
+      '<th style="text-align:left;padding:9px 12px">Colaborador</th>' +
+      '<th style="text-align:center;padding:9px 12px">Tipo</th>' +
+      '<th style="text-align:center;padding:9px 12px">Horário</th>' +
+      '<th style="text-align:left;padding:9px 12px">Horas Trabalhadas</th>' +
+    '</tr></thead><tbody>';
+
+  lista.forEach(function(r, ri) {
+    var isEnt = r.tipo === 'entrada';
+    html += '<tr style="border-bottom:1px solid var(--border)' + (ri%2===1?';background:var(--bg3)':'') + '">' +
+      '<td style="padding:7px 12px;color:var(--text3);white-space:nowrap">' + esc(r.data) + '</td>' +
+      '<td style="padding:7px 12px;font-weight:600">' + esc(r.nomeColab) + (r.cargo ? '<span style="font-weight:400;color:var(--text3);margin-left:6px;font-size:0.75rem">' + esc(r.cargo) + '</span>' : '') + '</td>' +
+      '<td style="padding:7px 12px;text-align:center">' +
+        '<span style="padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:' + (isEnt?'var(--green)':'var(--blue)') + '18;color:' + (isEnt?'var(--green)':'var(--blue)') + '">' +
+          (isEnt ? '▶ Entrada' : '■ Saída') +
+        '</span>' +
+      '</td>' +
+      '<td style="padding:7px 12px;text-align:center;font-weight:600">' + esc(r.hora) + '</td>' +
+      '<td style="padding:7px 12px;color:var(--text2)">' + (r.horasTrabalhadas || '—') + '</td>' +
+    '</tr>';
+  });
+
+  html += '</tbody></table></div>';
+  return html;
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+
+function pontoDataHoje() {
+  var now = new Date();
+  return now.toLocaleDateString('pt-BR');
+}
+
+function pontoHoraAtual() {
+  return new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+}
+
+function pontoStatusHoje(colabIdx) {
+  var hoje = pontoDataHoje();
+  var regs = state.ponto.registros.filter(function(r){ return r.colabIdx === colabIdx && r.data === hoje; });
+  if (!regs.length) return 'livre';
+  var ultimo = regs[regs.length - 1];
+  return ultimo.tipo === 'entrada' ? 'trabalhando' : 'saiu';
+}
+
+function pontoUltimoHoje(colabIdx) {
+  var hoje = pontoDataHoje();
+  var regs = state.ponto.registros.filter(function(r){ return r.colabIdx === colabIdx && r.data === hoje; });
+  if (!regs.length) return null;
+  var ultimo = regs[regs.length - 1];
+  return (ultimo.tipo === 'entrada' ? 'Entrada' : 'Saída') + ' às ' + ultimo.hora;
+}
+
+function pontoCalcStats(colabIdx, mes, ano) {
+  var regs = state.ponto.registros.filter(function(r){
+    if (r.colabIdx !== colabIdx) return false;
+    var partes = r.data.split('/');
+    if (partes.length < 3) return false;
+    return parseInt(partes[1])-1 === mes && parseInt(partes[2]) === ano;
+  });
+
+  // Agrupa por dia
+  var porDia = {};
+  regs.forEach(function(r){ if (!porDia[r.data]) porDia[r.data] = []; porDia[r.data].push(r); });
+
+  var totalMin = 0;
+  var diasTrabalhados = 0;
+
+  Object.keys(porDia).forEach(function(dia) {
+    var lista = porDia[dia];
+    // Pares entrada/saída
+    var entradas = lista.filter(function(r){ return r.tipo==='entrada'; });
+    var saidas   = lista.filter(function(r){ return r.tipo==='saida';   });
+    var pares = Math.min(entradas.length, saidas.length);
+    var minDia = 0;
+    for (var k = 0; k < pares; k++) {
+      var eMs = pontoHoraParaMs(entradas[k].hora);
+      var sMs = pontoHoraParaMs(saidas[k].hora);
+      if (sMs > eMs) minDia += sMs - eMs;
+    }
+    if (minDia > 0) { totalMin += minDia; diasTrabalhados++; }
+  });
+
+  // Faltas: dias úteis do mês passados sem registro
+  var hoje = new Date();
+  var diasUteisPassados = 0;
+  var limite = (mes === hoje.getMonth() && ano === hoje.getFullYear()) ? hoje.getDate() : new Date(ano, mes+1, 0).getDate();
+  for (var d = 1; d <= limite; d++) {
+    var dt = new Date(ano, mes, d);
+    var diaSem = dt.getDay();
+    if (diaSem === 0 || diaSem === 6) continue;
+    diasUteisPassados++;
+  }
+  var faltas = Math.max(0, diasUteisPassados - diasTrabalhados);
+
+  var h = Math.floor(totalMin / 60);
+  var m = totalMin % 60;
+  return {
+    horasFormatado: h + 'h' + (m > 0 ? String(m).padStart(2,'0') : ''),
+    diasTrabalhados: diasTrabalhados,
+    faltas: faltas,
+    totalMin: totalMin,
+  };
+}
+
+function pontoHoraParaMs(hora) {
+  var p = hora.split(':');
+  return parseInt(p[0]||0)*60 + parseInt(p[1]||0);
+}
+
+// ── AÇÕES ─────────────────────────────────────────────────────────────────────
+
+function pontoSelecionarColab(idx) {
+  _pontoColabSel = idx;
+  _pontoSenhaOk  = false;
+  navigate('ponto');
+}
+
+function pontoVoltar() {
+  _pontoColabSel = null;
+  _pontoSenhaOk  = false;
+  navigate('ponto');
+}
+
+function pontoVerificarSenha(val, idx) {
+  var c = state.ponto.colaboradores[idx];
+  if (!c) return;
+  _pontoSenhaOk = (val === c.senha);
+  // Re-render apenas o card aberto
+  var el = document.getElementById('page-content');
+  if (el) el.innerHTML = renderPontoColabAberto(idx);
+  // Restaura foco no input de senha
+  var inp = document.getElementById('ponto-senha');
+  if (inp) { inp.value = val; inp.focus(); inp.setSelectionRange(val.length, val.length); }
+}
+
+function pontoRegistrar(idx, tipo) {
+  if (!_pontoSenhaOk) return;
+  var c = state.ponto.colaboradores[idx];
+  if (!c) return;
+
+  var hoje = pontoDataHoje();
+  var hora = pontoHoraAtual();
+
+  // Calcula horas trabalhadas se for saída
+  var horasTrabalhadas = null;
+  if (tipo === 'saida') {
+    var regsHoje = state.ponto.registros.filter(function(r){ return r.colabIdx === idx && r.data === hoje && r.tipo === 'entrada'; });
+    if (regsHoje.length) {
+      var ultimaEntrada = regsHoje[regsHoje.length-1];
+      var difMin = pontoHoraParaMs(hora) - pontoHoraParaMs(ultimaEntrada.hora);
+      if (difMin > 0) {
+        var hh = Math.floor(difMin/60), mm = difMin%60;
+        horasTrabalhadas = hh + 'h' + String(mm).padStart(2,'0') + 'min';
+      }
+    }
+  }
+
+  state.ponto.registros.push({
+    id:              Date.now(),
+    colabIdx:        idx,
+    nomeColab:       c.nome,
+    cargo:           c.cargo || '',
+    data:            hoje,
+    hora:            hora,
+    tipo:            tipo,
+    horasTrabalhadas: horasTrabalhadas,
+  });
+
+  addLog((tipo==='entrada'?'Entrada':'Saída') + ' registrada: ' + c.nome + ' às ' + hora);
+  saveState();
+  _pontoSenhaOk = false;
+
+  // Feedback e volta
+  var el = document.getElementById('page-content');
+  if (el) el.innerHTML = renderPontoColabAberto(idx);
+  var status = document.getElementById('ponto-status');
+  if (status) {
+    status.style.color = tipo==='entrada' ? 'var(--green)' : 'var(--blue)';
+    status.textContent = (tipo==='entrada' ? '✓ Entrada registrada às ' : '✓ Saída registrada às ') + hora + (horasTrabalhadas ? ' — ' + horasTrabalhadas + ' trabalhadas' : '');
+    setTimeout(function(){ pontoVoltar(); }, 2500);
+  }
+}
+
+function pontoAdminSetTab(tab) {
+  _pontoTab = tab;
+  navigate('ponto');
+}
+
+function pontoSetFiltro(val) {
+  _pontoHistFiltro = val;
+  var el = document.getElementById('page-content');
+  if (el) el.innerHTML = renderPonto();
+  var inp = el ? el.querySelector('input[type="text"]') : null;
+  if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+}
+
+function pontoLimparHistorico() {
+  if (!confirm('Limpar todo o histórico de ponto?')) return;
+  state.ponto.registros = [];
+  addLog('Limpou histórico do ponto virtual');
+  saveState();
+  navigate('ponto');
+}
+
+function pontoAbrirModalColab(idx) {
+  var c = idx !== null ? state.ponto.colaboradores[idx] : null;
+  var modal = document.getElementById('modal');
+  var mc    = document.getElementById('modal-content');
+  if (!modal || !mc) return;
+  mc.innerHTML =
+    '<div style="padding:1.5rem;min-width:300px;max-width:400px">' +
+      '<div style="font-size:1.1rem;font-weight:700;margin-bottom:1.25rem">' + (c ? '✏️ Editar Colaborador' : '+ Novo Colaborador') + '</div>' +
+      '<div style="margin-bottom:10px"><label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:4px">Nome *</label>' +
+        '<input id="pt-nome" class="tn-input" placeholder="Nome completo" value="' + esc(c?c.nome:'') + '" style="width:100%;margin:0"></div>' +
+      '<div style="margin-bottom:10px"><label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:4px">Cargo</label>' +
+        '<input id="pt-cargo" class="tn-input" placeholder="Ex: Operador, Expedição..." value="' + esc(c?(c.cargo||''):'') + '" style="width:100%;margin:0"></div>' +
+      '<div style="margin-bottom:1.25rem"><label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:4px">Senha *</label>' +
+        '<input id="pt-senha" type="password" class="tn-input" placeholder="Senha de acesso ao ponto" value="' + esc(c?c.senha:'') + '" style="width:100%;margin:0">' +
+        '<div style="font-size:0.72rem;color:var(--text3);margin-top:4px">Esta senha será usada pelo colaborador para registrar o ponto</div></div>' +
+      '<div style="display:flex;gap:8px">' +
+        '<button class="btn" style="flex:1" onclick="closeModal()">Cancelar</button>' +
+        '<button class="btn btn-green" style="flex:1" onclick="pontoSalvarColab(' + (idx!==null?idx:'null') + ')">💾 Salvar</button>' +
+      '</div>' +
+      '<div id="pt-status" style="font-size:0.82rem;color:var(--red);text-align:center;margin-top:8px;min-height:1.2em"></div>' +
+    '</div>';
+  modal.style.display = 'flex';
+  setTimeout(function(){ var el = document.getElementById('pt-nome'); if(el) el.focus(); }, 50);
+}
+
+function pontoSalvarColab(idx) {
+  var nome  = (document.getElementById('pt-nome') ||{}).value || '';
+  var cargo = (document.getElementById('pt-cargo')||{}).value || '';
+  var senha = (document.getElementById('pt-senha')||{}).value || '';
+  var st    = document.getElementById('pt-status');
+
+  if (!nome.trim()) { if(st) st.textContent='Informe o nome.'; return; }
+  if (!senha.trim()) { if(st) st.textContent='Informe uma senha.'; return; }
+
+  if (idx === null || idx === 'null') {
+    state.ponto.colaboradores.push({ nome: nome.trim(), cargo: cargo.trim(), senha: senha });
+    addLog('Cadastrou colaborador no ponto: "' + nome.trim() + '"');
+  } else {
+    var c = state.ponto.colaboradores[idx];
+    c.nome = nome.trim(); c.cargo = cargo.trim(); c.senha = senha;
+    addLog('Editou colaborador no ponto: "' + nome.trim() + '"');
+  }
+  saveState();
+  closeModal();
+  navigate('ponto');
+}
+
+function pontoExcluirColab(idx) {
+  var c = state.ponto.colaboradores[idx];
+  if (!c) return;
+  if (!confirm('Excluir "' + c.nome + '"? Os registros de ponto serão mantidos.')) return;
+  addLog('Removeu colaborador do ponto: "' + c.nome + '"');
+  state.ponto.colaboradores.splice(idx, 1);
+  // Ajusta índices nos registros
+  state.ponto.registros.forEach(function(r){
+    if (r.colabIdx > idx) r.colabIdx--;
+  });
+  saveState();
+  navigate('ponto');
+}
+
 // ─── ESTOQUE ──────────────────────────────────────────────────────────────────
 var _estoqueTab = 'estoque';
 var _estoqueOrdem = 'nome';
@@ -3238,6 +3760,7 @@ function closeModalOutside(e) { if(e.target.id === 'modal') closeModal(); }
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 function esc(str) { return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+function iconPonto() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`; }
 function iconEstoque() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>`; }
 function iconHome() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`; }
 function iconTruck() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`; }

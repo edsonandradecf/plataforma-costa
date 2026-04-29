@@ -2346,18 +2346,39 @@ function renderPontoColabAberto(idx) {
   var c = state.ponto.colaboradores[idx];
   if (!c) { _pontoColabSel = null; return renderPontoPublico(); }
 
-  var now       = new Date();
-  var mesAtual  = now.getMonth();
-  var anoAtual  = now.getFullYear();
-  var status    = pontoStatusHoje(idx);
-  var stats     = pontoCalcStats(idx, mesAtual, anoAtual);
-  var senhaOk   = _pontoSenhaOk;
-  var corAvatar = ['#16a34a','#2563eb','#9333ea','#ea580c','#0891b2','#be185d'][idx % 6];
+  var now      = new Date();
+  var mesAtual = now.getMonth();
+  var anoAtual = now.getFullYear();
+  var stats    = pontoCalcStats(idx, mesAtual, anoAtual);
+  var senhaOk  = _pontoSenhaOk;
+  var corAvatar    = ['#16a34a','#2563eb','#9333ea','#ea580c','#0891b2','#be185d'][idx % 6];
   var inicialLetra = (c.nome || '?')[0].toUpperCase();
+  var nomesMes     = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
-  var btnEntrada = status === 'livre';
-  var btnSaida   = status === 'trabalhando';
-  var nomesMes   = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  // ── Jornada: 4 etapas ────────────────────────────────────
+  // 0 = Entrada (08h)  1 = Saída Almoço (12h)
+  // 2 = Volta Almoço (13h)  3 = Saída (17h)
+  var JORNADA = [
+    { tipo: 'entrada', label: '▶ Entrada',      hora: '08:00', cor: '#16a34a', descricao: 'Entrada às 08h00' },
+    { tipo: 'saida',   label: '🍽 Saída Almoço', hora: '12:00', cor: '#ea580c', descricao: 'Saída para almoço às 12h00' },
+    { tipo: 'entrada', label: '↩ Volta Almoço', hora: '13:00', cor: '#2563eb', descricao: 'Volta do almoço às 13h00' },
+    { tipo: 'saida',   label: '■ Saída',         hora: '17:00', cor: '#7c3aed', descricao: 'Saída às 17h00' },
+  ];
+
+  var hoje = pontoDataHoje();
+  var regsHoje = state.ponto.registros.filter(function(r){ return r.colabIdx === idx && r.data === hoje; });
+  var etapaAtual = regsHoje.length; // próxima etapa a registrar (0–4)
+  if (etapaAtual > 4) etapaAtual = 4;
+  var jornadaCompleta = etapaAtual >= 4;
+
+  // Botão habilitado = senha OK e ainda há etapa a registrar
+  var btnHabilitado = senhaOk && !jornadaCompleta;
+  var proximaEtapa  = JORNADA[etapaAtual] || null;
+
+  // Horário atual para exibição inicial no relógio
+  var hh = String(now.getHours()).padStart(2,'0');
+  var mm = String(now.getMinutes()).padStart(2,'0');
+  var ss = String(now.getSeconds()).padStart(2,'0');
 
   var html =
     // Botão voltar
@@ -2365,14 +2386,19 @@ function renderPontoColabAberto(idx) {
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="15 18 9 12 15 6"/></svg> Voltar' +
     '</button>' +
 
-    '<div style="max-width:440px;margin:0 auto">' +
+    '<div style="max-width:460px;margin:0 auto">' +
 
-    // Header do colaborador
-    '<div class="card" style="padding:1.5rem;margin-bottom:1rem;display:flex;align-items:center;gap:1rem">' +
-      '<div style="width:56px;height:56px;border-radius:50%;background:' + corAvatar + ';display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:700;color:#fff;flex-shrink:0">' + inicialLetra + '</div>' +
-      '<div>' +
-        '<div style="font-size:1.2rem;font-weight:700">' + esc(c.nome) + '</div>' +
-        (c.cargo ? '<div style="font-size:0.82rem;color:var(--text3)">' + esc(c.cargo) + '</div>' : '') +
+    // Header
+    '<div class="card" style="padding:1.25rem 1.5rem;margin-bottom:1rem;display:flex;align-items:center;gap:1rem">' +
+      '<div style="width:52px;height:52px;border-radius:50%;background:' + corAvatar + ';display:flex;align-items:center;justify-content:center;font-size:1.4rem;font-weight:700;color:#fff;flex-shrink:0">' + inicialLetra + '</div>' +
+      '<div style="flex:1">' +
+        '<div style="font-size:1.15rem;font-weight:700">' + esc(c.nome) + '</div>' +
+        (c.cargo ? '<div style="font-size:0.8rem;color:var(--text3)">' + esc(c.cargo) + '</div>' : '') +
+      '</div>' +
+      // Relógio digital
+      '<div style="text-align:right">' +
+        '<div id="ponto-relogio" style="font-size:1.9rem;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--text);line-height:1">' + hh + ':' + mm + ':' + ss + '</div>' +
+        '<div id="ponto-data-str" style="font-size:0.72rem;color:var(--text3);margin-top:2px;text-align:right">' + now.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'}) + '</div>' +
       '</div>' +
     '</div>' +
 
@@ -2383,52 +2409,97 @@ function renderPontoColabAberto(idx) {
       pontoStatCard('❌', 'Faltas', String(stats.faltas)) +
     '</div>' +
 
-    // Card de registro de ponto
-    '<div class="card" style="padding:1.5rem">' +
-      '<div style="font-weight:700;font-size:1rem;margin-bottom:1.25rem">🕐 Registrar Ponto</div>' +
+    // Jornada do dia — linha do tempo
+    '<div class="card" style="padding:1.25rem 1.5rem;margin-bottom:1rem">' +
+      '<div style="font-weight:700;font-size:0.88rem;color:var(--text2);margin-bottom:1rem;text-transform:uppercase;letter-spacing:0.5px">Jornada de hoje</div>' +
+      '<div style="display:flex;align-items:center;gap:0">' +
+        JORNADA.map(function(e, i) {
+          var feito = i < etapaAtual;
+          var atual = i === etapaAtual;
+          var cor   = feito ? e.cor : (atual ? e.cor : 'var(--border)');
+          var regE  = regsHoje[i];
+          return (
+            '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;position:relative">' +
+              // Linha conectora esquerda
+              (i > 0 ? '<div style="position:absolute;left:0;top:16px;width:50%;height:2px;background:' + (i <= etapaAtual ? JORNADA[i-1].cor : 'var(--border)') + '"></div>' : '') +
+              // Linha conectora direita
+              (i < 3 ? '<div style="position:absolute;right:0;top:16px;width:50%;height:2px;background:' + (i < etapaAtual ? e.cor : 'var(--border)') + '"></div>' : '') +
+              // Bolinha
+              '<div style="width:32px;height:32px;border-radius:50%;background:' + (feito||atual ? cor : 'var(--bg3)') + ';border:2px solid ' + cor + ';display:flex;align-items:center;justify-content:center;z-index:1;flex-shrink:0;transition:all 0.3s">' +
+                (feito ? '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" style="width:14px;height:14px"><polyline points="20 6 9 17 4 12"/></svg>' :
+                 atual ? '<div style="width:10px;height:10px;border-radius:50%;background:#fff"></div>' :
+                 '<div style="width:8px;height:8px;border-radius:50%;background:var(--border)"></div>') +
+              '</div>' +
+              '<div style="font-size:0.68rem;font-weight:' + (feito||atual?'700':'400') + ';color:' + (feito ? cor : atual ? cor : 'var(--text3)') + ';text-align:center;line-height:1.2">' + e.hora + '</div>' +
+              '<div style="font-size:0.62rem;color:' + (feito ? cor : atual ? cor : 'var(--text3)') + ';text-align:center;line-height:1.1">' +
+                (feito && regE ? regE.hora : (i === 0 ? 'Entrada' : i === 1 ? 'Almoço' : i === 2 ? 'Volta' : 'Saída')) +
+              '</div>' +
+            '</div>'
+          );
+        }).join('') +
+      '</div>' +
+    '</div>' + // card jornada
 
-      // Status atual
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:1.25rem;padding:10px 14px;background:var(--bg3);border-radius:8px">' +
-        '<div style="width:10px;height:10px;border-radius:50%;background:' + (status==='trabalhando'?'var(--green)':'var(--text3)') + ';flex-shrink:0"></div>' +
-        '<div style="font-size:0.88rem;color:var(--text2)">' +
-          (status === 'trabalhando' ? 'Entrada registrada — você está trabalhando' :
-           status === 'saiu'        ? 'Ponto finalizado por hoje' :
-           'Nenhum registro hoje') +
+    // Card de registro
+    '<div class="card" style="padding:1.5rem">' +
+
+      // Mensagem jornada completa
+      (jornadaCompleta ?
+        '<div style="text-align:center;padding:1rem 0">' +
+          '<div style="font-size:2.5rem;margin-bottom:8px">🎉</div>' +
+          '<div style="font-weight:700;font-size:1.1rem;margin-bottom:4px">Jornada completa!</div>' +
+          '<div style="font-size:0.85rem;color:var(--text2)">Todos os registros do dia foram efetuados.</div>' +
+        '</div>'
+      :
+
+      // Próxima ação
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:1.25rem;padding:12px 14px;background:var(--bg3);border-radius:10px;border-left:4px solid ' + (proximaEtapa ? proximaEtapa.cor : 'var(--border)') + '">' +
+        '<div>' +
+          '<div style="font-size:0.72rem;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Próximo registro</div>' +
+          '<div style="font-weight:700;font-size:0.95rem;margin-top:2px">' + (proximaEtapa ? proximaEtapa.descricao : '') + '</div>' +
         '</div>' +
       '</div>' +
-
-      // Último registro hoje
-      (pontoUltimoHoje(idx) ? '<div style="font-size:0.8rem;color:var(--text3);margin-bottom:1.25rem">Último registro: ' + esc(pontoUltimoHoje(idx)) + '</div>' : '') +
 
       // Campo de senha
-      '<div style="margin-bottom:1rem">' +
+      '<div style="margin-bottom:1.25rem">' +
         '<label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:6px;font-weight:600">🔒 Senha</label>' +
-        '<div style="display:flex;gap:8px">' +
+        '<div style="display:flex;gap:8px;align-items:center">' +
           '<input type="password" id="ponto-senha" placeholder="Digite sua senha" ' +
-            'style="flex:1;padding:0.65rem 1rem;border:1px solid ' + (senhaOk?'var(--green)':'var(--border)') + ';border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.95rem" ' +
-            'oninput="pontoVerificarSenha(this.value,' + idx + ')">' +
-          (senhaOk ? '<div style="display:flex;align-items:center;color:var(--green);font-size:1.2rem">✓</div>' : '') +
+            'style="flex:1;padding:0.65rem 1rem;border:2px solid ' + (senhaOk?'var(--green)':'var(--border)') + ';border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.95rem;transition:border 0.2s;outline:none" ' +
+            'oninput="pontoVerificarSenha(this.value,' + idx + ')" onkeydown="if(event.key===\'Enter\'&&' + (senhaOk?'true':'false') + ')pontoRegistrarEtapa(' + idx + ')">' +
+          '<div style="font-size:1.4rem;transition:opacity 0.2s;opacity:' + (senhaOk?'1':'0') + ';color:var(--green)">✓</div>' +
         '</div>' +
-        (!senhaOk ? '<div style="font-size:0.75rem;color:var(--text3);margin-top:4px">Digite sua senha para liberar o registro</div>' : '<div style="font-size:0.75rem;color:var(--green);margin-top:4px">Senha correta! Registre seu ponto abaixo.</div>') +
+        '<div style="font-size:0.75rem;margin-top:5px;color:' + (senhaOk?'var(--green)':'var(--text3)') + '">' +
+          (senhaOk ? 'Senha correta! Clique no botão abaixo para registrar.' : 'Digite sua senha para liberar o registro.') +
+        '</div>' +
       '</div>' +
 
-      // Botões de entrada/saída
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
-        '<button onclick="pontoRegistrar(' + idx + ',\'entrada\')" ' +
-          ((!senhaOk || !btnEntrada) ? 'disabled ' : '') +
-          'style="padding:0.75rem;border:none;border-radius:10px;font-size:0.95rem;font-weight:700;cursor:' + (senhaOk&&btnEntrada?'pointer':'not-allowed') + ';background:' + (senhaOk&&btnEntrada?'var(--green)':'var(--border)') + ';color:' + (senhaOk&&btnEntrada?'#fff':'var(--text3)') + ';transition:all 0.2s">' +
-          '▶ Entrada' +
-        '</button>' +
-        '<button onclick="pontoRegistrar(' + idx + ',\'saida\')" ' +
-          ((!senhaOk || !btnSaida) ? 'disabled ' : '') +
-          'style="padding:0.75rem;border:none;border-radius:10px;font-size:0.95rem;font-weight:700;cursor:' + (senhaOk&&btnSaida?'pointer':'not-allowed') + ';background:' + (senhaOk&&btnSaida?'var(--blue)':'var(--border)') + ';color:' + (senhaOk&&btnSaida?'#fff':'var(--text3)') + ';transition:all 0.2s">' +
-          '■ Saída' +
-        '</button>' +
-      '</div>' +
+      // Botão único — registra a próxima etapa da jornada
+      '<button onclick="pontoRegistrarEtapa(' + idx + ')" ' +
+        (!btnHabilitado ? 'disabled ' : '') +
+        'style="width:100%;padding:0.9rem;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:' + (btnHabilitado?'pointer':'not-allowed') + ';' +
+        'background:' + (btnHabilitado&&proximaEtapa ? proximaEtapa.cor : 'var(--border)') + ';' +
+        'color:' + (btnHabilitado?'#fff':'var(--text3)') + ';transition:all 0.2s;' +
+        (btnHabilitado ? 'box-shadow:0 4px 12px rgba(0,0,0,0.15)' : '') + '">' +
+        (proximaEtapa ? proximaEtapa.label : 'Registrar') +
+      '</button>') +
 
       '<div id="ponto-status" style="font-size:0.85rem;text-align:center;margin-top:10px;min-height:1.2em"></div>' +
     '</div>' + // card registro
-    '</div>'; // max-width
+    '</div>' + // max-width
+
+    // Script do relógio — roda a cada 1s, para quando sair da página
+    '<script>' +
+    '(function(){' +
+      'if(window._pontoRelogioTimer) clearInterval(window._pontoRelogioTimer);' +
+      'window._pontoRelogioTimer = setInterval(function(){' +
+        'var el=document.getElementById("ponto-relogio");' +
+        'if(!el){clearInterval(window._pontoRelogioTimer);return;}' +
+        'var n=new Date();' +
+        'el.textContent=String(n.getHours()).padStart(2,"0")+":"+String(n.getMinutes()).padStart(2,"0")+":"+String(n.getSeconds()).padStart(2,"0");' +
+      '},1000);' +
+    '})();' +
+    '<\/script>';
 
   return html;
 }
@@ -2572,9 +2643,11 @@ function pontoHoraAtual() {
 function pontoStatusHoje(colabIdx) {
   var hoje = pontoDataHoje();
   var regs = state.ponto.registros.filter(function(r){ return r.colabIdx === colabIdx && r.data === hoje; });
-  if (!regs.length) return 'livre';
-  var ultimo = regs[regs.length - 1];
-  return ultimo.tipo === 'entrada' ? 'trabalhando' : 'saiu';
+  var n = regs.length;
+  if (n === 0) return 'livre';
+  if (n >= 4)  return 'saiu';
+  // etapa 1 = trabalhando, 2 = almoço, 3 = voltou
+  return n % 2 === 1 ? 'trabalhando' : 'almocando';
 }
 
 function pontoUltimoHoje(colabIdx) {
@@ -2582,7 +2655,9 @@ function pontoUltimoHoje(colabIdx) {
   var regs = state.ponto.registros.filter(function(r){ return r.colabIdx === colabIdx && r.data === hoje; });
   if (!regs.length) return null;
   var ultimo = regs[regs.length - 1];
-  return (ultimo.tipo === 'entrada' ? 'Entrada' : 'Saída') + ' às ' + ultimo.hora;
+  var labels = ['Entrada','Saída Almoço','Volta Almoço','Saída'];
+  var label  = labels[regs.length - 1] || ultimo.tipo;
+  return label + ' às ' + ultimo.hora;
 }
 
 function pontoCalcStats(colabIdx, mes, ano) {
@@ -2668,51 +2743,71 @@ function pontoVerificarSenha(val, idx) {
   if (inp) { inp.value = val; inp.focus(); inp.setSelectionRange(val.length, val.length); }
 }
 
-function pontoRegistrar(idx, tipo) {
+function pontoRegistrarEtapa(idx) {
   if (!_pontoSenhaOk) return;
   var c = state.ponto.colaboradores[idx];
   if (!c) return;
 
+  var JORNADA = [
+    { tipo: 'entrada', label: 'Entrada' },
+    { tipo: 'saida',   label: 'Saída para Almoço' },
+    { tipo: 'entrada', label: 'Volta do Almoço' },
+    { tipo: 'saida',   label: 'Saída' },
+  ];
+
   var hoje = pontoDataHoje();
   var hora = pontoHoraAtual();
+  var regsHoje = state.ponto.registros.filter(function(r){ return r.colabIdx === idx && r.data === hoje; });
+  var etapa = regsHoje.length;
+  if (etapa >= 4) return;
 
-  // Calcula horas trabalhadas se for saída
+  var e = JORNADA[etapa];
+
+  // Calcula horas trabalhadas em etapas de saída
   var horasTrabalhadas = null;
-  if (tipo === 'saida') {
-    var regsHoje = state.ponto.registros.filter(function(r){ return r.colabIdx === idx && r.data === hoje && r.tipo === 'entrada'; });
-    if (regsHoje.length) {
-      var ultimaEntrada = regsHoje[regsHoje.length-1];
+  if (e.tipo === 'saida' && regsHoje.length > 0) {
+    // Última entrada antes desta saída
+    var ultimaEntrada = null;
+    for (var k = regsHoje.length - 1; k >= 0; k--) {
+      if (regsHoje[k].tipo === 'entrada') { ultimaEntrada = regsHoje[k]; break; }
+    }
+    if (ultimaEntrada) {
       var difMin = pontoHoraParaMs(hora) - pontoHoraParaMs(ultimaEntrada.hora);
       if (difMin > 0) {
-        var hh = Math.floor(difMin/60), mm = difMin%60;
-        horasTrabalhadas = hh + 'h' + String(mm).padStart(2,'0') + 'min';
+        var hh2 = Math.floor(difMin/60), mm2 = difMin%60;
+        horasTrabalhadas = hh2 + 'h' + String(mm2).padStart(2,'0') + 'min';
       }
     }
   }
 
   state.ponto.registros.push({
-    id:              Date.now(),
-    colabIdx:        idx,
-    nomeColab:       c.nome,
-    cargo:           c.cargo || '',
-    data:            hoje,
-    hora:            hora,
-    tipo:            tipo,
+    id:               Date.now(),
+    colabIdx:         idx,
+    nomeColab:        c.nome,
+    cargo:            c.cargo || '',
+    data:             hoje,
+    hora:             hora,
+    tipo:             e.tipo,
+    etapa:            etapa,
+    labelEtapa:       e.label,
     horasTrabalhadas: horasTrabalhadas,
   });
 
-  addLog((tipo==='entrada'?'Entrada':'Saída') + ' registrada: ' + c.nome + ' às ' + hora);
+  addLog(e.label + ': ' + c.nome + ' às ' + hora);
   saveState();
   _pontoSenhaOk = false;
 
-  // Feedback e volta
   var el = document.getElementById('page-content');
   if (el) el.innerHTML = renderPontoColabAberto(idx);
-  var status = document.getElementById('ponto-status');
-  if (status) {
-    status.style.color = tipo==='entrada' ? 'var(--green)' : 'var(--blue)';
-    status.textContent = (tipo==='entrada' ? '✓ Entrada registrada às ' : '✓ Saída registrada às ') + hora + (horasTrabalhadas ? ' — ' + horasTrabalhadas + ' trabalhadas' : '');
-    setTimeout(function(){ pontoVoltar(); }, 2500);
+
+  var statusEl = document.getElementById('ponto-status');
+  if (statusEl) {
+    statusEl.style.color = e.tipo === 'entrada' ? 'var(--green)' : 'var(--blue)';
+    statusEl.textContent = '✓ ' + e.label + ' registrada às ' + hora + (horasTrabalhadas ? ' — ' + horasTrabalhadas + ' trabalhadas' : '');
+    if (etapa === 3) {
+      // Jornada completa — volta automaticamente em 3s
+      setTimeout(function(){ pontoVoltar(); }, 3000);
+    }
   }
 }
 

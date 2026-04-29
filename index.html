@@ -2287,10 +2287,17 @@ function tnGeneratePDF(qtdEtiquetas) {
 
 // ─── PONTO VIRTUAL ────────────────────────────────────────────────────────────
 
-var _pontoTab        = 'cards';   // 'cards' | 'historico'
-var _pontoColabSel   = null;      // índice do colaborador selecionado
-var _pontoSenhaOk    = false;     // senha validada no card aberto
-var _pontoHistFiltro = '';        // filtro de nome no histórico
+var _pontoTab        = 'cards';
+var _pontoColabSel   = null;
+var _pontoSenhaOk    = false;
+var _pontoHistFiltro = '';
+var _pontoHistColab  = 'todos';
+var _pontoHistMes    = '';
+
+function pontoMesAnoAtual() {
+  var n = new Date();
+  return n.getFullYear() + '-' + String(n.getMonth()+1).padStart(2,'0');
+}
 
 function renderPonto() {
   if (isAdmin()) return renderPontoAdmin();
@@ -2586,43 +2593,155 @@ function renderPontoAdminColabs() {
 function renderPontoAdminHistorico() {
   var registros = state.ponto.registros;
   var cols      = state.ponto.colaboradores;
-  var filtro    = _pontoHistFiltro.toLowerCase();
+  var nomesMes  = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
-  var html = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:1.25rem">' +
-    '<input type="text" placeholder="🔍 Filtrar por colaborador..." value="' + esc(filtro) + '" oninput="pontoSetFiltro(this.value)" ' +
-      'style="flex:1;min-width:180px;padding:0.55rem 0.9rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem">' +
-    (registros.length ? '<button class="btn btn-sm btn-red" onclick="pontoLimparHistorico()">Limpar histórico</button>' : '') +
-  '</div>';
+  // ── Estado dos filtros ────────────────────────────────────
+  var filtroColab = (typeof _pontoHistColab !== 'undefined') ? _pontoHistColab : 'todos';
+  var filtroMes   = (typeof _pontoHistMes   !== 'undefined') ? _pontoHistMes   : pontoMesAnoAtual();
 
-  var lista = registros.slice().reverse();
-  if (filtro) lista = lista.filter(function(r){ return r.nomeColab.toLowerCase().indexOf(filtro) !== -1; });
+  // Meses disponíveis no histórico
+  var mesesDisp = {};
+  registros.forEach(function(r) {
+    var p = r.data.split('/');
+    if (p.length < 3) return;
+    var chave = p[2] + '-' + p[1]; // "2025-04"
+    mesesDisp[chave] = { ano: p[2], mes: p[1], label: nomesMes[parseInt(p[1])-1] + ' ' + p[2] };
+  });
+  // Garante o mês atual sempre disponível
+  var ma = new Date();
+  var chaveAtual = ma.getFullYear() + '-' + String(ma.getMonth()+1).padStart(2,'0');
+  if (!mesesDisp[chaveAtual]) mesesDisp[chaveAtual] = { ano: String(ma.getFullYear()), mes: String(ma.getMonth()+1).padStart(2,'0'), label: nomesMes[ma.getMonth()] + ' ' + ma.getFullYear() };
+  var mesesOrdenados = Object.keys(mesesDisp).sort().reverse();
+
+  // ── Filtros ────────────────────────────────────────────────
+  var html =
+    '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:1.25rem">' +
+
+      // Seletor de mês
+      '<div>' +
+        '<label style="font-size:0.75rem;color:var(--text2);display:block;margin-bottom:4px;font-weight:600">📅 Mês</label>' +
+        '<select onchange="pontoSetHistMes(this.value)" style="padding:0.55rem 0.9rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.88rem">' +
+          mesesOrdenados.map(function(k) {
+            return '<option value="' + k + '"' + (filtroMes === k ? ' selected' : '') + '>' + mesesDisp[k].label + '</option>';
+          }).join('') +
+        '</select>' +
+      '</div>' +
+
+      // Seletor de colaborador
+      '<div style="flex:1;min-width:180px">' +
+        '<label style="font-size:0.75rem;color:var(--text2);display:block;margin-bottom:4px;font-weight:600">👤 Colaborador</label>' +
+        '<select onchange="pontoSetHistColab(this.value)" style="width:100%;padding:0.55rem 0.9rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.88rem">' +
+          '<option value="todos"' + (filtroColab==='todos'?' selected':'') + '>Todos os colaboradores</option>' +
+          cols.map(function(c, i) {
+            return '<option value="' + i + '"' + (filtroColab===String(i)?' selected':'') + '>' + esc(c.nome) + '</option>';
+          }).join('') +
+        '</select>' +
+      '</div>' +
+
+      // Botão PDF
+      '<button class="btn btn-green" onclick="pontoBaixarPDF()" style="display:flex;align-items:center;gap:6px;white-space:nowrap">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>' +
+        'Baixar PDF' +
+      '</button>' +
+
+      // Limpar
+      (registros.length ? '<button class="btn btn-sm btn-red" onclick="pontoLimparHistorico()" style="white-space:nowrap">Limpar tudo</button>' : '') +
+    '</div>';
+
+  // ── Filtra registros ──────────────────────────────────────
+  var partesMes = filtroMes.split('-'); // ["2025","04"]
+  var lista = registros.filter(function(r) {
+    var p = r.data.split('/');
+    if (p.length < 3) return false;
+    if (p[2] !== partesMes[0] || p[1].padStart(2,'0') !== partesMes[1]) return false;
+    if (filtroColab !== 'todos' && String(r.colabIdx) !== filtroColab) return false;
+    return true;
+  });
+  // Ordena por data depois por etapa
+  lista.sort(function(a, b) {
+    var da = a.data.split('/').reverse().join(''), db = b.data.split('/').reverse().join('');
+    if (da !== db) return da < db ? -1 : 1;
+    return (a.etapa||0) - (b.etapa||0);
+  });
 
   if (!lista.length) {
-    return html + '<div class="empty-state">' + iconEmpty() + '<p>' + (filtro ? 'Nenhum registro para "' + esc(filtro) + '".' : 'Nenhum registro de ponto ainda.') + '</p></div>';
+    return html + '<div class="empty-state">' + iconEmpty() + '<p>Nenhum registro para o período selecionado.</p></div>';
   }
+
+  // ── Totais do período ─────────────────────────────────────
+  var totalMinPeriodo = 0;
+  // Agrupa por colab+dia para somar horas
+  var porColabDia = {};
+  lista.forEach(function(r) {
+    var k = r.colabIdx + '_' + r.data;
+    if (!porColabDia[k]) porColabDia[k] = [];
+    porColabDia[k].push(r);
+  });
+  Object.values(porColabDia).forEach(function(regs) {
+    var entradas = regs.filter(function(r){ return r.tipo==='entrada'; });
+    var saidas   = regs.filter(function(r){ return r.tipo==='saida';   });
+    var pares = Math.min(entradas.length, saidas.length);
+    for (var k=0; k<pares; k++) {
+      var dif = pontoHoraParaMs(saidas[k].hora) - pontoHoraParaMs(entradas[k].hora);
+      if (dif > 0) totalMinPeriodo += dif;
+    }
+  });
+  var thh = Math.floor(totalMinPeriodo/60), tmm = totalMinPeriodo%60;
+
+  html += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:1rem">' +
+    '<div style="padding:8px 16px;background:var(--bg3);border-radius:8px;font-size:0.82rem">' +
+      '<span style="color:var(--text3)">Registros: </span><strong>' + lista.length + '</strong>' +
+    '</div>' +
+    '<div style="padding:8px 16px;background:var(--bg3);border-radius:8px;font-size:0.82rem">' +
+      '<span style="color:var(--text3)">Total horas: </span><strong>' + thh + 'h' + String(tmm).padStart(2,'0') + '</strong>' +
+    '</div>' +
+  '</div>';
+
+  // ── Tabela agrupada por dia ───────────────────────────────
+  var ETAPA_LABELS = ['▶ Entrada','🍽 Saída Almoço','↩ Volta Almoço','■ Saída'];
+  var ETAPA_CORES  = ['var(--green)','#ea580c','#2563eb','#7c3aed'];
+
+  // Agrupa por data
+  var porData = {};
+  lista.forEach(function(r) {
+    if (!porData[r.data]) porData[r.data] = [];
+    porData[r.data].push(r);
+  });
+  var datasOrdenadas = Object.keys(porData).sort(function(a, b) {
+    var da = a.split('/').reverse().join(''), db = b.split('/').reverse().join('');
+    return da < db ? -1 : 1;
+  });
 
   html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">' +
     '<thead><tr style="background:var(--bg3);border-bottom:2px solid var(--border)">' +
-      '<th style="text-align:left;padding:9px 12px">Data</th>' +
+      '<th style="text-align:left;padding:9px 12px;white-space:nowrap">Data</th>' +
       '<th style="text-align:left;padding:9px 12px">Colaborador</th>' +
-      '<th style="text-align:center;padding:9px 12px">Tipo</th>' +
+      '<th style="text-align:center;padding:9px 12px">Etapa</th>' +
       '<th style="text-align:center;padding:9px 12px">Horário</th>' +
-      '<th style="text-align:left;padding:9px 12px">Horas Trabalhadas</th>' +
+      '<th style="text-align:center;padding:9px 12px">Horas</th>' +
     '</tr></thead><tbody>';
 
-  lista.forEach(function(r, ri) {
-    var isEnt = r.tipo === 'entrada';
-    html += '<tr style="border-bottom:1px solid var(--border)' + (ri%2===1?';background:var(--bg3)':'') + '">' +
-      '<td style="padding:7px 12px;color:var(--text3);white-space:nowrap">' + esc(r.data) + '</td>' +
-      '<td style="padding:7px 12px;font-weight:600">' + esc(r.nomeColab) + (r.cargo ? '<span style="font-weight:400;color:var(--text3);margin-left:6px;font-size:0.75rem">' + esc(r.cargo) + '</span>' : '') + '</td>' +
-      '<td style="padding:7px 12px;text-align:center">' +
-        '<span style="padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:' + (isEnt?'var(--green)':'var(--blue)') + '18;color:' + (isEnt?'var(--green)':'var(--blue)') + '">' +
-          (isEnt ? '▶ Entrada' : '■ Saída') +
-        '</span>' +
-      '</td>' +
-      '<td style="padding:7px 12px;text-align:center;font-weight:600">' + esc(r.hora) + '</td>' +
-      '<td style="padding:7px 12px;color:var(--text2)">' + (r.horasTrabalhadas || '—') + '</td>' +
-    '</tr>';
+  var rowIdx = 0;
+  datasOrdenadas.forEach(function(data) {
+    var regsData = porData[data];
+    regsData.forEach(function(r, ri) {
+      var etIdx = r.etapa !== undefined ? r.etapa : (r.tipo==='entrada'?0:3);
+      var cor   = ETAPA_CORES[etIdx] || 'var(--text2)';
+      var label = r.labelEtapa || ETAPA_LABELS[etIdx] || r.tipo;
+      var bg    = rowIdx % 2 === 1 ? 'background:var(--bg3);' : '';
+      html += '<tr style="border-bottom:1px solid var(--border);' + bg + '">' +
+        (ri === 0 ? '<td style="padding:7px 12px;color:var(--text3);white-space:nowrap;font-weight:600;vertical-align:top" rowspan="' + regsData.length + '">' + esc(data) + '</td>' : '') +
+        '<td style="padding:7px 12px;font-weight:600">' + esc(r.nomeColab) +
+          (r.cargo ? '<div style="font-weight:400;color:var(--text3);font-size:0.72rem">' + esc(r.cargo) + '</div>' : '') +
+        '</td>' +
+        '<td style="padding:7px 12px;text-align:center">' +
+          '<span style="padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:' + cor + '18;color:' + cor + '">' + label + '</span>' +
+        '</td>' +
+        '<td style="padding:7px 12px;text-align:center;font-weight:700">' + esc(r.hora) + '</td>' +
+        '<td style="padding:7px 12px;text-align:center;color:var(--text2)">' + (r.horasTrabalhadas || '—') + '</td>' +
+      '</tr>';
+      rowIdx++;
+    });
   });
 
   html += '</tbody></table></div>';
@@ -2813,6 +2932,7 @@ function pontoRegistrarEtapa(idx) {
 
 function pontoAdminSetTab(tab) {
   _pontoTab = tab;
+  if (tab === 'historico' && !_pontoHistMes) _pontoHistMes = pontoMesAnoAtual();
   navigate('ponto');
 }
 
@@ -2820,8 +2940,244 @@ function pontoSetFiltro(val) {
   _pontoHistFiltro = val;
   var el = document.getElementById('page-content');
   if (el) el.innerHTML = renderPonto();
-  var inp = el ? el.querySelector('input[type="text"]') : null;
-  if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+}
+
+function pontoSetHistMes(val) {
+  _pontoHistMes = val;
+  var el = document.getElementById('page-content');
+  if (el) el.innerHTML = renderPonto();
+}
+
+function pontoSetHistColab(val) {
+  _pontoHistColab = val;
+  var el = document.getElementById('page-content');
+  if (el) el.innerHTML = renderPonto();
+}
+
+function pontoBaixarPDF() {
+  var nomesMes  = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var ETAPA_LABELS = ['Entrada','Saída Almoço','Volta Almoço','Saída'];
+  var filtroColab = (typeof _pontoHistColab !== 'undefined') ? _pontoHistColab : 'todos';
+  var filtroMes   = (typeof _pontoHistMes   !== 'undefined' && _pontoHistMes) ? _pontoHistMes : pontoMesAnoAtual();
+  var cols        = state.ponto.colaboradores;
+  var registros   = state.ponto.registros;
+
+  var partesMes = filtroMes.split('-');
+  var anoStr = partesMes[0], mesStr = partesMes[1];
+  var mesLabel = nomesMes[parseInt(mesStr)-1] + ' ' + anoStr;
+  var colabLabel = filtroColab === 'todos' ? 'Todos os Colaboradores' : (cols[parseInt(filtroColab)] ? cols[parseInt(filtroColab)].nome : '');
+
+  // Filtra e ordena
+  var lista = registros.filter(function(r) {
+    var p = r.data.split('/');
+    if (p.length < 3) return false;
+    if (p[2] !== anoStr || p[1].padStart(2,'0') !== mesStr) return false;
+    if (filtroColab !== 'todos' && String(r.colabIdx) !== filtroColab) return false;
+    return true;
+  });
+  lista.sort(function(a,b){
+    var da = a.data.split('/').reverse().join(''), db = b.data.split('/').reverse().join('');
+    if (da !== db) return da < db ? -1 : 1;
+    return (a.etapa||0) - (b.etapa||0);
+  });
+
+  if (!lista.length) { alert('Nenhum registro para o período selecionado.'); return; }
+
+  try {
+    var jsPDFLib = window.jspdf;
+    var doc = new jsPDFLib.jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    var PW = 297, PH = 210, px = 14, py = 14;
+
+    function cabecalho(pageNum) {
+      // Faixa verde de header
+      doc.setFillColor(22, 163, 74);
+      doc.rect(0, 0, PW, 22, 'F');
+      doc.setTextColor(255,255,255);
+      doc.setFont('helvetica','bold');
+      doc.setFontSize(13);
+      doc.text('COSTA NATURE LIFE — Relatório de Ponto', px, 14);
+      doc.setFontSize(8);
+      doc.setFont('helvetica','normal');
+      doc.text('Período: ' + mesLabel + '  |  Colaborador: ' + colabLabel, px, 19.5);
+      doc.text('Pág. ' + pageNum, PW - px, 14, { align:'right' });
+      doc.text('Gerado em ' + new Date().toLocaleString('pt-BR'), PW - px, 19.5, { align:'right' });
+      doc.setTextColor(0,0,0);
+    }
+
+    // Agrupa por colaborador → por dia para calcular totais
+    var resumoPorColab = {};
+    lista.forEach(function(r) {
+      if (!resumoPorColab[r.nomeColab]) resumoPorColab[r.nomeColab] = { totalMin: 0, dias: {} };
+      if (!resumoPorColab[r.nomeColab].dias[r.data]) resumoPorColab[r.nomeColab].dias[r.data] = [];
+      resumoPorColab[r.nomeColab].dias[r.data].push(r);
+    });
+    Object.keys(resumoPorColab).forEach(function(nome) {
+      var dias = resumoPorColab[nome].dias;
+      Object.keys(dias).forEach(function(dia) {
+        var regs = dias[dia];
+        var ents = regs.filter(function(r){ return r.tipo==='entrada'; });
+        var sais = regs.filter(function(r){ return r.tipo==='saida';   });
+        var p = Math.min(ents.length, sais.length);
+        for (var k=0; k<p; k++) {
+          var dif = pontoHoraParaMs(sais[k].hora) - pontoHoraParaMs(ents[k].hora);
+          if (dif > 0) resumoPorColab[nome].totalMin += dif;
+        }
+      });
+    });
+
+    // ── Página 1: tabela detalhada ────────────────────────
+    var pageNum = 1;
+    cabecalho(pageNum);
+
+    // Colunas da tabela
+    var cols_w = { data:28, colab:55, etapa:40, hora:24, trabalhado:28 };
+    var colX = {
+      data:   px,
+      colab:  px + cols_w.data,
+      etapa:  px + cols_w.data + cols_w.colab,
+      hora:   px + cols_w.data + cols_w.colab + cols_w.etapa,
+      trab:   px + cols_w.data + cols_w.colab + cols_w.etapa + cols_w.hora,
+    };
+    var tableW = cols_w.data + cols_w.colab + cols_w.etapa + cols_w.hora + cols_w.trabalhado;
+    var rowH = 7, headerY = 28;
+
+    // Header da tabela
+    doc.setFillColor(240,240,240);
+    doc.rect(px, headerY, tableW, rowH, 'F');
+    doc.setDrawColor(180,180,180); doc.setLineWidth(0.3);
+    doc.rect(px, headerY, tableW, rowH);
+    doc.setFont('helvetica','bold'); doc.setFontSize(7.5);
+    doc.text('Data',        colX.data  + 2, headerY + 4.8);
+    doc.text('Colaborador', colX.colab + 2, headerY + 4.8);
+    doc.text('Etapa',       colX.etapa + 2, headerY + 4.8);
+    doc.text('Horário',     colX.hora  + 2, headerY + 4.8);
+    doc.text('Trab.',       colX.trab  + 2, headerY + 4.8);
+
+    var y = headerY + rowH;
+    var maxY = PH - 18;
+    var ETAPA_CORES_PDF = [[22,163,74],[234,88,12],[37,99,235],[124,58,237]];
+
+    lista.forEach(function(r, ri) {
+      if (y + rowH > maxY) {
+        // Rodapé
+        doc.setFontSize(7); doc.setTextColor(120,120,120);
+        doc.text('Costa Nature Life — Relatório de Ponto — ' + mesLabel, px, PH - 6);
+        doc.addPage();
+        pageNum++;
+        cabecalho(pageNum);
+        doc.setFillColor(240,240,240);
+        doc.rect(px, headerY, tableW, rowH, 'F');
+        doc.setDrawColor(180,180,180); doc.setLineWidth(0.3);
+        doc.rect(px, headerY, tableW, rowH);
+        doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(0,0,0);
+        doc.text('Data',        colX.data  + 2, headerY + 4.8);
+        doc.text('Colaborador', colX.colab + 2, headerY + 4.8);
+        doc.text('Etapa',       colX.etapa + 2, headerY + 4.8);
+        doc.text('Horário',     colX.hora  + 2, headerY + 4.8);
+        doc.text('Trab.',       colX.trab  + 2, headerY + 4.8);
+        y = headerY + rowH;
+      }
+
+      // Zebra
+      if (ri % 2 === 0) { doc.setFillColor(250,250,250); doc.rect(px, y, tableW, rowH, 'F'); }
+
+      doc.setDrawColor(210,210,210); doc.setLineWidth(0.2);
+      doc.line(px, y + rowH, px + tableW, y + rowH);
+
+      // Separador de colunas
+      [colX.colab, colX.etapa, colX.hora, colX.trab].forEach(function(cx) {
+        doc.line(cx, y, cx, y + rowH);
+      });
+
+      var etIdx = r.etapa !== undefined ? r.etapa : 0;
+      var etCor = ETAPA_CORES_PDF[etIdx] || [80,80,80];
+      var etLabel = r.labelEtapa || ETAPA_LABELS[etIdx] || r.tipo;
+
+      doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(0,0,0);
+      doc.text(r.data,      colX.data  + 2, y + 4.8);
+      doc.text(r.nomeColab, colX.colab + 2, y + 4.8);
+
+      // Badge colorido para etapa
+      doc.setFillColor(etCor[0], etCor[1], etCor[2]);
+      doc.roundedRect(colX.etapa + 2, y + 1.2, Math.min(etLabel.length * 2.1 + 4, cols_w.etapa - 4), 4.8, 1, 1, 'F');
+      doc.setTextColor(255,255,255); doc.setFontSize(6.5);
+      doc.text(etLabel, colX.etapa + 4, y + 4.8);
+
+      doc.setTextColor(0,0,0); doc.setFont('helvetica','bold'); doc.setFontSize(7.5);
+      doc.text(r.hora, colX.hora + cols_w.hora/2, y + 4.8, { align:'center' });
+      doc.setFont('helvetica','normal');
+      doc.text(r.horasTrabalhadas || '—', colX.trab + 2, y + 4.8);
+
+      y += rowH;
+    });
+
+    // Borda ao redor da tabela
+    doc.setDrawColor(150,150,150); doc.setLineWidth(0.4);
+    doc.rect(px, headerY, tableW, y - headerY);
+
+    // ── Página de resumo por colaborador ─────────────────
+    doc.addPage();
+    pageNum++;
+    cabecalho(pageNum);
+
+    doc.setFont('helvetica','bold'); doc.setFontSize(11);
+    doc.text('Resumo por Colaborador — ' + mesLabel, px, 32);
+
+    var ry = 40;
+    var nomes = Object.keys(resumoPorColab);
+    nomes.forEach(function(nome, ni) {
+      var d = resumoPorColab[nome];
+      var hh2 = Math.floor(d.totalMin/60), mm2 = d.totalMin%60;
+      var totalHorasStr = hh2 + 'h' + String(mm2).padStart(2,'0') + 'min';
+      var nDias = Object.keys(d.dias).length;
+
+      // Caixa do colaborador
+      var boxH = 22;
+      if (ry + boxH > PH - 14) { doc.addPage(); pageNum++; cabecalho(pageNum); ry = 32; }
+
+      var corIdx = ni % 6;
+      var coresBox = [[22,163,74],[37,99,235],[147,51,234],[234,88,12],[8,145,178],[190,24,93]];
+      var cb = coresBox[corIdx];
+
+      doc.setFillColor(cb[0],cb[1],cb[2],0.08);
+      doc.setDrawColor(cb[0],cb[1],cb[2]);
+      doc.setLineWidth(0.5);
+      doc.roundedRect(px, ry, PW - px*2, boxH, 3, 3, 'FD');
+
+      // Barra lateral colorida
+      doc.setFillColor(cb[0],cb[1],cb[2]);
+      doc.roundedRect(px, ry, 4, boxH, 2, 2, 'F');
+
+      doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(cb[0],cb[1],cb[2]);
+      doc.text(nome, px + 10, ry + 8);
+      doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(100,100,100);
+      var colabObj = cols.find(function(c){ return c.nome === nome; });
+      if (colabObj && colabObj.cargo) doc.text(colabObj.cargo, px + 10, ry + 13.5);
+
+      // Métricas
+      var mxBase = PW/2;
+      doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(0,0,0);
+      doc.text(totalHorasStr, mxBase, ry + 10);
+      doc.text(String(nDias), mxBase + 55, ry + 10);
+
+      doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(120,120,120);
+      doc.text('Total horas trabalhadas', mxBase, ry + 16);
+      doc.text('Dias com registro', mxBase + 55, ry + 16);
+
+      doc.setTextColor(0,0,0);
+      ry += boxH + 6;
+    });
+
+    // Rodapé última página
+    doc.setFontSize(7); doc.setTextColor(120,120,120);
+    doc.text('Costa Nature Life — CNPJ 44.168.874/0001-28 — Relatório de Ponto — ' + mesLabel, px, PH - 6);
+
+    var nomeArq = 'ponto-' + mesLabel.replace(' ','-').toLowerCase() + (filtroColab!=='todos'?'-'+colabLabel.replace(/\s+/g,'-').toLowerCase():'') + '.pdf';
+    doc.save(nomeArq);
+    addLog('Baixou relatório de ponto: ' + mesLabel + ' / ' + colabLabel);
+  } catch(err) {
+    alert('Erro ao gerar PDF: ' + err.message);
+  }
 }
 
 function pontoLimparHistorico() {

@@ -2493,22 +2493,24 @@ function renderPontoColabAberto(idx) {
 
       '<div id="ponto-status" style="font-size:0.85rem;text-align:center;margin-top:10px;min-height:1.2em"></div>' +
     '</div>' + // card registro
-    '</div>' + // max-width
+    '</div>'; // max-width
 
-    // Script do relógio — roda a cada 1s, para quando sair da página
-    '<script>' +
-    '(function(){' +
-      'if(window._pontoRelogioTimer) clearInterval(window._pontoRelogioTimer);' +
-      'window._pontoRelogioTimer = setInterval(function(){' +
-        'var el=document.getElementById("ponto-relogio");' +
-        'if(!el){clearInterval(window._pontoRelogioTimer);return;}' +
-        'var n=new Date();' +
-        'el.textContent=String(n.getHours()).padStart(2,"0")+":"+String(n.getMinutes()).padStart(2,"0")+":"+String(n.getSeconds()).padStart(2,"0");' +
-      '},1000);' +
-    '})();' +
-    '<\/script>';
+  // Inicia o relógio após o render (seguro, sem tags script inline)
+  setTimeout(function() { pontoIniciarRelogio(); }, 0);
 
   return html;
+}
+
+function pontoIniciarRelogio() {
+  if (window._pontoRelogioTimer) clearInterval(window._pontoRelogioTimer);
+  window._pontoRelogioTimer = setInterval(function() {
+    var el = document.getElementById('ponto-relogio');
+    if (!el) { clearInterval(window._pontoRelogioTimer); return; }
+    var n = new Date();
+    el.textContent = String(n.getHours()).padStart(2,'0') + ':' +
+                     String(n.getMinutes()).padStart(2,'0') + ':' +
+                     String(n.getSeconds()).padStart(2,'0');
+  }, 1000);
 }
 
 function pontoStatCard(icon, label, valor) {

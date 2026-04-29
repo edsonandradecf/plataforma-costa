@@ -2737,8 +2737,8 @@ function renderPontoAdminHistorico() {
     var regsData = porData[data];
     regsData.forEach(function(r, ri) {
       var etIdx = r.etapa !== undefined ? r.etapa : (r.tipo==='entrada'?0:3);
-      var cor   = ETAPA_CORES[etIdx] || 'var(--text2)';
-      var label = r.labelEtapa || ETAPA_LABELS[etIdx] || r.tipo;
+      var cor   = r.tipo === 'folga' ? '#0891b2' : (ETAPA_CORES[etIdx] || 'var(--text2)');
+      var label = r.tipo === 'folga' ? ('🏖 ' + (r.labelEtapa||'Folga')) : (r.labelEtapa || ETAPA_LABELS[etIdx] || r.tipo);
       var bg    = rowIdx % 2 === 1 ? 'background:var(--bg3);' : '';
       html += '<tr style="border-bottom:1px solid var(--border);' + bg + '">' +
         (ri === 0 ? '<td style="padding:7px 12px;color:var(--text3);white-space:nowrap;font-weight:600;vertical-align:top" rowspan="' + regsData.length + '">' + esc(data) + '</td>' : '') +
@@ -2798,16 +2798,23 @@ function pontoCalcStats(colabIdx, mes, ano) {
     return parseInt(partes[1])-1 === mes && parseInt(partes[2]) === ano;
   });
 
-  // Agrupa por dia
+  // Dias com folga/feriado — não contam como falta
+  var diasFolga = {};
+  regs.forEach(function(r){ if (r.tipo === 'folga') diasFolga[r.data] = true; });
+
+  // Agrupa registros de ponto por dia
   var porDia = {};
-  regs.forEach(function(r){ if (!porDia[r.data]) porDia[r.data] = []; porDia[r.data].push(r); });
+  regs.forEach(function(r){
+    if (r.tipo === 'folga') return; // ignora folgas no cálculo de horas
+    if (!porDia[r.data]) porDia[r.data] = [];
+    porDia[r.data].push(r);
+  });
 
   var totalMin = 0;
   var diasTrabalhados = 0;
 
   Object.keys(porDia).forEach(function(dia) {
     var lista = porDia[dia];
-    // Pares entrada/saída
     var entradas = lista.filter(function(r){ return r.tipo==='entrada'; });
     var saidas   = lista.filter(function(r){ return r.tipo==='saida';   });
     var pares = Math.min(entradas.length, saidas.length);
@@ -2820,7 +2827,7 @@ function pontoCalcStats(colabIdx, mes, ano) {
     if (minDia > 0) { totalMin += minDia; diasTrabalhados++; }
   });
 
-  // Faltas: dias úteis do mês passados sem registro
+  // Faltas: dias úteis passados sem registro de ponto E sem folga/feriado
   var hoje = new Date();
   var diasUteisPassados = 0;
   var limite = (mes === hoje.getMonth() && ano === hoje.getFullYear()) ? hoje.getDate() : new Date(ano, mes+1, 0).getDate();
@@ -2828,17 +2835,19 @@ function pontoCalcStats(colabIdx, mes, ano) {
     var dt = new Date(ano, mes, d);
     var diaSem = dt.getDay();
     if (diaSem === 0 || diaSem === 6) continue;
-    diasUteisPassados++;
+    var dataStr = String(d).padStart(2,'0') + '/' + String(mes+1).padStart(2,'0') + '/' + ano;
+    if (!diasFolga[dataStr]) diasUteisPassados++;
   }
   var faltas = Math.max(0, diasUteisPassados - diasTrabalhados);
 
   var h = Math.floor(totalMin / 60);
   var m = totalMin % 60;
   return {
-    horasFormatado: h + 'h' + (m > 0 ? String(m).padStart(2,'0') : ''),
+    horasFormatado:  h + 'h' + (m > 0 ? String(m).padStart(2,'0') : ''),
     diasTrabalhados: diasTrabalhados,
-    faltas: faltas,
-    totalMin: totalMin,
+    diasFolga:       Object.keys(diasFolga).length,
+    faltas:          faltas,
+    totalMin:        totalMin,
   };
 }
 
@@ -3260,22 +3269,27 @@ function pontoAbrirModalManual(idx) {
     { label: '■ Saída (17h)',          tipo: 'saida',   etapa: 3, labelEtapa: 'Saída' },
   ];
 
-  // Dia padrão = hoje
   var hoje = new Date();
   var dataDefault = String(hoje.getDate()).padStart(2,'0') + '/' +
                     String(hoje.getMonth()+1).padStart(2,'0') + '/' +
                     hoje.getFullYear();
 
-  // Detecta próxima etapa do dia padrão para pré-selecionar
   var regsHoje = state.ponto.registros.filter(function(r){ return r.colabIdx === idx && r.data === dataDefault; });
   var etapaDefault = Math.min(regsHoje.length, 3);
-
   var horasDefault = ['08:00','12:00','13:00','17:00'];
 
   mc.innerHTML =
     '<div style="padding:1.5rem;min-width:320px;max-width:420px">' +
       '<div style="font-size:1.1rem;font-weight:700;margin-bottom:4px">⏱ Registro Manual</div>' +
       '<div style="font-size:0.82rem;color:var(--text3);margin-bottom:1.25rem">Colaborador: <strong>' + esc(c.nome) + '</strong></div>' +
+
+      // Tipo de registro — toggle entre Ponto e Feriado/Folga
+      '<div style="display:flex;gap:6px;margin-bottom:1.25rem">' +
+        '<button id="pm-tipo-ponto" onclick="pontoManualTipoToggle(\'ponto\')" ' +
+          'style="flex:1;padding:8px;border:2px solid var(--green);border-radius:8px;background:var(--green);color:#fff;font-weight:700;cursor:pointer;font-size:0.85rem">⏱ Ponto</button>' +
+        '<button id="pm-tipo-folga" onclick="pontoManualTipoToggle(\'folga\')" ' +
+          'style="flex:1;padding:8px;border:2px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text2);font-weight:600;cursor:pointer;font-size:0.85rem">🏖 Feriado / Folga</button>' +
+      '</div>' +
 
       '<div style="margin-bottom:12px">' +
         '<label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:5px;font-weight:600">📅 Data</label>' +
@@ -3284,42 +3298,60 @@ function pontoAbrirModalManual(idx) {
         '<div style="font-size:0.72rem;color:var(--text3);margin-top:4px">Formato: DD/MM/AAAA</div>' +
       '</div>' +
 
-      '<div style="margin-bottom:12px">' +
-        '<label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:5px;font-weight:600">📋 Etapa</label>' +
-        '<div id="pm-etapas" style="display:flex;flex-direction:column;gap:6px">' +
-          ETAPAS.map(function(e, ei) {
-            return '<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:0.88rem;transition:all 0.15s" ' +
-              'onmouseover="this.style.borderColor=\'var(--green)\'" onmouseout="this.style.borderColor=\'var(--border)\'">' +
-              '<input type="radio" name="pm-etapa" value="' + ei + '" ' + (ei === etapaDefault ? 'checked' : '') + ' style="accent-color:var(--green)">' +
-              '<span>' + e.label + '</span>' +
-            '</label>';
-          }).join('') +
+      // Campos de ponto (ficam visíveis por padrão)
+      '<div id="pm-campos-ponto">' +
+        '<div style="margin-bottom:12px">' +
+          '<label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:5px;font-weight:600">📋 Etapa</label>' +
+          '<div id="pm-etapas" style="display:flex;flex-direction:column;gap:6px">' +
+            ETAPAS.map(function(e, ei) {
+              return '<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:0.88rem" ' +
+                'onmouseover="this.style.borderColor=\'var(--green)\'" onmouseout="this.style.borderColor=\'var(--border)\'">' +
+                '<input type="radio" name="pm-etapa" value="' + ei + '" ' + (ei === etapaDefault ? 'checked' : '') + ' style="accent-color:var(--green)">' +
+                '<span>' + e.label + '</span>' +
+              '</label>';
+            }).join('') +
+          '</div>' +
+          '<div id="pm-etapa-aviso" style="font-size:0.75rem;margin-top:6px;color:var(--amber)"></div>' +
         '</div>' +
-        '<div id="pm-etapa-aviso" style="font-size:0.75rem;margin-top:6px;color:var(--amber)"></div>' +
+        '<div style="margin-bottom:1.25rem">' +
+          '<label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:5px;font-weight:600">🕐 Horário</label>' +
+          '<input id="pm-hora" type="time" class="tn-input" value="' + horasDefault[etapaDefault] + '" style="width:100%;margin:0">' +
+          '<div style="font-size:0.72rem;color:var(--text3);margin-top:4px">Horário real do registro</div>' +
+        '</div>' +
       '</div>' +
 
-      '<div style="margin-bottom:1.25rem">' +
-        '<label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:5px;font-weight:600">🕐 Horário</label>' +
-        '<input id="pm-hora" type="time" class="tn-input" value="' + horasDefault[etapaDefault] + '" style="width:100%;margin:0">' +
-        '<div style="font-size:0.72rem;color:var(--text3);margin-top:4px">Horário real do registro</div>' +
+      // Campo de motivo — aparece só no modo folga
+      '<div id="pm-campos-folga" style="display:none;margin-bottom:1.25rem">' +
+        '<label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:5px;font-weight:600">📋 Motivo</label>' +
+        '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px">' +
+          '<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:0.88rem">' +
+            '<input type="radio" name="pm-motivo" value="Feriado" checked style="accent-color:var(--blue)"> <span>🎉 Feriado</span>' +
+          '</label>' +
+          '<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:0.88rem">' +
+            '<input type="radio" name="pm-motivo" value="Folga" style="accent-color:var(--blue)"> <span>🏖 Folga</span>' +
+          '</label>' +
+          '<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:0.88rem">' +
+            '<input type="radio" name="pm-motivo" value="Atestado" style="accent-color:var(--blue)"> <span>🏥 Atestado</span>' +
+          '</label>' +
+        '</div>' +
+        '<div style="padding:10px 12px;background:var(--bg3);border-radius:8px;font-size:0.78rem;color:var(--text2)">✓ Este dia <strong>não será contado como falta</strong> para o colaborador.</div>' +
       '</div>' +
 
       '<div style="margin-bottom:1.25rem">' +
         '<label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:5px;font-weight:600">📝 Observação</label>' +
-        '<input id="pm-obs" class="tn-input" placeholder="Ex: Sem internet, registrado pelo admin" ' +
+        '<input id="pm-obs" class="tn-input" placeholder="Observação adicional..." ' +
           'value="Registrado manualmente pelo administrador" style="width:100%;margin:0">' +
       '</div>' +
 
       '<div style="display:flex;gap:8px">' +
         '<button class="btn" style="flex:1" onclick="closeModal()">Cancelar</button>' +
-        '<button class="btn btn-green" style="flex:1" onclick="pontoSalvarManual(' + idx + ')">✓ Salvar Registro</button>' +
+        '<button class="btn btn-green" style="flex:1" onclick="pontoSalvarManual(' + idx + ')">✓ Salvar</button>' +
       '</div>' +
       '<div id="pm-status" style="font-size:0.82rem;color:var(--red);text-align:center;margin-top:8px;min-height:1.2em"></div>' +
     '</div>';
 
   modal.style.display = 'flex';
 
-  // Atualiza hora sugerida ao trocar etapa
   setTimeout(function() {
     var radios = document.querySelectorAll('input[name="pm-etapa"]');
     var horaEl = document.getElementById('pm-hora');
@@ -3329,6 +3361,26 @@ function pontoAbrirModalManual(idx) {
       });
     });
   }, 50);
+}
+
+function pontoManualTipoToggle(tipo) {
+  var camposPonto = document.getElementById('pm-campos-ponto');
+  var camposFolga = document.getElementById('pm-campos-folga');
+  var btnPonto    = document.getElementById('pm-tipo-ponto');
+  var btnFolga    = document.getElementById('pm-tipo-folga');
+  if (!camposPonto || !camposFolga) return;
+
+  if (tipo === 'folga') {
+    camposPonto.style.display = 'none';
+    camposFolga.style.display = 'block';
+    btnPonto.style.background = 'var(--bg2)'; btnPonto.style.color = 'var(--text2)'; btnPonto.style.borderColor = 'var(--border)';
+    btnFolga.style.background = 'var(--blue)'; btnFolga.style.color = '#fff'; btnFolga.style.borderColor = 'var(--blue)';
+  } else {
+    camposPonto.style.display = 'block';
+    camposFolga.style.display = 'none';
+    btnPonto.style.background = 'var(--green)'; btnPonto.style.color = '#fff'; btnPonto.style.borderColor = 'var(--green)';
+    btnFolga.style.background = 'var(--bg2)'; btnFolga.style.color = 'var(--text2)'; btnFolga.style.borderColor = 'var(--border)';
+  }
 }
 
 function pontoManualAtualizarEtapas(idx) {
@@ -3349,19 +3401,57 @@ function pontoManualAtualizarEtapas(idx) {
 function pontoSalvarManual(idx) {
   var c      = state.ponto.colaboradores[idx];
   var dataEl = document.getElementById('pm-data');
-  var horaEl = document.getElementById('pm-hora');
   var obsEl  = document.getElementById('pm-obs');
   var stEl   = document.getElementById('pm-status');
-  var radios = document.querySelectorAll('input[name="pm-etapa"]');
 
   var data = dataEl ? dataEl.value.trim() : '';
-  var hora = horaEl ? horaEl.value.trim() : '';
   var obs  = obsEl  ? obsEl.value.trim()  : '';
+
+  if (!/^\d{2}\/\d{2}\/\d{4}$/.test(data)) { if(stEl) stEl.textContent = '⚠ Data inválida. Use DD/MM/AAAA.'; return; }
+
+  // Detecta modo
+  var btnFolga = document.getElementById('pm-tipo-folga');
+  var modoFolga = btnFolga && btnFolga.style.background !== 'var(--bg2)' && btnFolga.style.color === '#fff';
+
+  if (modoFolga) {
+    // ── Salva feriado/folga ──────────────────────────────
+    var motivoEl = document.querySelector('input[name="pm-motivo"]:checked');
+    var motivo   = motivoEl ? motivoEl.value : 'Folga';
+
+    // Verifica se já existe folga neste dia
+    var jaExiste = state.ponto.registros.some(function(r){
+      return r.colabIdx === idx && r.data === data && r.tipo === 'folga';
+    });
+    if (jaExiste) { if(stEl) stEl.textContent = '⚠ Já existe um registro de ' + motivo.toLowerCase() + ' neste dia.'; return; }
+
+    state.ponto.registros.push({
+      id:         Date.now(),
+      colabIdx:   idx,
+      nomeColab:  c.nome,
+      cargo:      c.cargo || '',
+      data:       data,
+      hora:       '—',
+      tipo:       'folga',
+      etapa:      -1,
+      labelEtapa: motivo,
+      manual:     true,
+      obs:        obs || motivo,
+    });
+
+    addLog(motivo + ' registrado para ' + c.nome + ' em ' + data);
+    saveState();
+    closeModal();
+    navigate('ponto');
+    return;
+  }
+
+  // ── Salva ponto normal ───────────────────────────────
+  var horaEl = document.getElementById('pm-hora');
+  var radios = document.querySelectorAll('input[name="pm-etapa"]');
+  var hora = horaEl ? horaEl.value.trim() : '';
   var etapaIdx = -1;
   radios.forEach(function(r){ if (r.checked) etapaIdx = parseInt(r.value); });
 
-  // Validações
-  if (!/^\d{2}\/\d{2}\/\d{4}$/.test(data)) { if(stEl) stEl.textContent = '⚠ Data inválida. Use DD/MM/AAAA.'; return; }
   if (!hora) { if(stEl) stEl.textContent = '⚠ Informe o horário.'; return; }
   if (etapaIdx < 0) { if(stEl) stEl.textContent = '⚠ Selecione uma etapa.'; return; }
 
@@ -3373,7 +3463,6 @@ function pontoSalvarManual(idx) {
   ];
   var e = ETAPAS[etapaIdx];
 
-  // Calcula horas trabalhadas se for saída
   var horasTrabalhadas = null;
   if (e.tipo === 'saida') {
     var regsData = state.ponto.registros.filter(function(r){ return r.colabIdx === idx && r.data === data && r.tipo === 'entrada'; });
@@ -3402,13 +3491,12 @@ function pontoSalvarManual(idx) {
     obs:              obs,
   });
 
-  // Reordena os registros do dia por etapa
   state.ponto.registros.sort(function(a, b) {
     if (a.data !== b.data || a.colabIdx !== b.colabIdx) return 0;
     return (a.etapa||0) - (b.etapa||0);
   });
 
-  addLog('Registro manual de ponto: ' + e.labelEtapa + ' de ' + c.nome + ' em ' + data + ' às ' + hora + (obs ? ' — ' + obs : ''));
+  addLog('Registro manual: ' + e.labelEtapa + ' de ' + c.nome + ' em ' + data + ' às ' + hora);
   saveState();
   closeModal();
   navigate('ponto');

@@ -327,6 +327,7 @@ let state = {
   estoque: { produtos: [], movimentacoes: [] },
   ponto: { colaboradores: [], registros: [] },
   mlToken: null,
+  shopeeToken: null,
   currentUser: null,
   currentPage: 'inicio',
   calMonth: new Date().getMonth(),
@@ -399,8 +400,11 @@ function applyParsed(parsed, forceMerge) {
   };
   if (parsed.mlToken) {
     state.mlToken = parsed.mlToken;
-    // Sync to localStorage so mlLoadToken finds it
     localStorage.setItem('ml_token', JSON.stringify(parsed.mlToken));
+  }
+  if (parsed.shopeeToken) {
+    state.shopeeToken = parsed.shopeeToken;
+    localStorage.setItem('shopee_token', JSON.stringify(parsed.shopeeToken));
   }
 }
 
@@ -535,7 +539,8 @@ function saveState() {
     tabnutri: state.tabnutri,
     estoque:  state.estoque,
     ponto:    state.ponto,
-    mlToken:  state.mlToken || null,
+    mlToken:      state.mlToken || null,
+    shopeeToken:  state.shopeeToken || null,
   };
   localStorage.setItem('costa_state', JSON.stringify(data));
   if (_saveTimer) clearTimeout(_saveTimer);
@@ -667,17 +672,16 @@ function toggleTheme() {
 
 // Try saved login
 (function checkSavedLogin() {
-  // Load local cache
   try {
     const s = localStorage.getItem('costa_state');
     if (s) applyParsed(JSON.parse(s));
   } catch(e) {}
 
-  // Check if Mercado Livre returned a code in the URL
-  const urlParams = new URLSearchParams(window.location.search);
-  const mlCode = urlParams.get('code');
+  const urlParams  = new URLSearchParams(window.location.search);
+  const mlCode     = urlParams.get('code');
+  const shopeeCode = urlParams.get('code');
+  const shopeeShopId = urlParams.get('shop_id'); // Shopee retorna shop_id no redirect
 
-  // Restore saved credentials
   const saved = localStorage.getItem('costa_saved_login');
   if (saved) {
     try {
@@ -688,33 +692,37 @@ function toggleTheme() {
         document.getElementById('login-pass').value = senha;
         document.getElementById('login-remember').checked = true;
 
-        // If there's an ML code AND user has saved credentials → auto-login and process code
-        if (mlCode) {
+        if (mlCode || (shopeeCode && shopeeShopId)) {
           state.currentUser = user;
           _loginTime = Date.now();
           _firebaseReady = false;
-          // Clean URL immediately
           window.history.replaceState({}, document.title, window.location.pathname);
-          // Start app and process the ML code
           startApp();
-          // Process ML auth code after app loads
           setTimeout(async function() {
             try {
-              await mlExchangeCode(mlCode);
+              if (shopeeShopId && shopeeCode) {
+                // É um redirect da Shopee (tem shop_id)
+                await shopeeExchangeCode(shopeeCode, shopeeShopId);
+                _vendaTab = 'shopee';
+              } else if (mlCode) {
+                await mlExchangeCode(mlCode);
+              }
               navigate('vendas');
-            } catch(e) {
-              navigate('vendas');
-            }
+            } catch(e) { navigate('vendas'); }
           }, 500);
-          return; // Skip showing login screen
+          return;
         }
       }
     } catch(e) {}
   }
 
-  // If ML code but no saved login → store code and show login
-  if (mlCode) {
+  if (mlCode && !urlParams.get('shop_id')) {
     localStorage.setItem('ml_pending_code', mlCode);
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+  if (shopeeCode && shopeeShopId) {
+    localStorage.setItem('shopee_pending_code', shopeeCode);
+    localStorage.setItem('shopee_pending_shop_id', shopeeShopId);
     window.history.replaceState({}, document.title, window.location.pathname);
   }
 })();
@@ -3898,6 +3906,49 @@ const ML_CLIENT_SECRET = 'c2yBzHKBjJNFbM3JIlh6ppld3JgE5k5u';
 const ML_REDIRECT_URI  = 'https://edsonandradecf.github.io/plataforma-costa';
 const ML_PROXY         = 'https://ml-proxy.costanaturelife.workers.dev';
 
+// ─── SHOPEE ───────────────────────────────────────────────────────────────────
+const SHOPEE_PARTNER_ID  = 1232734;
+const SHOPEE_SHOP_ID     = 1577798856;
+const SHOPEE_PROXY       = 'https://shopee-proxy.costanaturelife.workers.dev';
+const SHOPEE_REDIRECT    = 'https://edsonandradecf.github.io/plataforma-costa';
+
+var _shopeeToken = null; // { access_token, refresh_token, expires_at, shop_id }
+var _vendaTab    = 'ml'; // 'ml' | 'shopee'
+
+function shopeeLoadToken() {
+  if (_shopeeToken) return _shopeeToken;
+  try { _shopeeToken = JSON.parse(localStorage.getItem('shopee_token')); } catch(e) {}
+  if (!_shopeeToken && state.shopeeToken) _shopeeToken = state.shopeeToken;
+  return _shopeeToken;
+}
+function shopeeSaveToken(t) {
+  _shopeeToken = t;
+  localStorage.setItem('shopee_token', JSON.stringify(t));
+  state.shopeeToken = t;
+  saveState();
+}
+function shopeeTokenValid() {
+  var t = shopeeLoadToken();
+  return t && t.access_token && Date.now() < (t.expires_at || 0);
+}
+async function shopeeRefreshToken() {
+  var t = shopeeLoadToken();
+  if (!t || !t.refresh_token) throw new Error('Sem refresh token Shopee');
+  var resp = await fetch(SHOPEE_PROXY + '?action=refresh_token&refresh_token=' + encodeURIComponent(t.refresh_token) + '&shop_id=' + SHOPEE_SHOP_ID);
+  var data = await resp.json();
+  if (!data.access_token) throw new Error('Falha ao renovar token Shopee');
+  shopeeSaveToken({ access_token: data.access_token, refresh_token: data.refresh_token || t.refresh_token, expires_at: Date.now() + ((data.expire_in || 14400) * 1000), shop_id: SHOPEE_SHOP_ID });
+}
+async function shopeeGet(path, params) {
+  if (!shopeeTokenValid()) await shopeeRefreshToken();
+  var t = shopeeLoadToken();
+  var q = new URLSearchParams(params || {});
+  var url = SHOPEE_PROXY + '?action=api&path=' + encodeURIComponent(path) + '&access_token=' + encodeURIComponent(t.access_token) + '&shop_id=' + SHOPEE_SHOP_ID + '&' + q.toString();
+  var resp = await fetch(url);
+  if (!resp.ok) throw new Error('Shopee API erro ' + resp.status);
+  return await resp.json();
+}
+
 // Wraps a URL through the CORS proxy
 function mlProxyUrl(url) {
   return ML_PROXY + '?url=' + encodeURIComponent(url);
@@ -4066,43 +4117,202 @@ async function mlFetchVendas() {
   };
 }
 
-function renderVendas() {
-  return '<div id="vendas-content"><div class="card" style="text-align:center;padding:2rem">' +
-    '<div style="font-size:2rem;margin-bottom:1rem">📊</div>' +
-    '<p style="color:var(--text2);margin-bottom:1rem">Carregando dados de vendas...</p>' +
-    '<div id="vendas-progress" style="max-width:300px;margin:0 auto"></div>' +
-    '<div id="vendas-loading" style="color:var(--text3);font-size:0.85rem"></div>' +
-  '</div></div>';
+async function shopeeExchangeCode(code, shopId) {
+  var resp = await fetch(SHOPEE_PROXY + '?action=get_token&code=' + encodeURIComponent(code) + '&shop_id=' + shopId);
+  var data = await resp.json();
+  if (!data.access_token) throw new Error('Falha ao obter token Shopee: ' + JSON.stringify(data));
+  shopeeSaveToken({
+    access_token:  data.access_token,
+    refresh_token: data.refresh_token,
+    expires_at:    Date.now() + ((data.expire_in || 14400) * 1000),
+    shop_id:       parseInt(shopId),
+  });
+  addLog('Shopee conectada com sucesso');
+  return data;
 }
 
-async function bindVendas() {
-  var el = document.getElementById('vendas-content');
+function shopeeDesconectar() {
+  _shopeeToken = null;
+  state.shopeeToken = null;
+  localStorage.removeItem('shopee_token');
+  saveState();
+  navigate('vendas');
+}
+
+function shopeeAuthHtml() {
+  return '<div class="card" style="max-width:480px;margin:0 auto;text-align:center;padding:2.5rem">' +
+    '<div style="font-size:2.5rem;margin-bottom:1rem">🛒</div>' +
+    '<h3 style="margin-bottom:0.5rem">Conectar Shopee</h3>' +
+    '<p style="color:var(--text2);font-size:0.9rem;margin-bottom:1.5rem">Clique abaixo para autorizar a Plataforma Costa a acessar seus pedidos da Shopee.</p>' +
+    '<button onclick="shopeeIniciarAuth()" class="btn btn-green" style="padding:0.75rem 2rem;font-size:1rem">🔗 Conectar com Shopee</button>' +
+  '</div>';
+}
+
+async function shopeeIniciarAuth() {
+  try {
+    var resp = await fetch(SHOPEE_PROXY + '?action=auth_url&redirect_uri=' + encodeURIComponent(SHOPEE_REDIRECT));
+    var data = await resp.json();
+    if (data.auth_url) window.location.href = data.auth_url;
+    else alert('Erro ao gerar link de autorização Shopee');
+  } catch(e) {
+    alert('Erro: ' + e.message);
+  }
+}
+
+async function shopeeCarregarVendas() {
+  var el = document.getElementById('shopee-content');
   if (!el) return;
 
-  // Code is handled at page load in checkSavedLogin — nothing to do here
-
-  if (!mlTokenValid()) {
-    el.innerHTML = mlAuthHtml();
+  if (!shopeeTokenValid()) {
+    el.innerHTML = shopeeAuthHtml();
     return;
   }
 
+  el.innerHTML = '<div class="card" style="text-align:center;padding:2rem"><div style="font-size:2rem;margin-bottom:1rem">⏳</div><p>Carregando pedidos da Shopee...</p></div>';
+
   try {
-    document.getElementById('vendas-loading') && (document.getElementById('vendas-loading').textContent = 'Buscando pedidos do dia...');
-    var result = await mlFetchVendas();
-    el.innerHTML = mlDashHtml(result);
+    var now       = Math.floor(Date.now() / 1000);
+    var inicioMes = Math.floor(new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime() / 1000);
+
+    // Busca lista de pedidos do mês
+    var resp = await shopeeGet('/api/v2/order/get_order_list', {
+      time_range_field: 'create_time',
+      time_from:        inicioMes,
+      time_to:          now,
+      page_size:        100,
+      response_optional_fields: 'order_status',
+    });
+
+    var orderList = (resp.response && resp.response.order_list) ? resp.response.order_list : [];
+    var totalPedidos = orderList.length;
+
+    // Busca detalhes dos pedidos para obter valores
+    var totalFaturado = 0;
+    var pedidosHoje = 0;
+    var faturadoHoje = 0;
+    var hoje = new Date(); hoje.setHours(0,0,0,0);
+    var hojeTs = Math.floor(hoje.getTime() / 1000);
+
+    if (orderList.length > 0) {
+      var snsChunks = [];
+      for (var i = 0; i < orderList.length; i += 50) {
+        snsChunks.push(orderList.slice(i, i+50).map(function(o){ return o.order_sn; }));
+      }
+      for (var ci = 0; ci < snsChunks.length; ci++) {
+        var det = await shopeeGet('/api/v2/order/get_order_detail', {
+          order_sn_list: snsChunks[ci].join(','),
+          response_optional_fields: 'total_amount,create_time',
+        });
+        if (det.response && det.response.order_list) {
+          det.response.order_list.forEach(function(o) {
+            var val = parseFloat(o.total_amount || 0);
+            totalFaturado += val;
+            if (o.create_time >= hojeTs) {
+              pedidosHoje++;
+              faturadoHoje += val;
+            }
+          });
+        }
+      }
+    }
+
+    var t = shopeeLoadToken();
+    el.innerHTML =
+      '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:1.25rem">' +
+        '<div style="display:flex;align-items:center;gap:10px">' +
+          '<img src="https://down-br.img.susercontent.com/file/br-50009109-png-5b2ef7d89f6e01a3a92547e4d7279a3b" style="height:24px" onerror="this.style.display=\'none\'">' +
+          '<span style="font-size:0.85rem;color:var(--text3)">Shopee • Loja conectada</span>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px">' +
+          '<button class="btn btn-sm" onclick="shopeeCarregarVendas()">🔄 Atualizar</button>' +
+          '<button class="btn btn-sm btn-red" onclick="shopeeDesconectar()">Desconectar</button>' +
+        '</div>' +
+      '</div>' +
+
+      // Cards do dia
+      '<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:0.5rem">Hoje</div>' +
+      '<div class="stats-grid" style="margin-bottom:1.25rem">' +
+        '<div class="stat-card"><div class="stat-icon">🛍️</div><div class="stat-label">Pedidos Hoje</div><div class="stat-value">' + pedidosHoje + '</div></div>' +
+        '<div class="stat-card"><div class="stat-icon">💰</div><div class="stat-label">Faturado Hoje</div><div class="stat-value">R$ ' + faturadoHoje.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</div></div>' +
+      '</div>' +
+
+      // Cards do mês
+      '<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:0.5rem">' + new Date().toLocaleString('pt-BR',{month:'long'}) + '</div>' +
+      '<div class="stats-grid" style="margin-bottom:1.25rem">' +
+        '<div class="stat-card"><div class="stat-icon">📅</div><div class="stat-label">Pedidos no Mês</div><div class="stat-value">' + totalPedidos + '</div></div>' +
+        '<div class="stat-card"><div class="stat-icon">💵</div><div class="stat-label">Faturado no Mês</div><div class="stat-value">R$ ' + totalFaturado.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</div></div>' +
+      '</div>';
+
   } catch(e) {
-    // Erros de autenticação → limpa token e pede reconexão
-    var isAuthError = e.message.includes('401') || e.message.includes('Token expirado') ||
-                      e.message.includes('token') || e.message.includes('Failed to fetch') ||
-                      e.message.includes('invalid_grant') || e.message.includes('invalid_token');
-    if (isAuthError) {
-      localStorage.removeItem('ml_token'); _mlToken = null;
-      state.mlToken = null;
-      el.innerHTML = mlAuthHtml();
+    var isAuth = e.message.includes('401') || e.message.includes('token');
+    if (isAuth) {
+      _shopeeToken = null; state.shopeeToken = null; localStorage.removeItem('shopee_token');
+      el.innerHTML = shopeeAuthHtml();
     } else {
-      el.innerHTML = mlErrorHtml('Erro ao buscar vendas: ' + e.message);
+      el.innerHTML = '<div class="card" style="border-color:var(--red);text-align:center;padding:2rem">' +
+        '<div style="color:var(--red)">⚠ ' + esc(e.message) + '</div>' +
+        '<button class="btn btn-sm" style="margin-top:1rem" onclick="shopeeCarregarVendas()">Tentar novamente</button>' +
+      '</div>';
     }
   }
+}
+
+function renderVendas() {
+  var isMl = _vendaTab !== 'shopee';
+  return '<div id="vendas-content">' +
+    // Abas ML + Shopee
+    '<div style="display:flex;border-bottom:2px solid var(--border);margin-bottom:1.5rem">' +
+      '<button onclick="vendasSetTab(\'ml\')" style="display:flex;align-items:center;gap:6px;padding:0.65rem 1.5rem;background:none;border:none;border-bottom:' + (isMl?'3px solid var(--green);color:var(--green);font-weight:600':'none;color:var(--text2)') + ';cursor:pointer;font-size:0.95rem;margin-bottom:-2px">' +
+        '🛒 Mercado Livre' +
+      '</button>' +
+      '<button onclick="vendasSetTab(\'shopee\')" style="display:flex;align-items:center;gap:6px;padding:0.65rem 1.5rem;background:none;border:none;border-bottom:' + (!isMl?'3px solid var(--amber);color:var(--amber);font-weight:600':'none;color:var(--text2)') + ';cursor:pointer;font-size:0.95rem;margin-bottom:-2px">' +
+        '🧡 Shopee' +
+      '</button>' +
+    '</div>' +
+    '<div id="ml-tab-content"' + (isMl?'':' style="display:none"') + '>' +
+      '<div class="card" style="text-align:center;padding:2rem"><div style="font-size:2rem;margin-bottom:1rem">📊</div><p style="color:var(--text2)">Carregando Mercado Livre...</p></div>' +
+    '</div>' +
+    '<div id="shopee-content"' + (!isMl?'':' style="display:none"') + '>' +
+      '<div class="card" style="text-align:center;padding:2rem"><div style="font-size:2rem;margin-bottom:1rem">📊</div><p style="color:var(--text2)">Carregando Shopee...</p></div>' +
+    '</div>' +
+  '</div>';
+}
+
+function vendasSetTab(tab) {
+  _vendaTab = tab;
+  var mlDiv     = document.getElementById('ml-tab-content');
+  var shopeeDiv = document.getElementById('shopee-content');
+  if (!mlDiv || !shopeeDiv) { navigate('vendas'); return; }
+  mlDiv.style.display    = tab === 'ml'     ? '' : 'none';
+  shopeeDiv.style.display = tab === 'shopee' ? '' : 'none';
+  if (tab === 'shopee') shopeeCarregarVendas();
+}
+
+async function bindVendas() {
+  // ML tab
+  var mlEl = document.getElementById('ml-tab-content');
+  if (!mlEl) return;
+
+  if (!mlTokenValid()) {
+    mlEl.innerHTML = mlAuthHtml();
+  } else {
+    try {
+      mlEl.innerHTML = '<div class="card" style="text-align:center;padding:2rem"><div style="font-size:2rem;margin-bottom:1rem">📊</div><p style="color:var(--text2);margin-bottom:1rem">Carregando pedidos...</p><div id="vendas-progress" style="max-width:300px;margin:0 auto"></div><div id="vendas-loading" style="color:var(--text3);font-size:0.85rem"></div></div>';
+      var result = await mlFetchVendas();
+      mlEl.innerHTML = mlDashHtml(result);
+    } catch(e) {
+      var isAuthError = e.message.includes('401') || e.message.includes('Token expirado') || e.message.includes('token');
+      if (isAuthError) {
+        localStorage.removeItem('ml_token'); _mlToken = null; state.mlToken = null;
+        mlEl.innerHTML = mlAuthHtml();
+      } else {
+        mlEl.innerHTML = mlErrorHtml('Erro ao buscar vendas: ' + e.message);
+      }
+    }
+  }
+
+  // Shopee tab (só carrega se estiver ativa)
+  if (_vendaTab === 'shopee') shopeeCarregarVendas();
 }
 
 function mlAuthHtml() {
@@ -4289,7 +4499,7 @@ function mlDashHtml(result) {
     });
   }
   html += '</div>';
-  return '<div id="vendas-content">' + html + '</div>';
+  return html;
 }
 
 function mlDesconectar() {

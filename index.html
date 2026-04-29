@@ -2583,7 +2583,16 @@ function renderPontoAdminColabs() {
           '<div style="font-size:0.65rem;color:var(--text3)">Faltas</div>' +
         '</div>' +
       '</div>' +
-      '<div style="font-size:0.75rem;font-weight:600;color:' + corStatus + '">' + labelStatus + '</div>' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">' +
+        '<div style="font-size:0.75rem;font-weight:600;color:' + corStatus + '">' + labelStatus + '</div>' +
+        '<button onclick="pontoAbrirModalManual(' + i + ')" title="Registrar ponto manualmente" ' +
+          'style="display:flex;align-items:center;gap:4px;padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);color:var(--text2);cursor:pointer;font-size:0.75rem;transition:all 0.15s" ' +
+          'onmouseover="this.style.borderColor=\'var(--amber)\';this.style.color=\'var(--amber)\'" ' +
+          'onmouseout="this.style.borderColor=\'var(--border)\';this.style.color=\'var(--text2)\'">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' +
+          ' Reg. Manual' +
+        '</button>' +
+      '</div>' +
     '</div>';
   });
   html += '</div>';
@@ -2737,7 +2746,7 @@ function renderPontoAdminHistorico() {
         '<td style="padding:7px 12px;text-align:center">' +
           '<span style="padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:' + cor + '18;color:' + cor + '">' + label + '</span>' +
         '</td>' +
-        '<td style="padding:7px 12px;text-align:center;font-weight:700">' + esc(r.hora) + '</td>' +
+        '<td style="padding:7px 12px;text-align:center;font-weight:700">' + esc(r.hora) + (r.manual ? ' <span title="' + esc(r.obs||'') + '" style="font-size:0.65rem;font-weight:600;background:var(--amber)18;color:var(--amber);border-radius:4px;padding:1px 5px">manual</span>' : '') + '</td>' +
         '<td style="padding:7px 12px;text-align:center;color:var(--text2)">' + (r.horasTrabalhadas || '—') + '</td>' +
       '</tr>';
       rowIdx++;
@@ -3235,7 +3244,173 @@ function pontoSalvarColab(idx) {
   navigate('ponto');
 }
 
-function pontoExcluirColab(idx) {
+function pontoAbrirModalManual(idx) {
+  var c = state.ponto.colaboradores[idx];
+  if (!c) return;
+  var modal = document.getElementById('modal');
+  var mc    = document.getElementById('modal-content');
+  if (!modal || !mc) return;
+
+  var ETAPAS = [
+    { label: '▶ Entrada (08h)',       tipo: 'entrada', etapa: 0, labelEtapa: 'Entrada' },
+    { label: '🍽 Saída Almoço (12h)', tipo: 'saida',   etapa: 1, labelEtapa: 'Saída para Almoço' },
+    { label: '↩ Volta Almoço (13h)', tipo: 'entrada', etapa: 2, labelEtapa: 'Volta do Almoço' },
+    { label: '■ Saída (17h)',          tipo: 'saida',   etapa: 3, labelEtapa: 'Saída' },
+  ];
+
+  // Dia padrão = hoje
+  var hoje = new Date();
+  var dataDefault = String(hoje.getDate()).padStart(2,'0') + '/' +
+                    String(hoje.getMonth()+1).padStart(2,'0') + '/' +
+                    hoje.getFullYear();
+
+  // Detecta próxima etapa do dia padrão para pré-selecionar
+  var regsHoje = state.ponto.registros.filter(function(r){ return r.colabIdx === idx && r.data === dataDefault; });
+  var etapaDefault = Math.min(regsHoje.length, 3);
+
+  var horasDefault = ['08:00','12:00','13:00','17:00'];
+
+  mc.innerHTML =
+    '<div style="padding:1.5rem;min-width:320px;max-width:420px">' +
+      '<div style="font-size:1.1rem;font-weight:700;margin-bottom:4px">⏱ Registro Manual</div>' +
+      '<div style="font-size:0.82rem;color:var(--text3);margin-bottom:1.25rem">Colaborador: <strong>' + esc(c.nome) + '</strong></div>' +
+
+      '<div style="margin-bottom:12px">' +
+        '<label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:5px;font-weight:600">📅 Data</label>' +
+        '<input id="pm-data" type="text" class="tn-input" placeholder="DD/MM/AAAA" value="' + dataDefault + '" ' +
+          'style="width:100%;margin:0" oninput="pontoManualAtualizarEtapas(' + idx + ')">' +
+        '<div style="font-size:0.72rem;color:var(--text3);margin-top:4px">Formato: DD/MM/AAAA</div>' +
+      '</div>' +
+
+      '<div style="margin-bottom:12px">' +
+        '<label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:5px;font-weight:600">📋 Etapa</label>' +
+        '<div id="pm-etapas" style="display:flex;flex-direction:column;gap:6px">' +
+          ETAPAS.map(function(e, ei) {
+            return '<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:0.88rem;transition:all 0.15s" ' +
+              'onmouseover="this.style.borderColor=\'var(--green)\'" onmouseout="this.style.borderColor=\'var(--border)\'">' +
+              '<input type="radio" name="pm-etapa" value="' + ei + '" ' + (ei === etapaDefault ? 'checked' : '') + ' style="accent-color:var(--green)">' +
+              '<span>' + e.label + '</span>' +
+            '</label>';
+          }).join('') +
+        '</div>' +
+        '<div id="pm-etapa-aviso" style="font-size:0.75rem;margin-top:6px;color:var(--amber)"></div>' +
+      '</div>' +
+
+      '<div style="margin-bottom:1.25rem">' +
+        '<label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:5px;font-weight:600">🕐 Horário</label>' +
+        '<input id="pm-hora" type="time" class="tn-input" value="' + horasDefault[etapaDefault] + '" style="width:100%;margin:0">' +
+        '<div style="font-size:0.72rem;color:var(--text3);margin-top:4px">Horário real do registro</div>' +
+      '</div>' +
+
+      '<div style="margin-bottom:1.25rem">' +
+        '<label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:5px;font-weight:600">📝 Observação</label>' +
+        '<input id="pm-obs" class="tn-input" placeholder="Ex: Sem internet, registrado pelo admin" ' +
+          'value="Registrado manualmente pelo administrador" style="width:100%;margin:0">' +
+      '</div>' +
+
+      '<div style="display:flex;gap:8px">' +
+        '<button class="btn" style="flex:1" onclick="closeModal()">Cancelar</button>' +
+        '<button class="btn btn-green" style="flex:1" onclick="pontoSalvarManual(' + idx + ')">✓ Salvar Registro</button>' +
+      '</div>' +
+      '<div id="pm-status" style="font-size:0.82rem;color:var(--red);text-align:center;margin-top:8px;min-height:1.2em"></div>' +
+    '</div>';
+
+  modal.style.display = 'flex';
+
+  // Atualiza hora sugerida ao trocar etapa
+  setTimeout(function() {
+    var radios = document.querySelectorAll('input[name="pm-etapa"]');
+    var horaEl = document.getElementById('pm-hora');
+    radios.forEach(function(r) {
+      r.addEventListener('change', function() {
+        if (horaEl) horaEl.value = horasDefault[parseInt(r.value)];
+      });
+    });
+  }, 50);
+}
+
+function pontoManualAtualizarEtapas(idx) {
+  var dataEl = document.getElementById('pm-data');
+  var aviso  = document.getElementById('pm-etapa-aviso');
+  if (!dataEl || !aviso) return;
+  var data = dataEl.value.trim();
+  // Valida formato
+  if (!/^\d{2}\/\d{2}\/\d{4}$/.test(data)) { aviso.textContent = ''; return; }
+  var regsData = state.ponto.registros.filter(function(r){ return r.colabIdx === idx && r.data === data; });
+  var n = regsData.length;
+  if (n === 0) { aviso.textContent = ''; return; }
+  var LABELS = ['Entrada','Saída Almoço','Volta Almoço','Saída'];
+  var feitos = regsData.map(function(r,i){ return LABELS[i] || r.tipo; }).join(', ');
+  aviso.textContent = n >= 4 ? '⚠ Jornada completa neste dia.' : '⚠ Já registrado: ' + feitos + '. Próxima etapa disponível: ' + (LABELS[n]||'—');
+}
+
+function pontoSalvarManual(idx) {
+  var c      = state.ponto.colaboradores[idx];
+  var dataEl = document.getElementById('pm-data');
+  var horaEl = document.getElementById('pm-hora');
+  var obsEl  = document.getElementById('pm-obs');
+  var stEl   = document.getElementById('pm-status');
+  var radios = document.querySelectorAll('input[name="pm-etapa"]');
+
+  var data = dataEl ? dataEl.value.trim() : '';
+  var hora = horaEl ? horaEl.value.trim() : '';
+  var obs  = obsEl  ? obsEl.value.trim()  : '';
+  var etapaIdx = -1;
+  radios.forEach(function(r){ if (r.checked) etapaIdx = parseInt(r.value); });
+
+  // Validações
+  if (!/^\d{2}\/\d{2}\/\d{4}$/.test(data)) { if(stEl) stEl.textContent = '⚠ Data inválida. Use DD/MM/AAAA.'; return; }
+  if (!hora) { if(stEl) stEl.textContent = '⚠ Informe o horário.'; return; }
+  if (etapaIdx < 0) { if(stEl) stEl.textContent = '⚠ Selecione uma etapa.'; return; }
+
+  var ETAPAS = [
+    { tipo: 'entrada', labelEtapa: 'Entrada' },
+    { tipo: 'saida',   labelEtapa: 'Saída para Almoço' },
+    { tipo: 'entrada', labelEtapa: 'Volta do Almoço' },
+    { tipo: 'saida',   labelEtapa: 'Saída' },
+  ];
+  var e = ETAPAS[etapaIdx];
+
+  // Calcula horas trabalhadas se for saída
+  var horasTrabalhadas = null;
+  if (e.tipo === 'saida') {
+    var regsData = state.ponto.registros.filter(function(r){ return r.colabIdx === idx && r.data === data && r.tipo === 'entrada'; });
+    if (regsData.length) {
+      var ultimaEnt = regsData[regsData.length-1];
+      var dif = pontoHoraParaMs(hora) - pontoHoraParaMs(ultimaEnt.hora);
+      if (dif > 0) {
+        var hh = Math.floor(dif/60), mm = dif%60;
+        horasTrabalhadas = hh + 'h' + String(mm).padStart(2,'0') + 'min';
+      }
+    }
+  }
+
+  state.ponto.registros.push({
+    id:               Date.now(),
+    colabIdx:         idx,
+    nomeColab:        c.nome,
+    cargo:            c.cargo || '',
+    data:             data,
+    hora:             hora,
+    tipo:             e.tipo,
+    etapa:            etapaIdx,
+    labelEtapa:       e.labelEtapa,
+    horasTrabalhadas: horasTrabalhadas,
+    manual:           true,
+    obs:              obs,
+  });
+
+  // Reordena os registros do dia por etapa
+  state.ponto.registros.sort(function(a, b) {
+    if (a.data !== b.data || a.colabIdx !== b.colabIdx) return 0;
+    return (a.etapa||0) - (b.etapa||0);
+  });
+
+  addLog('Registro manual de ponto: ' + e.labelEtapa + ' de ' + c.nome + ' em ' + data + ' às ' + hora + (obs ? ' — ' + obs : ''));
+  saveState();
+  closeModal();
+  navigate('ponto');
+}
   var c = state.ponto.colaboradores[idx];
   if (!c) return;
   if (!confirm('Excluir "' + c.nome + '"? Os registros de ponto serão mantidos.')) return;

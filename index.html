@@ -3413,6 +3413,8 @@ function pontoSalvarManual(idx) {
   closeModal();
   navigate('ponto');
 }
+
+function pontoExcluirColab(idx) {
   var c = state.ponto.colaboradores[idx];
   if (!c) return;
   if (!confirm('Excluir "' + c.nome + '"? Os registros de ponto serão mantidos.')) return;

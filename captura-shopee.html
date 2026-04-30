@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head><title>Capturando token Shopee...</title></head>
+<body>
+<h2 id="status">⏳ Capturando code...</h2>
+<pre id="resultado"></pre>
+<script>
+const PROXY = 'https://shopee-proxy.costanaturelife.workers.dev';
+
+(async function() {
+  const params  = new URLSearchParams(window.location.search);
+  const code    = params.get('code');
+  const shop_id = params.get('shop_id');
+  const el      = document.getElementById('resultado');
+  const st      = document.getElementById('status');
+
+  if (!code || !shop_id) {
+    st.textContent = '❌ Nenhum code encontrado na URL.';
+    return;
+  }
+
+  st.textContent = '🔄 Trocando code por access_token...';
+  el.textContent = 'code: ' + code + '\nshop_id: ' + shop_id;
+
+  try {
+    const resp = await fetch(`${PROXY}/?action=get_token&code=${code}&shop_id=${shop_id}`);
+    const data = await resp.json();
+    el.textContent = JSON.stringify(data, null, 2);
+    if (data.access_token) {
+      st.textContent = '✅ Sucesso! Copie o access_token e refresh_token abaixo:';
+      st.style.color = 'green';
+    } else {
+      st.textContent = '❌ Erro: ' + (data.message || JSON.stringify(data));
+      st.style.color = 'red';
+    }
+  } catch(e) {
+    st.textContent = '❌ Erro: ' + e.message;
+    st.style.color = 'red';
+  }
+})();
+</script>
+</body>
+</html>

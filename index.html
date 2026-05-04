@@ -2483,19 +2483,25 @@ function renderPontoColabAberto(idx) {
         '</div>' +
       '</div>' +
 
-      // Campo de senha
-      '<div style="margin-bottom:1.25rem">' +
-        '<label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:6px;font-weight:600">🔒 Senha</label>' +
-        '<div style="display:flex;gap:8px;align-items:center">' +
-          '<input type="password" id="ponto-senha" placeholder="Digite sua senha" ' +
-            'style="flex:1;padding:0.65rem 1rem;border:2px solid ' + (senhaOk?'var(--green)':'var(--border)') + ';border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.95rem;transition:border 0.2s;outline:none" ' +
-            'oninput="pontoVerificarSenha(this.value,' + idx + ')" onkeydown="if(event.key===\'Enter\'&&' + (senhaOk?'true':'false') + ')pontoRegistrarEtapa(' + idx + ')">' +
-          '<div style="font-size:1.4rem;transition:opacity 0.2s;opacity:' + (senhaOk?'1':'0') + ';color:var(--green)">✓</div>' +
-        '</div>' +
-        '<div style="font-size:0.75rem;margin-top:5px;color:' + (senhaOk?'var(--green)':'var(--text3)') + '">' +
-          (senhaOk ? 'Senha correta! Clique no botão abaixo para registrar.' : 'Digite sua senha para liberar o registro.') +
-        '</div>' +
-      '</div>' +
+      // Campo de senha — admin não precisa digitar
+      (isAdmin() ?
+        '<div style="margin-bottom:1.25rem;padding:10px 14px;background:var(--bg3);border-radius:8px;font-size:0.85rem;color:var(--text2)">' +
+          '🔑 Modo administrador — senha dispensada' +
+        '</div>'
+      :
+        '<div style="margin-bottom:1.25rem">' +
+          '<label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:6px;font-weight:600">🔒 Senha</label>' +
+          '<div style="display:flex;gap:8px;align-items:center">' +
+            '<input type="password" id="ponto-senha" placeholder="Digite sua senha" ' +
+              'style="flex:1;padding:0.65rem 1rem;border:2px solid ' + (senhaOk?'var(--green)':'var(--border)') + ';border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.95rem;transition:border 0.2s;outline:none" ' +
+              'oninput="pontoVerificarSenha(this.value,' + idx + ')" onkeydown="if(event.key===\'Enter\'&&' + (senhaOk?'true':'false') + ')pontoRegistrarEtapa(' + idx + ')">' +
+            '<div style="font-size:1.4rem;transition:opacity 0.2s;opacity:' + (senhaOk?'1':'0') + ';color:var(--green)">✓</div>' +
+          '</div>' +
+          '<div style="font-size:0.75rem;margin-top:5px;color:' + (senhaOk?'var(--green)':'var(--text3)') + '">' +
+            (senhaOk ? 'Senha correta! Clique no botão abaixo para registrar.' : 'Digite sua senha para liberar o registro.') +
+          '</div>' +
+        '</div>'
+      ) +
 
       // Botão único — registra a próxima etapa da jornada
       '<button onclick="pontoRegistrarEtapa(' + idx + ')" ' +
@@ -2509,6 +2515,30 @@ function renderPontoColabAberto(idx) {
 
       '<div id="ponto-status" style="font-size:0.85rem;text-align:center;margin-top:10px;min-height:1.2em"></div>' +
     '</div>' + // card registro
+
+    // Registros do dia (visível para admin) com botão de excluir
+    (isAdmin() && regsHoje.length > 0 ?
+      '<div class="card" style="padding:1.25rem;margin-top:1rem">' +
+        '<div style="font-weight:700;font-size:0.9rem;margin-bottom:1rem">🗂 Registros de hoje — clique em ✕ para excluir</div>' +
+        regsHoje.map(function(r, ri) {
+          var ETAPA_LABELS = ['▶ Entrada','🍽 Saída Almoço','↩ Volta Almoço','■ Saída'];
+          var ETAPA_CORES  = ['var(--green)','#ea580c','#2563eb','#7c3aed'];
+          var etIdx = r.etapa !== undefined ? r.etapa : ri;
+          var cor   = r.tipo === 'folga' ? '#0891b2' : (ETAPA_CORES[etIdx] || 'var(--text2)');
+          var label = r.tipo === 'folga' ? ('🏖 ' + (r.labelEtapa||'Folga')) : (r.labelEtapa || ETAPA_LABELS[etIdx] || r.tipo);
+          return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">' +
+            '<div style="display:flex;align-items:center;gap:10px">' +
+              '<span style="font-size:0.8rem;font-weight:700;color:' + cor + '">' + label + '</span>' +
+              '<span style="font-size:0.8rem;color:var(--text2)">' + esc(r.hora) + '</span>' +
+              (r.manual ? '<span style="font-size:0.7rem;background:var(--amber)18;color:var(--amber);border-radius:4px;padding:1px 6px">manual</span>' : '') +
+            '</div>' +
+            '<button onclick="pontoAdminExcluirRegistro(' + r.id + ')" ' +
+              'style="padding:3px 10px;border:1px solid var(--red);border-radius:6px;background:transparent;color:var(--red);cursor:pointer;font-size:0.78rem;font-weight:600">✕ Excluir</button>' +
+          '</div>';
+        }).join('') +
+      '</div>'
+    : '') +
+
     '</div>'; // max-width
 
   // Inicia o relógio após o render (seguro, sem tags script inline)
@@ -2573,7 +2603,7 @@ function renderPontoAdminColabs() {
     var corAvatar = ['#16a34a','#2563eb','#9333ea','#ea580c','#0891b2','#be185d'][i % 6];
     var inicialLetra = (c.nome||'?')[0].toUpperCase();
 
-    html += '<div class="card" style="padding:1rem">' +
+    html += '<div class="card" style="padding:1rem;cursor:pointer;transition:box-shadow 0.15s" onclick="pontoAdminVerColab(' + i + ')" onmouseover="this.style.boxShadow=\'0 4px 16px rgba(0,0,0,0.13)\'" onmouseout="this.style.boxShadow=\'\'">' +
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">' +
         '<div style="display:flex;align-items:center;gap:10px">' +
           '<div style="width:42px;height:42px;border-radius:50%;background:' + corAvatar + ';display:flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:700;color:#fff;flex-shrink:0">' + inicialLetra + '</div>' +
@@ -2582,7 +2612,7 @@ function renderPontoAdminColabs() {
             (c.cargo ? '<div style="font-size:0.72rem;color:var(--text3)">' + esc(c.cargo) + '</div>' : '') +
           '</div>' +
         '</div>' +
-        '<div style="display:flex;gap:4px">' +
+        '<div style="display:flex;gap:4px" onclick="event.stopPropagation()">' +
           '<button class="btn btn-sm" onclick="pontoAbrirModalColab(' + i + ')" title="Editar">✏️</button>' +
           '<button class="btn btn-sm btn-red" onclick="pontoExcluirColab(' + i + ')" title="Excluir">✕</button>' +
         '</div>' +
@@ -2603,13 +2633,15 @@ function renderPontoAdminColabs() {
       '</div>' +
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">' +
         '<div style="font-size:0.75rem;font-weight:600;color:' + corStatus + '">' + labelStatus + '</div>' +
-        '<button onclick="pontoAbrirModalManual(' + i + ')" title="Registrar ponto manualmente" ' +
-          'style="display:flex;align-items:center;gap:4px;padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);color:var(--text2);cursor:pointer;font-size:0.75rem;transition:all 0.15s" ' +
-          'onmouseover="this.style.borderColor=\'var(--amber)\';this.style.color=\'var(--amber)\'" ' +
-          'onmouseout="this.style.borderColor=\'var(--border)\';this.style.color=\'var(--text2)\'">' +
-          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' +
-          ' Reg. Manual' +
-        '</button>' +
+        '<div style="display:flex;gap:4px" onclick="event.stopPropagation()">' +
+          '<button onclick="pontoAbrirModalManual(' + i + ')" title="Registrar ponto manualmente" ' +
+            'style="display:flex;align-items:center;gap:4px;padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg2);color:var(--text2);cursor:pointer;font-size:0.75rem" ' +
+            'onmouseover="this.style.borderColor=\'var(--amber)\';this.style.color=\'var(--amber)\'" ' +
+            'onmouseout="this.style.borderColor=\'var(--border)\';this.style.color=\'var(--text2)\'">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' +
+            ' Reg. Manual' +
+          '</button>' +
+        '</div>' +
       '</div>' +
     '</div>';
   });
@@ -2898,7 +2930,25 @@ function pontoVerificarSenha(val, idx) {
   if (inp) { inp.value = val; inp.focus(); inp.setSelectionRange(val.length, val.length); }
 }
 
-function pontoRegistrarEtapa(idx) {
+function pontoAdminVerColab(idx) {
+  _pontoColabSel = idx;
+  _pontoSenhaOk  = true; // Admin não precisa digitar senha
+  navigate('ponto');
+}
+
+function pontoAdminExcluirRegistro(regId) {
+  if (!confirm('Excluir este registro de ponto?')) return;
+  var idx = state.ponto.registros.findIndex(function(r){ return r.id === regId; });
+  if (idx === -1) return;
+  var reg = state.ponto.registros[idx];
+  addLog('Admin excluiu registro de ponto: ' + reg.labelEtapa + ' de ' + reg.nomeColab + ' em ' + reg.data + ' às ' + reg.hora);
+  state.ponto.registros.splice(idx, 1);
+  saveState();
+  // Re-renderiza a tela do colaborador
+  var el = document.getElementById('page-content');
+  if (el) el.innerHTML = renderPontoColabAberto(_pontoColabSel);
+  pontoIniciarRelogio();
+}
   if (!_pontoSenhaOk) return;
   var c = state.ponto.colaboradores[idx];
   if (!c) return;
@@ -3922,13 +3972,62 @@ const SHOPEE_REDIRECT    = 'https://edsonandradecf.github.io/plataforma-costa';
 
 var _shopeeToken = null; // { access_token, refresh_token, expires_at, shop_id }
 var _vendaTab    = 'ml'; // 'ml' | 'shopee'
-var _mlCache     = null;  // { data, loadedAt }
-var _shopeeCache = null;  // { data, loadedAt }
-var _CACHE_TTL   = 23 * 60 * 60 * 1000; // 23 horas em ms
+var _mlCache     = null;
+var _shopeeCache = null;
+var _CACHE_TTL   = 23 * 60 * 60 * 1000; // 23 horas
 
 function vendaCacheValido(cache) {
   return cache && cache.loadedAt && (Date.now() - cache.loadedAt) < _CACHE_TTL;
 }
+
+async function vendaSalvarCache(chave, cache) {
+  // Salva no localStorage local (instantâneo)
+  try { localStorage.setItem(chave, JSON.stringify(cache)); } catch(e) {}
+  // Salva no Firebase (compartilhado entre todos os usuários)
+  try {
+    await fetch(FIREBASE_URL + '/vendas_cache/' + chave + '.json', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cache),
+    });
+  } catch(e) {}
+}
+
+async function vendaCarregarCacheFirebase(chave) {
+  // Tenta localStorage primeiro (mais rápido)
+  try {
+    var local = localStorage.getItem(chave);
+    if (local) {
+      var c = JSON.parse(local);
+      if (vendaCacheValido(c)) return c;
+    }
+  } catch(e) {}
+  // Tenta Firebase
+  try {
+    var resp = await fetch(FIREBASE_URL + '/vendas_cache/' + chave + '.json');
+    if (resp.ok) {
+      var c2 = await resp.json();
+      if (c2 && vendaCacheValido(c2)) {
+        // Salva no localStorage para próxima vez
+        try { localStorage.setItem(chave, JSON.stringify(c2)); } catch(e) {}
+        return c2;
+      }
+    }
+  } catch(e) {}
+  return null;
+}
+
+// Restaura caches ao iniciar (localStorage — Firebase é carregado sob demanda)
+(function() {
+  try {
+    var ml = localStorage.getItem('costa_ml_cache');
+    if (ml) { var c = JSON.parse(ml); if (vendaCacheValido(c)) _mlCache = c; }
+  } catch(e) {}
+  try {
+    var sh = localStorage.getItem('costa_shopee_cache');
+    if (sh) { var c2 = JSON.parse(sh); if (vendaCacheValido(c2)) _shopeeCache = c2; }
+  } catch(e) {}
+})();
 
 function shopeeLoadToken() {
   if (_shopeeToken) return _shopeeToken;
@@ -4180,10 +4279,22 @@ async function shopeeCarregarVendas(forcar) {
 
   if (!shopeeTokenValid()) { el.innerHTML = shopeeAuthHtml(); return; }
 
-  // Usa cache se válido e não forçado
+  // Tenta Firebase se não tem cache local válido
+  if (!forcar && !vendaCacheValido(_shopeeCache)) {
+    var fbSh = await vendaCarregarCacheFirebase('costa_shopee_cache');
+    if (fbSh) _shopeeCache = fbSh;
+  }
+
   if (!forcar && vendaCacheValido(_shopeeCache)) {
     renderShopeeVendas(el, _shopeeCache.data);
     return;
+  }
+
+  // Limpa Firebase ao forçar
+  if (forcar) {
+    _shopeeCache = null;
+    localStorage.removeItem('costa_shopee_cache');
+    fetch(FIREBASE_URL + '/vendas_cache/costa_shopee_cache.json', { method: 'DELETE' }).catch(function(){});
   }
 
   el.innerHTML = '<div class="card" style="text-align:center;padding:2rem"><p>⏳ Carregando pedidos da Shopee...</p></div>';
@@ -4314,8 +4425,26 @@ function vendasSetTab(tab) {
   navigate('vendas');
 }
 
+function mlAtualizar() {
+  _mlCache = null;
+  localStorage.removeItem('costa_ml_cache');
+  // Limpa também no Firebase
+  fetch(FIREBASE_URL + '/vendas_cache/costa_ml_cache.json', { method: 'DELETE' }).catch(function(){});
+  navigate('vendas');
+}
+
 async function bindVendas() {
   var tab = _vendaTab || 'ml';
+
+  // Tenta carregar cache do Firebase se não tem local válido
+  if (!vendaCacheValido(_mlCache)) {
+    var fbMl = await vendaCarregarCacheFirebase('costa_ml_cache');
+    if (fbMl) _mlCache = fbMl;
+  }
+  if (!vendaCacheValido(_shopeeCache)) {
+    var fbSh = await vendaCarregarCacheFirebase('costa_shopee_cache');
+    if (fbSh) _shopeeCache = fbSh;
+  }
 
   // ML
   var mlEl = document.getElementById('ml-tab-content');
@@ -4325,11 +4454,10 @@ async function bindVendas() {
     } else if (vendaCacheValido(_mlCache)) {
       mlEl.innerHTML = mlDashHtml(_mlCache.data);
     } else if (tab === 'ml') {
-      // Só carrega ML se for a aba ativa
       mlEl.innerHTML = '<div class="card" style="text-align:center;padding:2rem"><p style="color:var(--text2);margin-bottom:1rem">Carregando pedidos...</p><div id="vendas-progress"></div><div id="vendas-loading" style="color:var(--text3);font-size:0.85rem"></div></div>';
       try {
         var result = await mlFetchVendas();
-        _mlCache = { data: result, loadedAt: Date.now() };
+        _mlCache = { data: result, loadedAt: Date.now() }; vendaSalvarCache('costa_ml_cache', _mlCache);
         mlEl.innerHTML = mlDashHtml(result);
       } catch(e) {
         var isAuthError = e.message.includes('401') || e.message.includes('token');
@@ -4337,16 +4465,14 @@ async function bindVendas() {
         else mlEl.innerHTML = mlErrorHtml('Erro: ' + e.message);
       }
     } else {
-      // Não é a aba ativa — carrega em background sem mostrar loading
       mlFetchVendas().then(function(result) {
-        _mlCache = { data: result, loadedAt: Date.now() };
+        _mlCache = { data: result, loadedAt: Date.now() }; vendaSalvarCache('costa_ml_cache', _mlCache);
         var el = document.getElementById('ml-tab-content');
         if (el) el.innerHTML = mlDashHtml(result);
       }).catch(function(){});
     }
   }
 
-  // Shopee e Combinado
   if (tab === 'shopee')    shopeeCarregarVendas(false);
   if (tab === 'combinado') vendasCarregarCombinado(false);
 }
@@ -4374,7 +4500,7 @@ async function vendasCarregarCombinado(forcar) {
   try {
     if (mlOk && !vendaCacheValido(_mlCache)) {
       var r = await mlFetchVendas();
-      _mlCache = { data: r, loadedAt: Date.now() };
+      _mlCache = { data: r, loadedAt: Date.now() }; vendaSalvarCache('costa_ml_cache', _mlCache);
     }
     if (shopeeOk && !vendaCacheValido(_shopeeCache)) {
       await shopeeCarregarDados();
@@ -4534,7 +4660,7 @@ async function shopeeCarregarDados() {
   }
 
   var data = { totalPedidos: allOrders.length, totalFaturado, pedidosHoje, faturadoHoje, pedidosPorDia, prodRanking };
-  _shopeeCache = { data, loadedAt: Date.now() };
+  _shopeeCache = { data, loadedAt: Date.now() }; vendaSalvarCache('costa_shopee_cache', _shopeeCache);
   return data;
 }
 
@@ -4605,6 +4731,7 @@ function mlDashHtml(result) {
     _mlCache.data.totalPedidosMes = totalPedidosMes;
     _mlCache.data.totalVendidoMes = totalVendidoMes;
     _mlCache.data.totalVendidoDia = totalVendidoDia;
+    vendaSalvarCache('costa_ml_cache', _mlCache);
   }
 
   var maxVal = Math.max.apply(null, chartData) || 1;
@@ -4621,7 +4748,7 @@ function mlDashHtml(result) {
   var html = '<div style="margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center">' +
     '<span style="font-size:0.85rem;color:var(--text3)">Olá, <b>' + esc(me.nickname||me.first_name||'') + '</b> · Mercado Livre ✓</span>' +
     '<div style="display:flex;gap:8px">' +
-      '<button class="btn btn-sm" onclick="bindVendas()">🔄 Atualizar</button>' +
+      '<button class="btn btn-sm" onclick="mlAtualizar()">🔄 Atualizar</button>' +
       '<button class="btn btn-sm btn-red" onclick="mlDesconectar()">Desconectar</button>' +
     '</div>' +
   '</div>' +

@@ -3914,6 +3914,13 @@ const SHOPEE_REDIRECT    = 'https://edsonandradecf.github.io/plataforma-costa';
 
 var _shopeeToken = null; // { access_token, refresh_token, expires_at, shop_id }
 var _vendaTab    = 'ml'; // 'ml' | 'shopee'
+var _mlCache     = null;  // { data, loadedAt }
+var _shopeeCache = null;  // { data, loadedAt }
+var _CACHE_TTL   = 23 * 60 * 60 * 1000; // 23 horas em ms
+
+function vendaCacheValido(cache) {
+  return cache && cache.loadedAt && (Date.now() - cache.loadedAt) < _CACHE_TTL;
+}
 
 function shopeeLoadToken() {
   if (_shopeeToken) return _shopeeToken;
@@ -4159,245 +4166,365 @@ async function shopeeIniciarAuth() {
   }
 }
 
-async function shopeeCarregarVendas() {
+async function shopeeCarregarVendas(forcar) {
   var el = document.getElementById('shopee-content');
   if (!el) return;
 
   if (!shopeeTokenValid()) { el.innerHTML = shopeeAuthHtml(); return; }
 
-  el.innerHTML = '<div class="card" style="text-align:center;padding:2rem"><div style="font-size:2rem;margin-bottom:1rem">⏳</div><p>Carregando pedidos da Shopee...</p></div>';
+  // Usa cache se válido e não forçado
+  if (!forcar && vendaCacheValido(_shopeeCache)) {
+    renderShopeeVendas(el, _shopeeCache.data);
+    return;
+  }
+
+  el.innerHTML = '<div class="card" style="text-align:center;padding:2rem"><p>⏳ Carregando pedidos da Shopee...</p></div>';
 
   try {
-    var now       = Math.floor(Date.now() / 1000);
-    var dtInicio  = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    var inicioMes = Math.floor(dtInicio.getTime() / 1000);
-    var nomesMes  = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-    var mesNome   = nomesMes[new Date().getMonth()];
-
-    // ── Busca todos os pedidos do mês (paginado) ──────────────────────────
-    var allOrders = [];
-    var cursor = '';
-    for (var pg = 0; pg < 20; pg++) {
-      var params = {
-        time_range_field: 'create_time',
-        time_from:        inicioMes,
-        time_to:          now,
-        page_size:        100,
-        response_optional_fields: 'order_status',
-      };
-      if (cursor) params.cursor = cursor;
-      var resp = await shopeeGet('/api/v2/order/get_order_list', params);
-      var list = (resp.response && resp.response.order_list) ? resp.response.order_list : [];
-      allOrders = allOrders.concat(list);
-      if (!resp.response || !resp.response.more || !resp.response.next_cursor) break;
-      cursor = resp.response.next_cursor;
-    }
-
-    var totalPedidos = allOrders.length;
-
-    // ── Busca detalhes (total_amount, create_time, item_list) ────────────
-    var totalFaturado = 0;
-    var pedidosHoje   = 0;
-    var faturadoHoje  = 0;
-    var hoje = new Date(); hoje.setHours(0,0,0,0);
-    var hojeTs = Math.floor(hoje.getTime() / 1000);
-
-    // Pedidos por dia do mês
-    var pedidosPorDia = {};
-    var diasNoMes = new Date().getDate();
-    for (var d = 1; d <= diasNoMes; d++) pedidosPorDia[d] = 0;
-
-    // Ranking de produtos
-    var prodRanking = {};
-
-    if (allOrders.length > 0) {
-      var chunks = [];
-      for (var i = 0; i < allOrders.length; i += 50)
-        chunks.push(allOrders.slice(i, i+50).map(function(o){ return o.order_sn; }));
-
-      for (var ci = 0; ci < chunks.length; ci++) {
-        var det = await shopeeGet('/api/v2/order/get_order_detail', {
-          order_sn_list: chunks[ci].join(','),
-          response_optional_fields: 'total_amount,create_time,item_list',
-        });
-        if (!det.response || !det.response.order_list) continue;
-        det.response.order_list.forEach(function(o) {
-          var val = parseFloat(o.total_amount || 0);
-          var ts  = o.create_time || 0;
-          totalFaturado += val;
-
-          // Dia do pedido
-          var dtPed = new Date(ts * 1000);
-          if (dtPed.getMonth() === new Date().getMonth() && dtPed.getFullYear() === new Date().getFullYear()) {
-            var dia = dtPed.getDate();
-            pedidosPorDia[dia] = (pedidosPorDia[dia] || 0) + 1;
-          }
-
-          // Hoje
-          if (ts >= hojeTs) { pedidosHoje++; faturadoHoje += val; }
-
-          // Ranking produtos
-          if (o.item_list) {
-            o.item_list.forEach(function(item) {
-              var nome = item.item_name || 'Produto';
-              var qtd  = item.model_quantity_purchased || 1;
-              var rev  = val; // receita do pedido por produto (simplificado)
-              if (!prodRanking[nome]) prodRanking[nome] = { qtd: 0, receita: 0 };
-              prodRanking[nome].qtd     += qtd;
-              prodRanking[nome].receita += rev;
-            });
-          }
-        });
-      }
-    }
-
-    // ── Top 5 produtos ────────────────────────────────────────────────────
-    var top5 = Object.keys(prodRanking).map(function(n){ return { nome: n, qtd: prodRanking[n].qtd, receita: prodRanking[n].receita }; });
-    top5.sort(function(a,b){ return b.qtd - a.qtd; });
-    top5 = top5.slice(0, 5);
-
-    // ── Monta o HTML ──────────────────────────────────────────────────────
-    var html =
-      // Header
-      '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:1.25rem">' +
-        '<div style="display:flex;align-items:center;gap:10px">' +
-          '<img src="https://down-br.img.susercontent.com/file/br-50009109-png-5b2ef7d89f6e01a3a92547e4d7279a3b" style="height:24px" onerror="this.style.display=\'none\'">' +
-          '<span style="font-size:0.85rem;color:var(--text3)">Shopee • Loja conectada</span>' +
-        '</div>' +
-        '<div style="display:flex;gap:8px">' +
-          '<button class="btn btn-sm" onclick="shopeeCarregarVendas()">🔄 Atualizar</button>' +
-          '<button class="btn btn-sm btn-red" onclick="shopeeDesconectar()">Desconectar</button>' +
-        '</div>' +
-      '</div>' +
-
-      // Cards hoje
-      '<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:0.5rem">Hoje</div>' +
-      '<div class="stats-grid" style="margin-bottom:1.25rem">' +
-        '<div class="stat-card"><div class="stat-icon">🛍️</div><div class="stat-label">Pedidos Hoje</div><div class="stat-value">' + pedidosHoje + '</div></div>' +
-        '<div class="stat-card"><div class="stat-icon">💰</div><div class="stat-label">Faturado Hoje</div><div class="stat-value">R$ ' + faturadoHoje.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</div></div>' +
-      '</div>' +
-
-      // Cards mês
-      '<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:0.5rem">' + mesNome + '</div>' +
-      '<div class="stats-grid" style="margin-bottom:1.5rem">' +
-        '<div class="stat-card"><div class="stat-icon">📅</div><div class="stat-label">Pedidos no Mês</div><div class="stat-value">' + totalPedidos + '</div></div>' +
-        '<div class="stat-card"><div class="stat-icon">💵</div><div class="stat-label">Faturado no Mês</div><div class="stat-value">R$ ' + totalFaturado.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</div></div>' +
-        '<div class="stat-card"><div class="stat-icon">🎯</div><div class="stat-label">Ticket Médio</div><div class="stat-value">R$ ' + (totalPedidos > 0 ? (totalFaturado/totalPedidos).toLocaleString('pt-BR',{minimumFractionDigits:2}) : '0,00') + '</div></div>' +
-      '</div>' +
-
-      // Gráfico pedidos por dia
-      '<div class="card" style="padding:1.25rem;margin-bottom:1.25rem">' +
-        '<div style="font-weight:700;font-size:0.9rem;margin-bottom:1rem">📈 Pedidos por Dia — ' + mesNome + '</div>' +
-        '<div style="position:relative;height:160px;display:flex;align-items:flex-end;gap:3px;padding-bottom:20px">';
-
-    var maxDia = Math.max.apply(null, Object.values(pedidosPorDia).concat([1]));
-    for (var d2 = 1; d2 <= diasNoMes; d2++) {
-      var qtdDia = pedidosPorDia[d2] || 0;
-      var pct    = Math.round((qtdDia / maxDia) * 130);
-      var isHoje = d2 === new Date().getDate();
-      html += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0">' +
-        (qtdDia > 0 ? '<div style="font-size:0.55rem;color:var(--text3);line-height:1">' + qtdDia + '</div>' : '<div style="font-size:0.55rem;color:transparent">0</div>') +
-        '<div style="width:100%;height:' + pct + 'px;background:' + (isHoje ? 'var(--amber)' : '#f4630a') + ';border-radius:3px 3px 0 0;opacity:' + (isHoje?'1':'0.8') + ';min-height:2px;transition:height 0.3s"></div>' +
-        '<div style="font-size:0.55rem;color:var(--text3);margin-top:2px">' + d2 + '</div>' +
-      '</div>';
-    }
-
-    html += '</div></div>' +
-
-      // Top 5 produtos
-      (top5.length > 0 ?
-        '<div class="card" style="padding:1.25rem">' +
-          '<div style="font-weight:700;font-size:0.9rem;margin-bottom:1rem">🏆 Top Produtos — ' + mesNome + '</div>' +
-          top5.map(function(p, i) {
-            var medalhas = ['🥇','🥈','🥉','4️⃣','5️⃣'];
-            var pctBar = top5[0].qtd > 0 ? Math.round((p.qtd / top5[0].qtd) * 100) : 0;
-            return '<div style="margin-bottom:12px">' +
-              '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">' +
-                '<div style="font-size:0.82rem;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
-                  medalhas[i] + ' ' + esc(p.nome) +
-                '</div>' +
-                '<div style="font-size:0.78rem;color:var(--text2);flex-shrink:0;margin-left:8px">' + p.qtd + ' un</div>' +
-              '</div>' +
-              '<div style="height:6px;background:var(--bg3);border-radius:3px;overflow:hidden">' +
-                '<div style="height:100%;width:' + pctBar + '%;background:#f4630a;border-radius:3px;transition:width 0.5s"></div>' +
-              '</div>' +
-            '</div>';
-          }).join('') +
-        '</div>'
-      : '');
-
-    el.innerHTML = html;
-
+    var data = await shopeeCarregarDados();
+    renderShopeeVendas(el, data);
   } catch(e) {
     var isAuth = e.message.includes('401') || e.message.includes('token');
-    if (isAuth) {
-      _shopeeToken = null; state.shopeeToken = null; localStorage.removeItem('shopee_token');
-      el.innerHTML = shopeeAuthHtml();
-    } else {
-      el.innerHTML = '<div class="card" style="border-color:var(--red);text-align:center;padding:2rem">' +
-        '<div style="color:var(--red)">⚠ ' + esc(e.message) + '</div>' +
-        '<button class="btn btn-sm" style="margin-top:1rem" onclick="shopeeCarregarVendas()">Tentar novamente</button>' +
-      '</div>';
-    }
+    if (isAuth) { _shopeeToken = null; state.shopeeToken = null; localStorage.removeItem('shopee_token'); el.innerHTML = shopeeAuthHtml(); }
+    else el.innerHTML = '<div class="card" style="border-color:var(--red);text-align:center;padding:2rem"><div style="color:var(--red)">⚠ ' + esc(e.message) + '</div><button class="btn btn-sm" style="margin-top:1rem" onclick="shopeeCarregarVendas(true)">Tentar novamente</button></div>';
   }
+}
+
+function renderShopeeVendas(el, data) {
+  var nomesMes  = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var mesNome   = nomesMes[new Date().getMonth()];
+  var diasNoMes = new Date().getDate();
+
+  var totalPedidos = data.totalPedidos, totalFaturado = data.totalFaturado;
+  var pedidosHoje  = data.pedidosHoje,  faturadoHoje  = data.faturadoHoje;
+  var pedidosPorDia = data.pedidosPorDia || {};
+  var prodRanking   = data.prodRanking   || {};
+
+  var top5 = Object.keys(prodRanking).map(function(n){ return { nome:n, qtd:prodRanking[n].qtd, receita:prodRanking[n].receita }; });
+  top5.sort(function(a,b){ return b.qtd - a.qtd; });
+  top5 = top5.slice(0, 5);
+
+  var html =
+    '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:1.25rem">' +
+      '<span style="font-size:0.85rem;color:var(--text3)">🧡 Shopee • Loja conectada</span>' +
+      '<div style="display:flex;gap:8px">' +
+        '<button class="btn btn-sm" onclick="shopeeCarregarVendas(true)">🔄 Atualizar</button>' +
+        '<button class="btn btn-sm btn-red" onclick="shopeeDesconectar()">Desconectar</button>' +
+      '</div>' +
+    '</div>' +
+
+    '<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:0.5rem">Hoje</div>' +
+    '<div class="stats-grid" style="margin-bottom:1.25rem">' +
+      '<div class="stat-card"><div class="stat-label">🧡 Pedidos Shopee Hoje</div><div class="stat-value" style="color:#f4630a">' + pedidosHoje + '</div></div>' +
+      '<div class="stat-card"><div class="stat-label">💰 Faturado Hoje</div><div class="stat-value">R$ ' + faturadoHoje.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</div></div>' +
+    '</div>' +
+
+    '<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:0.5rem">' + mesNome + '</div>' +
+    '<div class="stats-grid" style="margin-bottom:1.5rem">' +
+      '<div class="stat-card"><div class="stat-label">📅 Pedidos no Mês</div><div class="stat-value">' + totalPedidos + '</div></div>' +
+      '<div class="stat-card"><div class="stat-label">💵 Faturado no Mês</div><div class="stat-value">R$ ' + totalFaturado.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</div></div>' +
+      '<div class="stat-card"><div class="stat-label">🎯 Ticket Médio</div><div class="stat-value">R$ ' + (totalPedidos > 0 ? (totalFaturado/totalPedidos).toLocaleString('pt-BR',{minimumFractionDigits:2}) : '0,00') + '</div></div>' +
+    '</div>' +
+
+    '<div class="card" style="padding:1.25rem;margin-bottom:1.25rem">' +
+      '<div style="font-weight:700;font-size:0.9rem;margin-bottom:1rem">📈 Pedidos por Dia — ' + mesNome + '</div>' +
+      '<div style="position:relative;height:160px;display:flex;align-items:flex-end;gap:3px;padding-bottom:20px">';
+
+  var maxDia = Math.max.apply(null, Object.values(pedidosPorDia).concat([1]));
+  for (var d2 = 1; d2 <= diasNoMes; d2++) {
+    var qtdDia = pedidosPorDia[d2] || 0;
+    var pct    = Math.round((qtdDia / maxDia) * 130);
+    var isHoje = d2 === new Date().getDate();
+    html += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0">' +
+      (qtdDia > 0 ? '<div style="font-size:0.55rem;color:var(--text3)">' + qtdDia + '</div>' : '<div style="font-size:0.55rem;color:transparent">0</div>') +
+      '<div style="width:100%;height:' + pct + 'px;background:' + (isHoje?'var(--amber)':'#f4630a') + ';border-radius:3px 3px 0 0;opacity:' + (isHoje?'1':'0.8') + ';min-height:2px"></div>' +
+      '<div style="font-size:0.55rem;color:var(--text3);margin-top:2px">' + d2 + '</div>' +
+    '</div>';
+  }
+
+  html += '</div></div>' +
+    (top5.length > 0 ?
+      '<div class="card" style="padding:1.25rem">' +
+        '<div style="font-weight:700;font-size:0.9rem;margin-bottom:1rem">🏆 Top Produtos — ' + mesNome + '</div>' +
+        top5.map(function(p, i) {
+          var medalhas = ['🥇','🥈','🥉','4️⃣','5️⃣'];
+          var pctBar = top5[0].qtd > 0 ? Math.round((p.qtd / top5[0].qtd) * 100) : 0;
+          return '<div style="margin-bottom:12px">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">' +
+              '<div style="font-size:0.82rem;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + medalhas[i] + ' ' + esc(p.nome) + '</div>' +
+              '<div style="font-size:0.78rem;color:var(--text2);margin-left:8px;flex-shrink:0">' + p.qtd + ' un</div>' +
+            '</div>' +
+            '<div style="height:6px;background:var(--bg3);border-radius:3px;overflow:hidden">' +
+              '<div style="height:100%;width:' + pctBar + '%;background:#f4630a;border-radius:3px"></div>' +
+            '</div>' +
+          '</div>';
+        }).join('') +
+      '</div>'
+    : '');
+
+  el.innerHTML = html;
 }
 
 function renderVendas() {
   var isMl = _vendaTab !== 'shopee';
+  var mlConectado     = mlTokenValid();
+  var shopeeConectado = shopeeTokenValid();
+
+  // Bolinhas coloridas
+  var dotML     = '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#FFE600;border:1.5px solid #e0c900;flex-shrink:0"></span>';
+  var dotShopee = '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f4630a;border:1.5px solid #d4530a;flex-shrink:0"></span>';
+  var dotComb   = '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,#FFE600 50%,#f4630a 50%);border:1.5px solid #ccc;flex-shrink:0"></span>';
+
   return '<div id="vendas-content">' +
-    // Abas ML + Shopee
     '<div style="display:flex;border-bottom:2px solid var(--border);margin-bottom:1.5rem">' +
-      '<button onclick="vendasSetTab(\'ml\')" style="display:flex;align-items:center;gap:6px;padding:0.65rem 1.5rem;background:none;border:none;border-bottom:' + (isMl?'3px solid var(--green);color:var(--green);font-weight:600':'none;color:var(--text2)') + ';cursor:pointer;font-size:0.95rem;margin-bottom:-2px">' +
-        '🛒 Mercado Livre' +
+      '<button onclick="vendasSetTab(\'ml\')" style="display:flex;align-items:center;gap:6px;padding:0.65rem 1.25rem;background:none;border:none;border-bottom:' + (isMl?'3px solid var(--green);color:var(--green);font-weight:600':'none;color:var(--text2)') + ';cursor:pointer;font-size:0.9rem;margin-bottom:-2px">' +
+        dotML + ' Mercado Livre' +
       '</button>' +
-      '<button onclick="vendasSetTab(\'shopee\')" style="display:flex;align-items:center;gap:6px;padding:0.65rem 1.5rem;background:none;border:none;border-bottom:' + (!isMl?'3px solid var(--amber);color:var(--amber);font-weight:600':'none;color:var(--text2)') + ';cursor:pointer;font-size:0.95rem;margin-bottom:-2px">' +
-        '🧡 Shopee' +
+      '<button onclick="vendasSetTab(\'shopee\')" style="display:flex;align-items:center;gap:6px;padding:0.65rem 1.25rem;background:none;border:none;border-bottom:' + (!isMl?'3px solid #f4630a;color:#f4630a;font-weight:600':'none;color:var(--text2)') + ';cursor:pointer;font-size:0.9rem;margin-bottom:-2px">' +
+        dotShopee + ' Shopee' +
       '</button>' +
+      ((mlConectado && shopeeConectado) ?
+        '<button onclick="vendasSetTab(\'combinado\')" style="display:flex;align-items:center;gap:6px;padding:0.65rem 1.25rem;background:none;border:none;border-bottom:' + (_vendaTab==='combinado'?'3px solid var(--blue);color:var(--blue);font-weight:600':'none;color:var(--text2)') + ';cursor:pointer;font-size:0.9rem;margin-bottom:-2px">' +
+          dotComb + ' Combinado' +
+        '</button>' : '') +
     '</div>' +
-    '<div id="ml-tab-content"' + (isMl?'':' style="display:none"') + '>' +
-      '<div class="card" style="text-align:center;padding:2rem"><div style="font-size:2rem;margin-bottom:1rem">📊</div><p style="color:var(--text2)">Carregando Mercado Livre...</p></div>' +
+    '<div id="ml-tab-content"' + (isMl?' ':'  style="display:none"') + '>' +
+      '<div class="card" style="text-align:center;padding:2rem"><p style="color:var(--text2)">Carregando Mercado Livre...</p></div>' +
     '</div>' +
-    '<div id="shopee-content"' + (!isMl?'':' style="display:none"') + '>' +
-      '<div class="card" style="text-align:center;padding:2rem"><div style="font-size:2rem;margin-bottom:1rem">📊</div><p style="color:var(--text2)">Carregando Shopee...</p></div>' +
+    '<div id="shopee-content"' + (_vendaTab==='shopee'?' ':'  style="display:none"') + '>' +
+      '<div class="card" style="text-align:center;padding:2rem"><p style="color:var(--text2)">Carregando Shopee...</p></div>' +
+    '</div>' +
+    '<div id="combinado-content"' + (_vendaTab==='combinado'?' ':'  style="display:none"') + '>' +
+      '<div class="card" style="text-align:center;padding:2rem"><p style="color:var(--text2)">Carregando dados combinados...</p></div>' +
     '</div>' +
   '</div>';
 }
 
 function vendasSetTab(tab) {
   _vendaTab = tab;
-  var mlDiv     = document.getElementById('ml-tab-content');
-  var shopeeDiv = document.getElementById('shopee-content');
-  if (!mlDiv || !shopeeDiv) { navigate('vendas'); return; }
-  mlDiv.style.display    = tab === 'ml'     ? '' : 'none';
-  shopeeDiv.style.display = tab === 'shopee' ? '' : 'none';
-  if (tab === 'shopee') shopeeCarregarVendas();
+  var mlDiv   = document.getElementById('ml-tab-content');
+  var shDiv   = document.getElementById('shopee-content');
+  var combDiv = document.getElementById('combinado-content');
+  if (!mlDiv) { navigate('vendas'); return; }
+  mlDiv.style.display   = tab === 'ml'        ? '' : 'none';
+  if (shDiv)   shDiv.style.display   = tab === 'shopee'    ? '' : 'none';
+  if (combDiv) combDiv.style.display = tab === 'combinado' ? '' : 'none';
+  if (tab === 'shopee')    shopeeCarregarVendas(false);
+  if (tab === 'combinado') vendasCarregarCombinado(false);
 }
 
 async function bindVendas() {
-  // ML tab
   var mlEl = document.getElementById('ml-tab-content');
   if (!mlEl) return;
 
   if (!mlTokenValid()) {
     mlEl.innerHTML = mlAuthHtml();
   } else {
-    try {
-      mlEl.innerHTML = '<div class="card" style="text-align:center;padding:2rem"><div style="font-size:2rem;margin-bottom:1rem">📊</div><p style="color:var(--text2);margin-bottom:1rem">Carregando pedidos...</p><div id="vendas-progress" style="max-width:300px;margin:0 auto"></div><div id="vendas-loading" style="color:var(--text3);font-size:0.85rem"></div></div>';
-      var result = await mlFetchVendas();
-      mlEl.innerHTML = mlDashHtml(result);
-    } catch(e) {
-      var isAuthError = e.message.includes('401') || e.message.includes('Token expirado') || e.message.includes('token');
-      if (isAuthError) {
-        localStorage.removeItem('ml_token'); _mlToken = null; state.mlToken = null;
-        mlEl.innerHTML = mlAuthHtml();
-      } else {
-        mlEl.innerHTML = mlErrorHtml('Erro ao buscar vendas: ' + e.message);
+    // Usa cache se válido
+    if (vendaCacheValido(_mlCache)) {
+      mlEl.innerHTML = mlDashHtml(_mlCache.data);
+    } else {
+      mlEl.innerHTML = '<div class="card" style="text-align:center;padding:2rem"><p style="color:var(--text2);margin-bottom:1rem">Carregando pedidos...</p><div id="vendas-progress"></div><div id="vendas-loading" style="color:var(--text3);font-size:0.85rem"></div></div>';
+      try {
+        var result = await mlFetchVendas();
+        _mlCache = { data: result, loadedAt: Date.now() };
+        mlEl.innerHTML = mlDashHtml(result);
+      } catch(e) {
+        var isAuthError = e.message.includes('401') || e.message.includes('token');
+        if (isAuthError) { localStorage.removeItem('ml_token'); _mlToken = null; state.mlToken = null; mlEl.innerHTML = mlAuthHtml(); }
+        else mlEl.innerHTML = mlErrorHtml('Erro: ' + e.message);
       }
     }
   }
+  if (_vendaTab === 'shopee')    shopeeCarregarVendas(false);
+  if (_vendaTab === 'combinado') vendasCarregarCombinado(false);
+}
 
-  // Shopee tab (só carrega se estiver ativa)
-  if (_vendaTab === 'shopee') shopeeCarregarVendas();
+async function vendasCarregarCombinado(forcar) {
+  var el = document.getElementById('combinado-content');
+  if (!el) return;
+
+  var mlOk     = mlTokenValid();
+  var shopeeOk = shopeeTokenValid();
+
+  if (!mlOk && !shopeeOk) {
+    el.innerHTML = '<div class="card" style="text-align:center;padding:2rem">Conecte ao menos uma plataforma.</div>';
+    return;
+  }
+
+  // Usa cache se ambos válidos
+  if (!forcar && vendaCacheValido(_mlCache) && (!shopeeOk || vendaCacheValido(_shopeeCache))) {
+    renderCombinado(el);
+    return;
+  }
+
+  el.innerHTML = '<div class="card" style="text-align:center;padding:2rem"><p style="color:var(--text2)">Carregando dados combinados...</p></div>';
+
+  try {
+    if (mlOk && !vendaCacheValido(_mlCache)) {
+      var r = await mlFetchVendas();
+      _mlCache = { data: r, loadedAt: Date.now() };
+    }
+    if (shopeeOk && !vendaCacheValido(_shopeeCache)) {
+      await shopeeCarregarDados();
+    }
+    renderCombinado(el);
+  } catch(e) {
+    el.innerHTML = '<div class="card" style="text-align:center;padding:2rem;color:var(--red)">⚠ ' + esc(e.message) + '</div>';
+  }
+}
+
+function renderCombinado(el) {
+  var nomesMes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var mesNome  = nomesMes[new Date().getMonth()];
+  var diasNoMes = new Date().getDate();
+
+  var mlOk     = mlTokenValid() && vendaCacheValido(_mlCache);
+  var shopeeOk = shopeeTokenValid() && vendaCacheValido(_shopeeCache);
+
+  var mlData     = mlOk     ? _mlCache.data     : null;
+  var shopeeData = shopeeOk ? _shopeeCache.data  : null;
+
+  var mlHoje    = mlData     ? (mlData.totalPedidosDia  || 0) : 0;
+  var shHoje    = shopeeData ? (shopeeData.pedidosHoje   || 0) : 0;
+  var mlMes     = mlData     ? (mlData.totalPedidosMes  || 0) : 0;
+  var shMes     = shopeeData ? (shopeeData.totalPedidos  || 0) : 0;
+  var mlFat     = mlData     ? (mlData.totalVendidoMes  || 0) : 0;
+  var shFat     = shopeeData ? (shopeeData.totalFaturado || 0) : 0;
+  var mlFatHoje = mlData     ? (mlData.totalVendidoDia  || 0) : 0;
+  var shFatHoje = shopeeData ? (shopeeData.faturadoHoje  || 0) : 0;
+
+  var totalMes    = mlMes + shMes;
+  var totalFatMes = mlFat + shFat;
+  var totalHoje   = mlHoje + shHoje;
+  var totalFatH   = mlFatHoje + shFatHoje;
+
+  var dotML     = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#FFE600;margin-right:4px"></span>';
+  var dotSh     = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f4630a;margin-right:4px"></span>';
+
+  var html =
+    '<div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:1.25rem">' +
+      '<button class="btn btn-sm" onclick="vendasCarregarCombinado(true)">🔄 Atualizar</button>' +
+    '</div>' +
+
+    // Cards hoje
+    '<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:0.5rem">Hoje</div>' +
+    '<div class="stats-grid" style="margin-bottom:1.25rem">' +
+      (mlOk ? '<div class="stat-card"><div class="stat-label">' + dotML + 'Pedidos ML Hoje</div><div class="stat-value" style="color:var(--green)">' + mlHoje + '</div><div style="font-size:0.78rem;color:var(--text3)">R$ ' + mlFatHoje.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</div></div>' : '') +
+      (shopeeOk ? '<div class="stat-card"><div class="stat-label">' + dotSh + 'Pedidos Shopee Hoje</div><div class="stat-value" style="color:#f4630a">' + shHoje + '</div><div style="font-size:0.78rem;color:var(--text3)">R$ ' + shFatHoje.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</div></div>' : '') +
+      '<div class="stat-card"><div class="stat-label">🛒 Total Hoje</div><div class="stat-value">' + totalHoje + '</div><div style="font-size:0.78rem;color:var(--text3)">R$ ' + totalFatH.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</div></div>' +
+    '</div>' +
+
+    // Cards mês
+    '<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:0.5rem">' + mesNome + '</div>' +
+    '<div class="stats-grid" style="margin-bottom:1.5rem">' +
+      (mlOk ? '<div class="stat-card"><div class="stat-label">' + dotML + 'Pedidos ML</div><div class="stat-value" style="color:var(--green)">' + mlMes + '</div><div style="font-size:0.78rem;color:var(--text3)">R$ ' + mlFat.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</div></div>' : '') +
+      (shopeeOk ? '<div class="stat-card"><div class="stat-label">' + dotSh + 'Pedidos Shopee</div><div class="stat-value" style="color:#f4630a">' + shMes + '</div><div style="font-size:0.78rem;color:var(--text3)">R$ ' + shFat.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</div></div>' : '') +
+      '<div class="stat-card"><div class="stat-label">📦 Total Mês</div><div class="stat-value">' + totalMes + '</div><div style="font-size:0.78rem;color:var(--text3)">R$ ' + totalFatMes.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</div></div>' +
+      '<div class="stat-card"><div class="stat-label">🎯 Ticket Médio</div><div class="stat-value">R$ ' + (totalMes > 0 ? (totalFatMes/totalMes).toLocaleString('pt-BR',{minimumFractionDigits:2}) : '0,00') + '</div></div>' +
+    '</div>' +
+
+    // Gráfico combinado
+    '<div class="card" style="padding:1.25rem;margin-bottom:1.25rem">' +
+      '<div style="font-weight:700;font-size:0.9rem;margin-bottom:0.5rem">📈 Pedidos por Dia — ' + mesNome + '</div>' +
+      '<div style="display:flex;gap:12px;margin-bottom:0.75rem;font-size:0.75rem">' +
+        (mlOk ? '<span>' + dotML + 'ML</span>' : '') +
+        (shopeeOk ? '<span>' + dotSh + 'Shopee</span>' : '') +
+        '<span style="color:var(--text3)">● Total</span>' +
+      '</div>' +
+      '<div style="position:relative;height:160px;display:flex;align-items:flex-end;gap:3px;padding-bottom:20px">';
+
+  // Monta dados por dia combinados
+  var mlPorDia    = mlData     ? (mlData.pedidosPorDia     || {}) : {};
+  var shopeePorDia = shopeeData ? (shopeeData.pedidosPorDia || {}) : {};
+  var combPorDia  = {};
+  for (var d = 1; d <= diasNoMes; d++) {
+    combPorDia[d] = (mlPorDia[d] || 0) + (shopeePorDia[d] || 0);
+  }
+  var maxDia = Math.max.apply(null, Object.values(combPorDia).concat([1]));
+
+  for (var d2 = 1; d2 <= diasNoMes; d2++) {
+    var total   = combPorDia[d2] || 0;
+    var mlQ     = mlPorDia[d2]    || 0;
+    var shQ     = shopeePorDia[d2] || 0;
+    var pct     = Math.round((total / maxDia) * 130);
+    var mlPct   = total > 0 ? Math.round((mlQ / total) * pct) : 0;
+    var shPct   = pct - mlPct;
+    var isHoje  = d2 === new Date().getDate();
+    html +=
+      '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0">' +
+        (total > 0 ? '<div style="font-size:0.55rem;color:var(--text3)">' + total + '</div>' : '<div style="font-size:0.55rem;color:transparent">0</div>') +
+        '<div style="width:100%;display:flex;flex-direction:column;border-radius:3px 3px 0 0;overflow:hidden;opacity:' + (isHoje?'1':'0.85') + ';min-height:2px">' +
+          (mlOk && mlPct > 0 ? '<div style="height:' + mlPct + 'px;background:#FFE600"></div>' : '') +
+          (shopeeOk && shPct > 0 ? '<div style="height:' + shPct + 'px;background:#f4630a"></div>' : '') +
+          (total === 0 ? '<div style="height:2px;background:var(--border)"></div>' : '') +
+        '</div>' +
+        '<div style="font-size:0.55rem;color:var(--text3);margin-top:2px">' + d2 + '</div>' +
+      '</div>';
+  }
+
+  html += '</div></div>';
+  el.innerHTML = html;
+}
+
+// Extrai e salva dados da Shopee no cache
+async function shopeeCarregarDados() {
+  var now       = Math.floor(Date.now() / 1000);
+  var dtInicio  = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  var inicioMes = Math.floor(dtInicio.getTime() / 1000);
+  var hoje = new Date(); hoje.setHours(0,0,0,0);
+  var hojeTs = Math.floor(hoje.getTime() / 1000);
+
+  var allOrders = [];
+  var cursor = '';
+  for (var pg = 0; pg < 20; pg++) {
+    var params = { time_range_field:'create_time', time_from:inicioMes, time_to:now, page_size:100, response_optional_fields:'order_status' };
+    if (cursor) params.cursor = cursor;
+    var resp = await shopeeGet('/api/v2/order/get_order_list', params);
+    var list = (resp.response && resp.response.order_list) ? resp.response.order_list : [];
+    allOrders = allOrders.concat(list);
+    if (!resp.response || !resp.response.more || !resp.response.next_cursor) break;
+    cursor = resp.response.next_cursor;
+  }
+
+  var totalFaturado = 0, pedidosHoje = 0, faturadoHoje = 0;
+  var pedidosPorDia = {}, prodRanking = {};
+  var diasNoMes = new Date().getDate();
+  for (var d = 1; d <= diasNoMes; d++) pedidosPorDia[d] = 0;
+
+  if (allOrders.length > 0) {
+    var chunks = [];
+    for (var i = 0; i < allOrders.length; i += 50)
+      chunks.push(allOrders.slice(i, i+50).map(function(o){ return o.order_sn; }));
+    for (var ci = 0; ci < chunks.length; ci++) {
+      var det = await shopeeGet('/api/v2/order/get_order_detail', { order_sn_list: chunks[ci].join(','), response_optional_fields:'total_amount,create_time,item_list' });
+      if (!det.response || !det.response.order_list) continue;
+      det.response.order_list.forEach(function(o) {
+        var val = parseFloat(o.total_amount || 0);
+        var ts  = o.create_time || 0;
+        totalFaturado += val;
+        var dtPed = new Date(ts * 1000);
+        if (dtPed.getMonth() === new Date().getMonth() && dtPed.getFullYear() === new Date().getFullYear()) {
+          var dia = dtPed.getDate();
+          pedidosPorDia[dia] = (pedidosPorDia[dia] || 0) + 1;
+        }
+        if (ts >= hojeTs) { pedidosHoje++; faturadoHoje += val; }
+        if (o.item_list) {
+          o.item_list.forEach(function(item) {
+            var nome = item.item_name || 'Produto';
+            var qtd  = item.model_quantity_purchased || 1;
+            if (!prodRanking[nome]) prodRanking[nome] = { qtd: 0, receita: 0 };
+            prodRanking[nome].qtd += qtd;
+            prodRanking[nome].receita += val;
+          });
+        }
+      });
+    }
+  }
+
+  var data = { totalPedidos: allOrders.length, totalFaturado, pedidosHoje, faturadoHoje, pedidosPorDia, prodRanking };
+  _shopeeCache = { data, loadedAt: Date.now() };
+  return data;
 }
 
 function mlAuthHtml() {
@@ -4450,11 +4577,25 @@ function mlDashHtml(result) {
   // Monthly chart data — orders per day of month
   var daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
   var chartData = new Array(daysInMonth).fill(0);
+  var pedidosPorDia = {};
   ordersMonth.forEach(function(o) {
     if (!o.date_created) return;
-    var d = new Date(o.date_created).getDate() - 1;
+    var dt = new Date(o.date_created);
+    var d = dt.getDate() - 1;
     if (d >= 0 && d < daysInMonth) chartData[d]++;
+    var dia = dt.getDate();
+    pedidosPorDia[dia] = (pedidosPorDia[dia] || 0) + 1;
   });
+
+  // Salva no cache com todos os dados para o combinado
+  if (_mlCache) {
+    _mlCache.data.pedidosPorDia   = pedidosPorDia;
+    _mlCache.data.totalPedidosDia = totalPedidosDia;
+    _mlCache.data.totalPedidosMes = totalPedidosMes;
+    _mlCache.data.totalVendidoMes = totalVendidoMes;
+    _mlCache.data.totalVendidoDia = totalVendidoDia;
+  }
+
   var maxVal = Math.max.apply(null, chartData) || 1;
 
   // Top 5 month products

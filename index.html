@@ -2569,6 +2569,11 @@ function pontoStatCard(icon, label, valor) {
 
 // ── VISÃO ADMIN ───────────────────────────────────────────────────────────────
 function renderPontoAdmin() {
+  // Se um colaborador foi selecionado, abre a tela de detalhes dele
+  if (_pontoColabSel !== null && state.ponto.colaboradores[_pontoColabSel]) {
+    return renderPontoColabAberto(_pontoColabSel);
+  }
+
   var isCards = _pontoTab === 'cards';
   var tabBar =
     '<div style="display:flex;border-bottom:2px solid var(--border);margin-bottom:1.5rem">' +
@@ -3020,6 +3025,7 @@ function pontoRegistrarEtapa(idx) {
 
 function pontoAdminSetTab(tab) {
   _pontoTab = tab;
+  _pontoColabSel = null; // Volta para a lista ao trocar de aba
   if (tab === 'historico' && !_pontoHistMes) _pontoHistMes = pontoMesAnoAtual();
   navigate('ponto');
 }

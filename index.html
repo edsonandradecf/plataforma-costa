@@ -962,15 +962,23 @@ function renderInicio() {
       <div id="inicio-chart-content" style="color:var(--text3);font-size:0.85rem;text-align:center;padding-top:1.5rem">Carregando...</div>
     </div>
     <div style="display:grid;grid-template-columns:160px 1fr;gap:1rem">
-      <div class="card" style="min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.5rem;padding:1.5rem 1rem">
+      <div class="card" style="min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:1.25rem 1rem">
         <div style="text-align:center">
-          <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:6px">Pedidos Hoje</div>
-          <div id="inicio-pedidos-dia" style="font-size:2.6rem;font-weight:800;color:var(--green);line-height:1">—</div>
+          <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:4px">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#FFE600;margin-right:3px"></span>ML Hoje
+          </div>
+          <div id="inicio-pedidos-dia" style="font-size:2rem;font-weight:800;color:var(--green);line-height:1">—</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:4px">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f4630a;margin-right:3px"></span>Shopee Hoje
+          </div>
+          <div id="inicio-pedidos-shopee-dia" style="font-size:2rem;font-weight:800;color:#f4630a;line-height:1">—</div>
         </div>
         <div style="width:50px;height:1px;background:var(--border)"></div>
         <div style="text-align:center">
-          <div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:6px">Pedidos no Mês</div>
-          <div id="inicio-pedidos-mes" style="font-size:2.6rem;font-weight:800;color:var(--text);line-height:1">—</div>
+          <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:4px">Total no Mês</div>
+          <div id="inicio-pedidos-mes" style="font-size:2rem;font-weight:800;color:var(--text);line-height:1">—</div>
         </div>
       </div>
       <div class="card" style="min-height:220px;overflow:hidden">
@@ -4266,35 +4274,36 @@ function renderShopeeVendas(el, data) {
 }
 
 function renderVendas() {
-  var isMl = _vendaTab !== 'shopee';
+  var tab = _vendaTab || 'ml';
   var mlConectado     = mlTokenValid();
   var shopeeConectado = shopeeTokenValid();
 
-  // Bolinhas coloridas
   var dotML     = '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#FFE600;border:1.5px solid #e0c900;flex-shrink:0"></span>';
   var dotShopee = '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f4630a;border:1.5px solid #d4530a;flex-shrink:0"></span>';
   var dotComb   = '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,#FFE600 50%,#f4630a 50%);border:1.5px solid #ccc;flex-shrink:0"></span>';
 
+  function tabStyle(t) {
+    var ativo = tab === t;
+    var cor   = t === 'ml' ? 'var(--green)' : t === 'shopee' ? '#f4630a' : 'var(--blue)';
+    return 'display:flex;align-items:center;gap:6px;padding:0.65rem 1.25rem;background:none;border:none;border-bottom:' +
+      (ativo ? '3px solid ' + cor + ';color:' + cor + ';font-weight:600' : 'none;color:var(--text2)') +
+      ';cursor:pointer;font-size:0.9rem;margin-bottom:-2px';
+  }
+
   return '<div id="vendas-content">' +
     '<div style="display:flex;border-bottom:2px solid var(--border);margin-bottom:1.5rem">' +
-      '<button onclick="vendasSetTab(\'ml\')" style="display:flex;align-items:center;gap:6px;padding:0.65rem 1.25rem;background:none;border:none;border-bottom:' + (isMl?'3px solid var(--green);color:var(--green);font-weight:600':'none;color:var(--text2)') + ';cursor:pointer;font-size:0.9rem;margin-bottom:-2px">' +
-        dotML + ' Mercado Livre' +
-      '</button>' +
-      '<button onclick="vendasSetTab(\'shopee\')" style="display:flex;align-items:center;gap:6px;padding:0.65rem 1.25rem;background:none;border:none;border-bottom:' + (!isMl?'3px solid #f4630a;color:#f4630a;font-weight:600':'none;color:var(--text2)') + ';cursor:pointer;font-size:0.9rem;margin-bottom:-2px">' +
-        dotShopee + ' Shopee' +
-      '</button>' +
+      '<button onclick="vendasSetTab(\'ml\')" style="' + tabStyle('ml') + '">' + dotML + ' Mercado Livre</button>' +
+      '<button onclick="vendasSetTab(\'shopee\')" style="' + tabStyle('shopee') + '">' + dotShopee + ' Shopee</button>' +
       ((mlConectado && shopeeConectado) ?
-        '<button onclick="vendasSetTab(\'combinado\')" style="display:flex;align-items:center;gap:6px;padding:0.65rem 1.25rem;background:none;border:none;border-bottom:' + (_vendaTab==='combinado'?'3px solid var(--blue);color:var(--blue);font-weight:600':'none;color:var(--text2)') + ';cursor:pointer;font-size:0.9rem;margin-bottom:-2px">' +
-          dotComb + ' Combinado' +
-        '</button>' : '') +
+        '<button onclick="vendasSetTab(\'combinado\')" style="' + tabStyle('combinado') + '">' + dotComb + ' Combinado</button>' : '') +
     '</div>' +
-    '<div id="ml-tab-content"' + (isMl?' ':'  style="display:none"') + '>' +
+    '<div id="ml-tab-content"' + (tab === 'ml' ? '' : ' style="display:none"') + '>' +
       '<div class="card" style="text-align:center;padding:2rem"><p style="color:var(--text2)">Carregando Mercado Livre...</p></div>' +
     '</div>' +
-    '<div id="shopee-content"' + (_vendaTab==='shopee'?' ':'  style="display:none"') + '>' +
+    '<div id="shopee-content"' + (tab === 'shopee' ? '' : ' style="display:none"') + '>' +
       '<div class="card" style="text-align:center;padding:2rem"><p style="color:var(--text2)">Carregando Shopee...</p></div>' +
     '</div>' +
-    '<div id="combinado-content"' + (_vendaTab==='combinado'?' ':'  style="display:none"') + '>' +
+    '<div id="combinado-content"' + (tab === 'combinado' ? '' : ' style="display:none"') + '>' +
       '<div class="card" style="text-align:center;padding:2rem"><p style="color:var(--text2)">Carregando dados combinados...</p></div>' +
     '</div>' +
   '</div>';
@@ -4772,7 +4781,30 @@ async function mlLoadInicio() {
 
     // Counts
     if (diaEl) diaEl.textContent = result.totalDay;
-    if (mesEl) mesEl.textContent = result.totalMonth;
+
+    // Shopee hoje — usa cache se disponível, senão tenta carregar
+    var shopeeEl = document.getElementById('inicio-pedidos-shopee-dia');
+    if (shopeeEl) {
+      if (shopeeTokenValid()) {
+        if (vendaCacheValido(_shopeeCache)) {
+          shopeeEl.textContent = _shopeeCache.data.pedidosHoje || 0;
+          if (mesEl) mesEl.textContent = result.totalMonth + (_shopeeCache.data.totalPedidos || 0);
+        } else {
+          shopeeEl.textContent = '...';
+          shopeeCarregarDados().then(function(data) {
+            var el2 = document.getElementById('inicio-pedidos-shopee-dia');
+            if (el2) el2.textContent = data.pedidosHoje || 0;
+            var mesEl2 = document.getElementById('inicio-pedidos-mes');
+            if (mesEl2) mesEl2.textContent = result.totalMonth + (data.totalPedidos || 0);
+          }).catch(function(){ var el2 = document.getElementById('inicio-pedidos-shopee-dia'); if(el2) el2.textContent = '—'; });
+        }
+      } else {
+        shopeeEl.textContent = '—';
+        if (mesEl) mesEl.textContent = result.totalMonth;
+      }
+    } else {
+      if (mesEl) mesEl.textContent = result.totalMonth;
+    }
 
     // Chart SVG
     if (chartEl) {

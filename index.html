@@ -4311,28 +4311,21 @@ function renderVendas() {
 
 function vendasSetTab(tab) {
   _vendaTab = tab;
-  var mlDiv   = document.getElementById('ml-tab-content');
-  var shDiv   = document.getElementById('shopee-content');
-  var combDiv = document.getElementById('combinado-content');
-  if (!mlDiv) { navigate('vendas'); return; }
-  mlDiv.style.display   = tab === 'ml'        ? '' : 'none';
-  if (shDiv)   shDiv.style.display   = tab === 'shopee'    ? '' : 'none';
-  if (combDiv) combDiv.style.display = tab === 'combinado' ? '' : 'none';
-  if (tab === 'shopee')    shopeeCarregarVendas(false);
-  if (tab === 'combinado') vendasCarregarCombinado(false);
+  navigate('vendas');
 }
 
 async function bindVendas() {
-  var mlEl = document.getElementById('ml-tab-content');
-  if (!mlEl) return;
+  var tab = _vendaTab || 'ml';
 
-  if (!mlTokenValid()) {
-    mlEl.innerHTML = mlAuthHtml();
-  } else {
-    // Usa cache se válido
-    if (vendaCacheValido(_mlCache)) {
+  // ML
+  var mlEl = document.getElementById('ml-tab-content');
+  if (mlEl) {
+    if (!mlTokenValid()) {
+      mlEl.innerHTML = mlAuthHtml();
+    } else if (vendaCacheValido(_mlCache)) {
       mlEl.innerHTML = mlDashHtml(_mlCache.data);
-    } else {
+    } else if (tab === 'ml') {
+      // Só carrega ML se for a aba ativa
       mlEl.innerHTML = '<div class="card" style="text-align:center;padding:2rem"><p style="color:var(--text2);margin-bottom:1rem">Carregando pedidos...</p><div id="vendas-progress"></div><div id="vendas-loading" style="color:var(--text3);font-size:0.85rem"></div></div>';
       try {
         var result = await mlFetchVendas();
@@ -4343,10 +4336,19 @@ async function bindVendas() {
         if (isAuthError) { localStorage.removeItem('ml_token'); _mlToken = null; state.mlToken = null; mlEl.innerHTML = mlAuthHtml(); }
         else mlEl.innerHTML = mlErrorHtml('Erro: ' + e.message);
       }
+    } else {
+      // Não é a aba ativa — carrega em background sem mostrar loading
+      mlFetchVendas().then(function(result) {
+        _mlCache = { data: result, loadedAt: Date.now() };
+        var el = document.getElementById('ml-tab-content');
+        if (el) el.innerHTML = mlDashHtml(result);
+      }).catch(function(){});
     }
   }
-  if (_vendaTab === 'shopee')    shopeeCarregarVendas(false);
-  if (_vendaTab === 'combinado') vendasCarregarCombinado(false);
+
+  // Shopee e Combinado
+  if (tab === 'shopee')    shopeeCarregarVendas(false);
+  if (tab === 'combinado') vendasCarregarCombinado(false);
 }
 
 async function vendasCarregarCombinado(forcar) {

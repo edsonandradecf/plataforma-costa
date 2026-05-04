@@ -2949,6 +2949,8 @@ function pontoAdminExcluirRegistro(regId) {
   if (el) el.innerHTML = renderPontoColabAberto(_pontoColabSel);
   pontoIniciarRelogio();
 }
+
+function pontoRegistrarEtapa(idx) {
   if (!_pontoSenhaOk) return;
   var c = state.ponto.colaboradores[idx];
   if (!c) return;

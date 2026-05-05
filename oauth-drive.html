@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Autenticando Google Drive...</title>
+  <style>
+    body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f9f9f9; }
+    .box { text-align: center; padding: 2rem; background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); max-width: 360px; }
+    .icon { font-size: 3rem; margin-bottom: 1rem; }
+    h2 { margin: 0 0 0.5rem; color: #1a1a1a; }
+    p { color: #666; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+<div class="box">
+  <div class="icon" id="icon">⏳</div>
+  <h2 id="titulo">Autenticando...</h2>
+  <p id="msg">Aguarde, estamos conectando ao Google Drive.</p>
+</div>
+<script>
+  (function() {
+    var hash   = window.location.hash.slice(1);
+    var params = new URLSearchParams(hash);
+    var token  = params.get('access_token');
+    var error  = params.get('error');
+
+    if (token) {
+      // Envia o token para a janela pai
+      if (window.opener) {
+        window.opener.postMessage({ type: 'drive_token', access_token: token }, 'https://edsonandradecf.github.io');
+      }
+      document.getElementById('icon').textContent    = '✅';
+      document.getElementById('titulo').textContent  = 'Conectado!';
+      document.getElementById('msg').textContent     = 'Google Drive autenticado com sucesso. Esta janela fechará automaticamente.';
+      setTimeout(function() { window.close(); }, 2000);
+    } else if (error) {
+      if (window.opener) {
+        window.opener.postMessage({ type: 'drive_token', error: error }, 'https://edsonandradecf.github.io');
+      }
+      document.getElementById('icon').textContent    = '❌';
+      document.getElementById('titulo').textContent  = 'Erro na autenticação';
+      document.getElementById('msg').textContent     = 'Erro: ' + error + '. Feche esta janela e tente novamente.';
+    } else {
+      document.getElementById('icon').textContent    = '⚠️';
+      document.getElementById('titulo').textContent  = 'Token não encontrado';
+      document.getElementById('msg').textContent     = 'Não foi possível obter o token. Feche esta janela e tente novamente.';
+    }
+  })();
+</script>
+</body>
+</html>

@@ -2786,7 +2786,15 @@ async function devBuscarML(valor, tipo) {
       if (r && r.id) return devFormatarPedidoML(r);
     } catch(e) { console.log('DEBUG /orders/ erro:', e.message); }
 
-    // Tenta busca via orders/search
+    // Tenta /packs (alguns pedidos estão em packs)
+    try {
+      var rPack = await mlGet('/packs/' + valor);
+      console.log('DEBUG /packs/:', JSON.stringify(rPack).slice(0,200));
+      if (rPack && rPack.orders && rPack.orders[0]) {
+        var orderP = await mlGet('/orders/' + rPack.orders[0].id);
+        if (orderP && orderP.id) return devFormatarPedidoML(orderP);
+      }
+    } catch(e) { console.log('DEBUG /packs/ erro:', e.message); }
     try {
       var r1b = await mlGet('/orders/search?seller=' + sellerId + '&q=' + encodeURIComponent(valor) + '&sort=date_desc&limit=5');
       console.log('DEBUG orders/search:', JSON.stringify(r1b).slice(0,300));

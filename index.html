@@ -2612,7 +2612,7 @@ function renderDevolucaoDetalhe(id) {
   // Link correto para o ML — abre a venda pelo número do pedido
   var linkML = d.linkMarketplace;
   if (d.marketplace === 'ml' && d.codigoEtiqueta) {
-    linkML = 'https://www.mercadolivre.com.br/vendas/gerenciar?search=' + d.codigoEtiqueta;
+    linkML = 'https://www.mercadolivre.com.br/vendas/gerenciar?search=' + d.codigoEtiqueta + '&filters=&subFilters=&limit=50&offset=0&startPeriod=WITH_DATE_CLOSED_2M_OLD&selectedTab=TAB_TODAY';
   }
 
   // Dados do pedido salvos

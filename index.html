@@ -48,7 +48,6 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; transition: background 0.2s, color 0.2s; }
 
-  
 /* LOGIN */
 #login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: var(--bg); }
 .login-card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 2.5rem 2rem; width: 100%; max-width: 380px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
@@ -344,7 +343,7 @@ let _isSaving = false;
 let _pendingSave = false;
 let _sseSource = null;
 let _firebaseReady = false;
-let _loginTime = 0; // momento do login — primeiros 10s bloqueiam pushToCloud
+let _loginTime = 0; // momento do login -- primeiros 10s bloqueiam pushToCloud
 
 function showSyncStatus(msg, color) {
   const el = document.getElementById('sync-status');
@@ -421,28 +420,28 @@ async function loadState() {
 
   // 2. Busca dados atualizados do Firebase
   try {
-    showSyncStatus('⟳ Sincronizando...', 'var(--text3)');
+    showSyncStatus('<> Sincronizando...', 'var(--text3)');
     const resp = await fetch(FIREBASE_URL + '/data.json');
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const parsed = await resp.json();
     const localStr = localStorage.getItem('costa_state');
     const localData = localStr ? JSON.parse(localStr) : null;
     if (parsed && dataSize(parsed) > 0) {
-      // Firebase tem dados — usa como fonte de verdade
+      // Firebase tem dados -- usa como fonte de verdade
       applyParsed(parsed, true);
       localStorage.setItem('costa_state', JSON.stringify(parsed));
       _firebaseReady = true;
     } else if (localData && dataSize(localData) > 0) {
-      // Firebase vazio mas temos dados locais — envia para Firebase
+      // Firebase vazio mas temos dados locais -- envia para Firebase
       console.log('Firebase vazio, enviando dados locais para a nuvem...');
       applyParsed(localData, true);
       _firebaseReady = true;
       pushToCloud(localData);
     } else {
-      // Ambos vazios — Firebase pronto para receber dados novos
+      // Ambos vazios -- Firebase pronto para receber dados novos
       _firebaseReady = true;
     }
-    showSyncStatus('✓ Pronto', 'var(--green)');
+    showSyncStatus('v Pronto', 'var(--green)');
     setTimeout(() => showSyncStatus('', ''), 1500);
   } catch(e) {
     showSyncStatus('⚠ Sem conexão', 'var(--amber)');
@@ -469,7 +468,7 @@ function startRealtimeSync() {
         // Não aplicar sem usuário logado ou se EU fui quem salvou (evita flicker)
         if (!state.currentUser || _isSaving) return;
 
-        // SSE data is authoritative — use forceMerge=true
+        // SSE data is authoritative -- use forceMerge=true
         _firebaseReady = true;
         applyParsed(incoming, true);
         localStorage.setItem('costa_state', JSON.stringify(incoming));
@@ -495,7 +494,7 @@ function startRealtimeSync() {
     };
 
   } catch(e) {
-    // SSE não disponível — fallback para polling a cada 8 segundos
+    // SSE não disponível -- fallback para polling a cada 8 segundos
     startPolling();
   }
 }
@@ -568,7 +567,7 @@ async function pushToCloud(data) {
   }
   if (_isSaving) { _pendingSave = true; return; }
   _isSaving = true;
-  showSyncStatus('⬆ Salvando...', 'var(--text3)');
+  showSyncStatus('^ Salvando...', 'var(--text3)');
   try {
     const resp = await fetch(FIREBASE_URL + '/data.json', {
       method: 'PUT',
@@ -578,7 +577,7 @@ async function pushToCloud(data) {
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     // After successful save, update localStorage so it matches Firebase
     localStorage.setItem('costa_state', JSON.stringify(data));
-    showSyncStatus('✓ Salvo', 'var(--green)');
+    showSyncStatus('v Salvo', 'var(--green)');
     setTimeout(() => showSyncStatus('', ''), 1500);
   } catch(e) {
     showSyncStatus('⚠ Erro ao salvar', 'var(--red)');
@@ -597,7 +596,7 @@ function addLog(action) {
     action,
   });
   if (state.logs.length > 500) state.logs = state.logs.slice(0, 500);
-  // Não chama saveState aqui — evita sobrescrever Firebase antes de sincronizar.
+  // Não chama saveState aqui -- evita sobrescrever Firebase antes de sincronizar.
   // Os logs são salvos junto com a próxima ação real do usuário.
   localStorage.setItem('costa_state', JSON.stringify({
     tasks: state.tasks, compras: state.compras, mural: state.mural,
@@ -641,7 +640,7 @@ function doLogin() {
 function doLogout() {
   addLog('Saiu da plataforma');
   stopSync();
-  _firebaseReady = false; // reset — próximo login não pode salvar antes de sincronizar
+  _firebaseReady = false; // reset -- próximo login não pode salvar antes de sincronizar
   state.currentUser = null;
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
@@ -785,7 +784,7 @@ function buildSidebar() {
   // Update logout button icon when collapsed
   const collapsed = document.querySelector('.sidebar').classList.contains('collapsed');
   const logoutBtn = document.getElementById('btn-logout-el');
-  if (logoutBtn) logoutBtn.textContent = collapsed ? '↩' : 'Sair';
+  if (logoutBtn) logoutBtn.textContent = collapsed ? '<-' : 'Sair';
 }
 
 function toggleSidebar() {
@@ -794,7 +793,7 @@ function toggleSidebar() {
   const btn = document.getElementById('btn-logout-el');
   const isCollapsed = sidebar.classList.toggle('collapsed');
   main.classList.toggle('sidebar-collapsed', isCollapsed);
-  if (btn) btn.textContent = isCollapsed ? '↩' : 'Sair';
+  if (btn) btn.textContent = isCollapsed ? '<-' : 'Sair';
   localStorage.setItem('costa_sidebar_collapsed', isCollapsed ? '1' : '0');
 }
 
@@ -810,7 +809,7 @@ function cleanOldTasks() {
     state.tasks[area] = state.tasks[area].filter(t => !(t.done && t.date < todayStr));
     if (state.tasks[area].length !== before) changed = true;
   });
-  // Não salva aqui — evita sobrescrever Firebase com dados locais ainda não sincronizados
+  // Não salva aqui -- evita sobrescrever Firebase com dados locais ainda não sincronizados
   // Os dados serão salvos na próxima ação real do usuário
 }
 
@@ -860,7 +859,7 @@ function navigate(page) {
   renderPage();
 }
 
-// safeRenderPage: called by SSE sync — only updates data, never changes page
+// safeRenderPage: called by SSE sync -- only updates data, never changes page
 function safeRenderPage() {
   if (!state.currentUser) return;
   var active = document.activeElement;
@@ -909,7 +908,7 @@ function renderInicio() {
     }).join('');
   }
 
-  // Mural — post-its estilo original
+  // Mural -- post-its estilo original
   let muralHtml = '';
   if (!state.mural.length) {
     muralHtml = '<p style="color:var(--text3);font-size:0.875rem;padding:1rem 0;text-align:center">Nenhum recado no mural</p>';
@@ -917,7 +916,7 @@ function renderInicio() {
     muralHtml = '<div class="mural-grid" style="margin-top:0.5rem">' +
       state.mural.slice(0,6).map(m =>
         '<div class="mural-note">' +
-          '<div class="mural-note-author">' + esc(m.author) + ' · ' + m.time + '</div>' +
+          '<div class="mural-note-author">' + esc(m.author) + ' . ' + m.time + '</div>' +
           '<div class="mural-note-text">' + esc(m.text) + '</div>' +
         '</div>'
       ).join('') +
@@ -974,18 +973,18 @@ function renderInicio() {
           <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:4px">
             <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#FFE600;margin-right:3px"></span>ML Hoje
           </div>
-          <div id="inicio-pedidos-dia" style="font-size:2rem;font-weight:800;color:var(--green);line-height:1">—</div>
+          <div id="inicio-pedidos-dia" style="font-size:2rem;font-weight:800;color:var(--green);line-height:1">--</div>
         </div>
         <div style="text-align:center">
           <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:4px">
             <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f4630a;margin-right:3px"></span>Shopee Hoje
           </div>
-          <div id="inicio-pedidos-shopee-dia" style="font-size:2rem;font-weight:800;color:#f4630a;line-height:1">—</div>
+          <div id="inicio-pedidos-shopee-dia" style="font-size:2rem;font-weight:800;color:#f4630a;line-height:1">--</div>
         </div>
         <div style="width:50px;height:1px;background:var(--border)"></div>
         <div style="text-align:center">
           <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:4px">Total no Mês</div>
-          <div id="inicio-pedidos-mes" style="font-size:2rem;font-weight:800;color:var(--text);line-height:1">—</div>
+          <div id="inicio-pedidos-mes" style="font-size:2rem;font-weight:800;color:var(--text);line-height:1">--</div>
         </div>
       </div>
       <div class="card" style="min-height:220px;overflow:hidden">
@@ -1006,7 +1005,7 @@ function renderTasks(area) {
   const today = new Date();
   today.setHours(0,0,0,0);
 
-  // Limpeza feita fora do render — apenas lê o state, não modifica
+  // Limpeza feita fora do render -- apenas lê o state, não modifica
 
   let html = `<div class="card">`;
   if (isAdmin) {
@@ -1023,7 +1022,7 @@ function renderTasks(area) {
     </div>`;
   }
 
-  // Sort: undone+late first (oldest date first), then today, then done — by date+time
+  // Sort: undone+late first (oldest date first), then today, then done -- by date+time
   const tasks = [...state.tasks[area]].map((t, i) => ({...t, _origIdx: i}))
     .sort((a, b) => {
       // Done tasks always go to bottom
@@ -1047,7 +1046,7 @@ function renderTasks(area) {
       const isLate     = !t.done && t.date < todayStr;
       const isToday    = !t.done && t.date === todayStr;
       const isTomorrow = !t.done && t.date === tomorrowStr;
-      const dateStr = new Date(t.date + 'T12:00:00').toLocaleDateString('pt-BR') + (t.time ? ' ' + t.time : ' · Sem horário');
+      const dateStr = new Date(t.date + 'T12:00:00').toLocaleDateString('pt-BR') + (t.time ? ' ' + t.time : ' . Sem horário');
 
       let badge = '';
       if (isLate)     badge = '<span class="task-badge">⚠ Atraso</span>';
@@ -1059,7 +1058,7 @@ function renderTasks(area) {
         <div class="task-text">${esc(t.text)}</div>
         <span class="task-meta">${dateStr}</span>
         ${badge}
-        ${isAdmin ? `<button class="task-delete" onclick="deleteTask('${area}',${i})" title="Excluir">✕</button>` : ''}
+        ${isAdmin ? `<button class="task-delete" onclick="deleteTask('${area}',${i})" title="Excluir">x</button>` : ''}
       </div>`;
     });
     html += `</div>`;
@@ -1122,7 +1121,7 @@ function renderCompras() {
       html += `<div class="compras-item">
         <div class="compras-check ${c.done?'checked':''}" onclick="toggleCompra(${i})"></div>
         <span class="compras-text ${c.done?'done':''}">${esc(c.text)}</span>
-        <button class="task-delete" onclick="deleteCompra(${i})">✕</button>
+        <button class="task-delete" onclick="deleteCompra(${i})">x</button>
       </div>`;
     });
   }
@@ -1179,8 +1178,8 @@ function renderMural() {
     html += `<div class="mural-grid">`;
     state.mural.forEach((m, i) => {
       html += `<div class="mural-note">
-        <button class="mural-note-del" onclick="deleteMural(${i})">✕</button>
-        <div class="mural-note-author">${esc(m.author)} · ${m.time}</div>
+        <button class="mural-note-del" onclick="deleteMural(${i})">x</button>
+        <div class="mural-note-author">${esc(m.author)} . ${m.time}</div>
         <div class="mural-note-text">${esc(m.text)}</div>
       </div>`;
     });
@@ -1254,7 +1253,7 @@ function renderEtiquetas() {
         </div>
         <div style="display:flex;gap:8px">
           <button class="btn btn-green" style="flex:1;padding:0.65rem" onclick="previewEtiqueta()">👁 Visualizar</button>
-          <button class="btn btn-green" style="flex:1;padding:0.65rem" onclick="gerarEtiqueta()">⬇ Baixar PDF</button>
+          <button class="btn btn-green" style="flex:1;padding:0.65rem" onclick="gerarEtiqueta()">v Baixar PDF</button>
         </div>
         <div id="lbl-status" style="color:var(--text2);font-size:0.85rem;text-align:center;min-height:1.2em;"></div>
       </div>
@@ -1287,13 +1286,13 @@ function renderEtiquetas() {
           '</div>' +
           '<div style="display:flex;gap:8px;margin-top:4px">' +
             '<button class="btn btn-green" style="flex:1;padding:0.65rem" onclick="etqPreview()">👁 Prévia</button>' +
-            '<button class="btn btn-green" style="flex:1;padding:0.65rem" onclick="etqGerarPDF()">⬇ Gerar PDF</button>' +
+            '<button class="btn btn-green" style="flex:1;padding:0.65rem" onclick="etqGerarPDF()">v Gerar PDF</button>' +
           '</div>' +
           '<div id="etq-status" style="color:var(--text2);font-size:0.85rem;text-align:center;min-height:1.2em;margin-top:6px"></div>' +
         '</div>' +
       '</div>' +
       '<div class="card" style="display:flex;flex-direction:column">' +
-        '<div class="card-header"><span class="card-title">Prévia — Volume 1</span></div>' +
+        '<div class="card-header"><span class="card-title">Prévia -- Volume 1</span></div>' +
         '<div id="etq-preview" style="flex:1;display:flex;align-items:center;justify-content:center;background:var(--bg3);border-radius:8px;min-height:280px;overflow:auto;padding:12px">' +
           '<span style="color:var(--text3);font-size:0.85rem">Preencha os dados e clique em Prévia</span>' +
         '</div>' +
@@ -1315,7 +1314,7 @@ function etqBuildLabel(vol, totalVols, data) {
   var W = '377px', H = '566px';
   return '<div style="width:' + W + ';height:' + H + ';border:2px solid #000;padding:0;font-family:Arial,sans-serif;background:#fff;color:#000;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden">' +
 
-    // Header — remetente
+    // Header -- remetente
     '<div style="background:#000;color:#fff;padding:6px 12px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0">' +
       '<div>' +
         '<div style="font-weight:900;font-size:0.95rem;letter-spacing:1px">COSTA NATURE LIFE</div>' +
@@ -1324,7 +1323,7 @@ function etqBuildLabel(vol, totalVols, data) {
       '<div style="font-size:0.7rem;opacity:0.8;text-align:right">SAC: (16)99755-9693</div>' +
     '</div>' +
 
-    // Volume badge — destaque central
+    // Volume badge -- destaque central
     '<div style="background:#f0f0f0;border-bottom:2px solid #000;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0">' +
       '<div style="font-size:0.7rem;text-transform:uppercase;font-weight:700;color:#333;letter-spacing:0.5px">VOLUME</div>' +
       '<div style="font-size:1.8rem;font-weight:900;background:#000;color:#fff;padding:2px 18px;border-radius:4px;letter-spacing:1px">' + vol + '/' + totalVols + '</div>' +
@@ -1332,7 +1331,7 @@ function etqBuildLabel(vol, totalVols, data) {
 
     // Destinatário
     '<div style="padding:10px 12px 6px;flex-shrink:0">' +
-      '<div style="font-size:0.62rem;text-transform:uppercase;color:#666;margin-bottom:3px;font-weight:700;letter-spacing:0.5px">▼ DESTINATÁRIO</div>' +
+      '<div style="font-size:0.62rem;text-transform:uppercase;color:#666;margin-bottom:3px;font-weight:700;letter-spacing:0.5px">v DESTINATÁRIO</div>' +
       '<div style="font-weight:800;font-size:1.05rem;line-height:1.2">' + esc(data.nome) + '</div>' +
     '</div>' +
 
@@ -1350,7 +1349,7 @@ function etqBuildLabel(vol, totalVols, data) {
       '</div>' +
       '<div style="border:1px solid #ccc;border-radius:4px;padding:5px 8px">' +
         '<div style="font-size:0.6rem;text-transform:uppercase;color:#666;margin-bottom:2px;font-weight:700">NOTA FISCAL</div>' +
-        '<div style="font-weight:700;font-size:0.95rem">' + esc(data.nf || '—') + '</div>' +
+        '<div style="font-weight:700;font-size:0.95rem">' + esc(data.nf || '--') + '</div>' +
       '</div>' +
     '</div>' +
 
@@ -1391,7 +1390,7 @@ function etqPreview() {
     return;
   }
   prev.innerHTML = etqBuildLabel(1, data.volumes, data);
-  document.querySelector('#etq-preview').previousElementSibling.textContent = 'Prévia — Volume 1/' + data.volumes;
+  document.querySelector('#etq-preview').previousElementSibling.textContent = 'Prévia -- Volume 1/' + data.volumes;
 }
 
 async function etqGerarPDF() {
@@ -1442,7 +1441,7 @@ async function etqGerarPDF() {
   }
 
   doc.save('etiquetas-transportadora.pdf');
-  status.textContent = '✓ ' + total + ' etiquetas geradas com sucesso!';
+  status.textContent = 'v ' + total + ' etiquetas geradas com sucesso!';
   setTimeout(function(){ status.textContent = ''; }, 4000);
 }
 
@@ -1629,7 +1628,7 @@ function renderAgenda() {
         <span style="width:14px;height:14px;border-radius:50%;background:var(--green);display:inline-block;flex-shrink:0"></span>
         <span class="text-sm" style="flex:1"><strong>${esc(e.title)}</strong></span>
         <span class="text-sm text-muted">${d}</span>
-        <button class="task-delete" onclick="deleteEvento('${e.id}')">✕</button>
+        <button class="task-delete" onclick="deleteEvento('${e.id}')">x</button>
       </div>`;
     });
     html += `</div>`;
@@ -1761,13 +1760,13 @@ function renderTabNutri() {
         savedHtml += '<div class="card" style="padding:1rem">' +
           '<div style="font-size:1rem;font-weight:600;margin-bottom:4px">' + esc(item.nome) + '</div>' +
           '<div style="font-size:0.8rem;color:var(--text3);margin-bottom:10px">' +
-            esc(item.porcao || '—') + ' &bull; ' + (item.ean ? 'EAN: ' + esc(item.ean) : 'Sem EAN') +
+            esc(item.porcao || '--') + ' &bull; ' + (item.ean ? 'EAN: ' + esc(item.ean) : 'Sem EAN') +
             (item.peso ? ' &bull; ' + esc(item.peso) : '') +
           '</div>' +
           '<div style="display:flex;gap:6px">' +
             '<button class="btn btn-sm" style="flex:1" onclick="tnLoad(' + i + ')">✏️ Editar</button>' +
-            '<button class="btn btn-sm btn-green" style="flex:1" onclick="tnPrint(' + i + ')">⬇ PDF</button>' +
-            '<button class="btn btn-sm btn-red" onclick="tnDelete(' + i + ')">✕</button>' +
+            '<button class="btn btn-sm btn-green" style="flex:1" onclick="tnPrint(' + i + ')">v PDF</button>' +
+            '<button class="btn btn-sm btn-red" onclick="tnDelete(' + i + ')">x</button>' +
           '</div>' +
         '</div>';
       });
@@ -1888,7 +1887,7 @@ function renderTabNutri() {
 
       '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
         '<button class="btn btn-green" style="flex:1;padding:0.7rem" onclick="tnSave()">💾 Salvar Tabela</button>' +
-        '<button class="btn btn-green" style="flex:1;padding:0.7rem" onclick="tnGeneratePDF()">⬇ Baixar PDF</button>' +
+        '<button class="btn btn-green" style="flex:1;padding:0.7rem" onclick="tnGeneratePDF()">v Baixar PDF</button>' +
       '</div>' +
       '<div id="tn-status" style="color:var(--text2);font-size:0.82rem;text-align:center;margin-top:8px;min-height:1.2em"></div>' +
     '</div>' +
@@ -1982,8 +1981,8 @@ function tnLiveUpdate() {
     (d.descricao ? '<div class="tn-preview-desc">' + d.descricao + '</div>' : '') +
     '<table class="tn-tbl" style="border:2px solid #000">' +
       '<tr><th class="tn-tbl-title" colspan="4" style="text-align:left;border-bottom:2px solid #000">INFORMAÇÃO NUTRICIONAL</th></tr>' +
-      '<tr><td colspan="4" class="tn-tbl-porcao">Porções por embalagem: <b>' + (d.porcoes||'—') + '</b><br>Porção: <b>' + (d.porcao||'—') + '</b></td></tr>' +
-      '<tr style="background:#eee"><td><b></b></td><td style="font-size:9px;text-align:center"><b>100g</b></td><td style="font-size:9px;text-align:center"><b>' + (d.porcao||'—') + '</b></td><td style="font-size:9px;text-align:right"><b>%VD*</b></td></tr>' +
+      '<tr><td colspan="4" class="tn-tbl-porcao">Porções por embalagem: <b>' + (d.porcoes||'--') + '</b><br>Porção: <b>' + (d.porcao||'--') + '</b></td></tr>' +
+      '<tr style="background:#eee"><td><b></b></td><td style="font-size:9px;text-align:center"><b>100g</b></td><td style="font-size:9px;text-align:center"><b>' + (d.porcao||'--') + '</b></td><td style="font-size:9px;text-align:right"><b>%VD*</b></td></tr>' +
       '<tr class="tn-divider"><td class="tn-bold">Valor Energético (kcal)</td><td style="text-align:center">' + (d.kcal100||'0') + '</td><td style="text-align:center">' + (d.energia||'0') + '</td><td style="text-align:right">' + (d.vce_energia||'0') + '</td></tr>' +
       '<tr><td class="tn-bold">Carboidratos (g)</td><td style="text-align:center">' + (d.carb100||'0') + '</td><td style="text-align:center">' + (d.carboidratos||'0') + '</td><td style="text-align:right">' + (d.carboidratos_vd||'0') + '</td></tr>' +
       '<tr><td style="padding-left:10px">Açúcares Totais (g)</td><td style="text-align:center">' + (d.acucar100||'0') + '</td><td style="text-align:center">' + (d.acucares||'0') + '</td><td style="text-align:right">' + (d.acucar_vd||'**') + '</td></tr>' +
@@ -1998,7 +1997,7 @@ function tnLiveUpdate() {
     '<div class="tn-preview-info" style="margin-top:4px">*% Valores Diários de referência com base em uma dieta de 2000kcal. Seus valores diários podem ser maiores ou menores dependendo de suas necessidades energéticas.</div>' +
     (d.ingredientes ? '<div class="tn-preview-info"><b>Ingredientes:</b> ' + d.ingredientes + '</div>' : '') +
     (d.alergicos ? '<div class="tn-preview-info" style="font-weight:700">' + d.alergicos + '</div>' : '') +
-    '<div class="tn-preview-info"><b>Peso Líq.:</b> ' + (d.peso||'—') +
+    '<div class="tn-preview-info"><b>Peso Líq.:</b> ' + (d.peso||'--') +
       (d.validade ? ' &nbsp;|&nbsp; <b>Validade:</b> ' + d.validade : '') +
       (d.lote ? ' &nbsp;|&nbsp; <b>Lote:</b> ' + d.lote : '') + '</div>' +
     (d.cnpj ? '<div class="tn-preview-info"><b>CNPJ:</b> ' + d.cnpj + '</div>' : '') +
@@ -2042,7 +2041,7 @@ function tnSave() {
   saveState();
   _tnEdit = null;
   _tnTab = 'biblioteca';
-  document.getElementById('tn-status').textContent = '✓ Tabela salva com sucesso!';
+  document.getElementById('tn-status').textContent = 'v Tabela salva com sucesso!';
   setTimeout(function(){ navigate('tabnutri'); }, 800);
 }
 
@@ -2085,7 +2084,7 @@ function tnAskQtdPDF() {
         'style="width:100%;padding:0.7rem 1rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:1.1rem;text-align:center;margin-bottom:1rem">' +
       '<div style="display:flex;gap:8px">' +
         '<button class="btn" style="flex:1" onclick="closeModal()">Cancelar</button>' +
-        '<button class="btn btn-green" style="flex:1" onclick="tnConfirmarQtdPDF()">⬇ Gerar PDF</button>' +
+        '<button class="btn btn-green" style="flex:1" onclick="tnConfirmarQtdPDF()">v Gerar PDF</button>' +
       '</div>' +
     '</div>';
   modal.style.display = 'flex';
@@ -2113,7 +2112,7 @@ function tnGeneratePDF(qtdEtiquetas) {
     var W = 100, H = 150;
     var px = 4, py = 4, lw = W - px*2;
 
-    function nv(v, suf) { v = (v||'').trim(); return v ? v+(suf||'') : '—'; }
+    function nv(v, suf) { v = (v||'').trim(); return v ? v+(suf||'') : '--'; }
 
     // Colunas
     var cLabel = 34, c100 = 14, cPorc = 19, cVd = lw - cLabel - c100 - cPorc;
@@ -2149,12 +2148,12 @@ function tnGeneratePDF(qtdEtiquetas) {
 
       // Porções
       doc.setFontSize(7); doc.setFont('helvetica','normal');
-      doc.text('Porções por embalagem: ' + (d.porcoes||'—'), px+1, y+3.2);
+      doc.text('Porções por embalagem: ' + (d.porcoes||'--'), px+1, y+3.2);
       y += 4;
-      doc.text('Porção: ' + (d.porcao||'—'), px+1, y+3.2);
+      doc.text('Porção: ' + (d.porcao||'--'), px+1, y+3.2);
       y += 5;
 
-      // -- Header de colunas (BRANCO — sem fill) -------------
+      // -- Header de colunas (BRANCO -- sem fill) -------------
       doc.setLineWidth(0.5); doc.setDrawColor(0,0,0);
       doc.line(px, y, px+lw, y);                   // linha grossa acima
       doc.setFont('helvetica','bold'); doc.setFontSize(6.5);
@@ -2184,12 +2183,12 @@ function tnGeneratePDF(qtdEtiquetas) {
 
       nutriRow('Valor Energético (kcal)', nv(d.kcal100),      nv(d.energia),         nv(d.vce_energia,'%'),        true,  true,  1);
       nutriRow('Carboidratos (g)',         nv(d.carb100),      nv(d.carboidratos),    nv(d.carboidratos_vd,'%'),    true,  false, 1);
-      nutriRow('  Açúcares Totais (g)',    nv(d.acucar100),    nv(d.acucares),        '—',                          false, false, 4);
+      nutriRow('  Açúcares Totais (g)',    nv(d.acucar100),    nv(d.acucares),        '--',                          false, false, 4);
       nutriRow('  Açúcares Adicionados',   nv(d.acucar_ad100), nv(d.acucares_ad),     nv(d.acucar_ad_vd,'%'),       false, false, 4);
       nutriRow('Proteínas (g)',            nv(d.prot100),      nv(d.proteinas),       nv(d.proteinas_vd,'%'),       true,  false, 1);
       nutriRow('Gorduras Totais (g)',      nv(d.gord100),      nv(d.gorduras_totais), nv(d.gorduras_totais_vd,'%'), true,  false, 1);
       nutriRow('  Gorduras Saturadas (g)', nv(d.gordsat100),   nv(d.gorduras_sat),    nv(d.gorduras_sat_vd,'%'),    false, false, 4);
-      nutriRow('  Gorduras Trans (g)',     nv(d.gordtrans100), nv(d.gorduras_trans),  '—',                          false, false, 4);
+      nutriRow('  Gorduras Trans (g)',     nv(d.gordtrans100), nv(d.gorduras_trans),  '--',                          false, false, 4);
       nutriRow('Fibras Alimentares (g)',   nv(d.fibra100),     nv(d.fibras),          nv(d.fibras_vd,'%'),          true,  false, 1);
       nutriRow('Sódio (mg)',               nv(d.sodio100),     nv(d.sodio),           nv(d.sodio_vd,'%'),           true,  true,  1);
 
@@ -2221,7 +2220,7 @@ function tnGeneratePDF(qtdEtiquetas) {
 
       // -- Peso / Validade / Lote ----------------------------
       doc.setFontSize(6.5); doc.setFont('helvetica','normal');
-      var infoLine = 'Peso Líq.: '+(d.peso||'—')+(d.validade?'  |  Validade: '+d.validade:'')+(d.lote?'  |  Lote: '+d.lote:'');
+      var infoLine = 'Peso Líq.: '+(d.peso||'--')+(d.validade?'  |  Validade: '+d.validade:'')+(d.lote?'  |  Lote: '+d.lote:'');
       doc.text(infoLine, px, y+3); y += 4.5;
 
       // -- CNPJ + SAC ----------------------------------------
@@ -2279,7 +2278,7 @@ function tnGeneratePDF(qtdEtiquetas) {
 
       doc.save('tabela-nutricional-'+(d.nome||'produto').replace(/\s+/g,'-').toLowerCase()+'.pdf');
       addLog('Gerou PDF de tabela nutricional: "'+d.nome+'" ('+qtdEtiquetas+'x)');
-      status.textContent = '✓ ' + qtdEtiquetas + ' etiqueta(s) gerada(s)!';
+      status.textContent = 'v ' + qtdEtiquetas + ' etiqueta(s) gerada(s)!';
       setTimeout(function(){ status.textContent=''; }, 4000);
     }
 
@@ -2389,32 +2388,6 @@ async function driveUpload(blob, nome, mimeType) {
 
 function driveViewUrl(fileId) { return 'https://drive.google.com/file/d/' + fileId + '/view'; }
 
-async function driveUpload(blob, nome, mimeType) {
-  if (!_driveToken) await driveAutenticar();
-  var meta = JSON.stringify({ name: nome, parents: [DRIVE_FOLDER_ID] });
-  var form = new FormData();
-  form.append('metadata', new Blob([meta], { type: 'application/json' }));
-  form.append('file', blob, nome);
-  var resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + _driveToken },
-    body: form,
-  });
-  if (!resp.ok) throw new Error('Drive upload falhou: ' + resp.status);
-  var data = await resp.json();
-  // Torna público para leitura
-  await fetch('https://www.googleapis.com/drive/v3/files/' + data.id + '/permissions', {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + _driveToken, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ role: 'reader', type: 'anyone' }),
-  });
-  return data.id;
-}
-
-function driveViewUrl(fileId) {
-  return 'https://drive.google.com/file/d/' + fileId + '/view';
-}
-
 // -- Render principal ----------------------------------------------------------
 function renderDevolucao() {
   if (_devSel) return renderDevolucaoDetalhe(_devSel);
@@ -2474,15 +2447,15 @@ function renderDevolucaoLista() {
     var cor   = STATUS_COR[d.status]   || 'var(--text3)';
     var label = STATUS_LABEL[d.status] || d.status;
     var plat  = d.marketplace === 'shopee' ? '🧡 Shopee' : '🛒 ML';
-    var dt    = d.criadoEm ? new Date(d.criadoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+    var dt    = d.criadoEm ? new Date(d.criadoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '--';
     html +=
       '<div onclick="devAbrirDetalhe(\'' + d.id + '\')" class="card" style="padding:1rem;cursor:pointer;display:flex;align-items:center;gap:14px;transition:box-shadow 0.15s" onmouseover="this.style.boxShadow=\'0 4px 16px rgba(0,0,0,0.12)\'" onmouseout="this.style.boxShadow=\'\'">' +
         // Badge status
         '<div style="width:10px;height:10px;border-radius:50%;background:' + cor + ';flex-shrink:0"></div>' +
         // Info principal
         '<div style="flex:1;min-width:0">' +
-          '<div style="font-weight:700;font-size:0.95rem">' + esc(d.codigoEtiqueta || '—') + '</div>' +
-          '<div style="font-size:0.78rem;color:var(--text3);margin-top:2px">' + plat + ' • ' + esc(d.nomeProduto || 'Produto não identificado') + '</div>' +
+          '<div style="font-weight:700;font-size:0.95rem">' + esc(d.codigoEtiqueta || '--') + '</div>' +
+          '<div style="font-size:0.78rem;color:var(--text3);margin-top:2px">' + plat + ' * ' + esc(d.nomeProduto || 'Produto não identificado') + '</div>' +
         '</div>' +
         // Status + data
         '<div style="text-align:right;flex-shrink:0">' +
@@ -2506,9 +2479,9 @@ function renderDevolucaoNovo() {
 
   '<div style="max-width:600px">' +
 
-  // Etapa 1 — Câmera
+  // Etapa 1 -- Câmera
   '<div class="card" style="padding:1.25rem;margin-bottom:1rem">' +
-    '<div style="font-weight:700;font-size:0.95rem;margin-bottom:1rem">📷 Etapa 1 — Registro de Mídia</div>' +
+    '<div style="font-weight:700;font-size:0.95rem;margin-bottom:1rem">📷 Etapa 1 -- Registro de Mídia</div>' +
 
     // Preview webcam
     '<div style="position:relative;background:#000;border-radius:10px;overflow:hidden;margin-bottom:10px;aspect-ratio:4/3;max-height:300px">' +
@@ -2527,9 +2500,9 @@ function renderDevolucaoNovo() {
     '<div id="dev-upload-status" style="font-size:0.8rem;color:var(--text3);margin-top:6px"></div>' +
   '</div>' +
 
-  // Etapa 2 — Marketplace e busca
+  // Etapa 2 -- Marketplace e busca
   '<div class="card" style="padding:1.25rem;margin-bottom:1rem">' +
-    '<div style="font-weight:700;font-size:0.95rem;margin-bottom:1rem">🏷 Etapa 2 — Identificação do Pedido</div>' +
+    '<div style="font-weight:700;font-size:0.95rem;margin-bottom:1rem">🏷 Etapa 2 -- Identificação do Pedido</div>' +
 
     // Marketplace
     '<div style="margin-bottom:12px">' +
@@ -2579,9 +2552,9 @@ function renderDevolucaoNovo() {
     '<div style="margin-top:10px;font-size:0.8rem;color:var(--text3)">Não encontrou? <button onclick="devPularBusca()" style="background:none;border:none;color:var(--blue);cursor:pointer;font-size:0.8rem;padding:0">Registrar sem associar pedido →</button></div>' +
   '</div>' +
 
-  // Etapa 3 — Salvar
+  // Etapa 3 -- Salvar
   '<div class="card" style="padding:1.25rem">' +
-    '<div style="font-weight:700;font-size:0.95rem;margin-bottom:1rem">✅ Etapa 3 — Registrar</div>' +
+    '<div style="font-weight:700;font-size:0.95rem;margin-bottom:1rem">✅ Etapa 3 -- Registrar</div>' +
     '<div style="margin-bottom:12px">' +
       '<label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:5px;font-weight:600">Observações iniciais</label>' +
       '<textarea id="dev-obs-inicial" rows="2" style="width:100%;padding:0.65rem 0.9rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.88rem;resize:vertical" placeholder="Descreva o estado do produto, embalagem, etc."></textarea>' +
@@ -2602,7 +2575,7 @@ function renderDevolucaoDetalhe(id) {
   var STATUS_LABEL = { aguardando:'⏳ Aguardando', aprovado:'✅ Aprovado', reprovado:'❌ Reprovado', recusa:'⚠ Recusa' };
   var cor   = STATUS_COR[d.status]   || 'var(--text3)';
   var label = STATUS_LABEL[d.status] || d.status;
-  var dt    = d.criadoEm ? new Date(d.criadoEm).toLocaleString('pt-BR') : '—';
+  var dt    = d.criadoEm ? new Date(d.criadoEm).toLocaleString('pt-BR') : '--';
 
   return '<button onclick="devFecharDetalhe()" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--text2);cursor:pointer;font-size:0.88rem;margin-bottom:1.25rem;padding:0">' +
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="15 18 9 12 15 6"/></svg> Voltar' +
@@ -2614,8 +2587,8 @@ function renderDevolucaoDetalhe(id) {
   '<div class="card" style="padding:1.25rem;margin-bottom:1rem">' +
     '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:1rem">' +
       '<div>' +
-        '<div style="font-size:1.2rem;font-weight:800">' + esc(d.codigoEtiqueta || '—') + '</div>' +
-        '<div style="font-size:0.82rem;color:var(--text3);margin-top:2px">' + (d.marketplace === 'shopee' ? '🧡 Shopee' : '🛒 Mercado Livre') + ' • ' + dt + ' • ' + esc(d.operador || '') + '</div>' +
+        '<div style="font-size:1.2rem;font-weight:800">' + esc(d.codigoEtiqueta || '--') + '</div>' +
+        '<div style="font-size:0.82rem;color:var(--text3);margin-top:2px">' + (d.marketplace === 'shopee' ? '🧡 Shopee' : '🛒 Mercado Livre') + ' * ' + dt + ' * ' + esc(d.operador || '') + '</div>' +
       '</div>' +
       '<span style="padding:4px 12px;border-radius:20px;font-size:0.82rem;font-weight:700;background:' + cor + '18;color:' + cor + ';white-space:nowrap">' + label + '</span>' +
     '</div>' +
@@ -2682,7 +2655,7 @@ var DEV_BUSCA_LABELS = {
 var DEV_BUSCA_PLACEHOLDERS = {
   numero:  'Ex: 123456789 ou BR123456789',
   cliente: 'Nome completo do comprador',
-  cpf:     'Apenas números — 000.000.000-00',
+  cpf:     'Apenas números -- 000.000.000-00',
   nf:      'Número da NF ou chave de acesso',
   link:    'Cole o link completo do pedido',
 };
@@ -2801,11 +2774,11 @@ async function devBuscarML(valor, tipo) {
     var r3 = await mlGet('/orders/search?seller=' + sellerId + '&q=' + encodeURIComponent(valor) + '&sort=date_desc&limit=1');
     if (r3 && r3.results && r3.results[0]) return devFormatarPedidoML(r3.results[0]);
   } else if (tipo === 'cpf') {
-    // Busca por comprador — ML não expõe CPF diretamente, busca pelo nome/ID
+    // Busca por comprador -- ML não expõe CPF diretamente, busca pelo nome/ID
     var r4 = await mlGet('/orders/search?seller=' + sellerId + '&buyer.nickname=' + encodeURIComponent(valor) + '&sort=date_desc&limit=1');
     if (r4 && r4.results && r4.results[0]) return devFormatarPedidoML(r4.results[0]);
   } else if (tipo === 'nf') {
-    // Busca pela NF — usa fiscal_data
+    // Busca pela NF -- usa fiscal_data
     var r5 = await mlGet('/orders/search?seller=' + sellerId + '&sort=date_desc&limit=50');
     if (r5 && r5.results) {
       var found = r5.results.find(function(o){ return o.id && String(o.id).includes(valor); });
@@ -2822,8 +2795,8 @@ function devFormatarPedidoML(order) {
   return {
     id:    order.id,
     nome:  items || 'Pedido #' + order.id,
-    info:  'Pedido ML #' + order.id + (buyer ? ' • Comprador: ' + buyer : '') + (total ? ' • ' + total : ''),
-    extra: 'Status: ' + (order.status || '—') + ' • Data: ' + (order.date_created ? new Date(order.date_created).toLocaleDateString('pt-BR') : '—'),
+    info:  'Pedido ML #' + order.id + (buyer ? ' * Comprador: ' + buyer : '') + (total ? ' * ' + total : ''),
+    extra: 'Status: ' + (order.status || '--') + ' * Data: ' + (order.date_created ? new Date(order.date_created).toLocaleDateString('pt-BR') : '--'),
     link:  'https://www.mercadolivre.com.br/vendas/' + order.id,
   };
 }
@@ -2845,7 +2818,7 @@ async function devBuscarShopee(valor, tipo) {
     } catch(e) {}
   }
 
-  // Busca por cliente/CPF — usa get_order_list e filtra
+  // Busca por cliente/CPF -- usa get_order_list e filtra
   if (tipo === 'cliente' || tipo === 'cpf') {
     var now2  = Math.floor(Date.now()/1000);
     var from2 = now2 - 90*24*3600; // últimos 90 dias
@@ -2875,11 +2848,13 @@ function devFormatarPedidoShopee(order) {
   return {
     id:    order.order_sn,
     nome:  items2 || 'Pedido #' + order.order_sn,
-    info:  'Pedido Shopee #' + order.order_sn + (order.buyer_username ? ' • Comprador: ' + order.buyer_username : '') + (total2 ? ' • ' + total2 : ''),
-    extra: 'Status: ' + (order.order_status || '—') + ' • Data: ' + (order.create_time ? new Date(order.create_time*1000).toLocaleDateString('pt-BR') : '—'),
+    info:  'Pedido Shopee #' + order.order_sn + (order.buyer_username ? ' * Comprador: ' + order.buyer_username : '') + (total2 ? ' * ' + total2 : ''),
+    extra: 'Status: ' + (order.order_status || '--') + ' * Data: ' + (order.create_time ? new Date(order.create_time*1000).toLocaleDateString('pt-BR') : '--'),
     link:  'https://seller.shopee.com.br/portal/sale/all?keyword=' + order.order_sn,
   };
 }
+
+function setupWebcam() {
   _devMediaFiles = [];
   _devGravando   = false;
   _devPedidoEncontrado = null;
@@ -2943,7 +2918,7 @@ function devRenderMidias() {
         '<img src="' + url + '" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:2px solid var(--border)">' :
         '<video src="' + url + '" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:2px solid var(--border)" controls muted></video>') +
       '<div style="position:absolute;top:2px;left:2px;font-size:0.65rem;background:rgba(0,0,0,0.6);color:#fff;padding:1px 4px;border-radius:4px">' + icon + '</div>' +
-      '<button onclick="devRemoverMidia(' + i + ')" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:var(--red);border:none;color:#fff;cursor:pointer;font-size:0.7rem;display:flex;align-items:center;justify-content:center">✕</button>' +
+      '<button onclick="devRemoverMidia(' + i + ')" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:var(--red);border:none;color:#fff;cursor:pointer;font-size:0.7rem;display:flex;align-items:center;justify-content:center">x</button>' +
     '</div>';
   }).join('');
 }
@@ -2961,58 +2936,6 @@ function devSetMarket(m) {
   if (sh) { sh.style.background = m==='shopee'?'#f4630a':'var(--bg2)'; sh.style.color = m==='shopee'?'#fff':'var(--text2)'; sh.style.borderColor = m==='shopee'?'#f4630a':'var(--border)'; }
 }
 
-async function devBuscarPedido() {
-  var codigo = (document.getElementById('dev-codigo')||{}).value || '';
-  codigo = codigo.trim();
-  if (!codigo) return;
-  var st = document.getElementById('dev-busca-status');
-  var found = document.getElementById('dev-pedido-encontrado');
-  if (st) st.textContent = '🔍 Buscando...'; if (st) st.style.color = 'var(--text3)';
-  if (found) found.style.display = 'none';
-  _devPedidoEncontrado = null;
-
-  try {
-    if (_devMarketplace === 'ml') {
-      if (!mlTokenValid()) throw new Error('Mercado Livre não conectado');
-      var resp = await fetch(ML_PROXY + '?url=' + encodeURIComponent('https://api.mercadolibre.com/orders/' + codigo));
-      var data = await resp.json();
-      if (data.id) {
-        _devPedidoEncontrado = { id: data.id, nome: (data.order_items||[]).map(function(i){ return i.item.title; }).join(', '), info: 'Pedido #' + data.id + ' • ' + (data.status||''), link: 'https://www.mercadolivre.com.br/vendas/' + data.id };
-      } else {
-        // Tenta buscar pelo número da etiqueta
-        var resp2 = await fetch(ML_PROXY + '?url=' + encodeURIComponent('https://api.mercadolibre.com/shipments/search?tracking_number=' + codigo));
-        var data2 = await resp2.json();
-        if (data2.results && data2.results[0]) {
-          var ship = data2.results[0];
-          _devPedidoEncontrado = { id: ship.order_id, nome: 'Envio #' + ship.id, info: 'Rastreio: ' + codigo, link: 'https://www.mercadolivre.com.br/vendas/' + ship.order_id };
-        }
-      }
-    } else {
-      if (!shopeeTokenValid()) throw new Error('Shopee não conectada');
-      var det = await shopeeGet('/api/v2/order/get_order_detail', { order_sn_list: codigo, response_optional_fields: 'item_list' });
-      var orders = det.response && det.response.order_list;
-      if (orders && orders[0]) {
-        var o = orders[0];
-        _devPedidoEncontrado = { id: o.order_sn, nome: (o.item_list||[]).map(function(i){ return i.item_name; }).join(', ') || codigo, info: 'Pedido Shopee #' + o.order_sn, link: 'https://seller.shopee.com.br/portal/sale/all?keyword=' + o.order_sn };
-      }
-    }
-
-    if (_devPedidoEncontrado) {
-      if (st) { st.textContent = '✅ Pedido encontrado!'; st.style.color = 'var(--green)'; }
-      var nome = document.getElementById('dev-pedido-nome');
-      var info = document.getElementById('dev-pedido-info');
-      if (nome) nome.textContent = _devPedidoEncontrado.nome;
-      if (info) info.textContent = _devPedidoEncontrado.info;
-      if (found) found.style.display = 'block';
-    } else {
-      if (st) { st.textContent = '⚠ Pedido não encontrado — você pode continuar assim mesmo.'; st.style.color = 'var(--amber)'; }
-      _devPedidoEncontrado = { id: codigo, nome: codigo, info: 'Identificado manualmente', link: null };
-    }
-  } catch(e) {
-    if (st) { st.textContent = '⚠ ' + e.message + ' — continuando sem busca.'; st.style.color = 'var(--amber)'; }
-    _devPedidoEncontrado = { id: codigo, nome: codigo, info: 'Identificado manualmente', link: null };
-  }
-}
 
 async function devSalvarNovo() {
   var codigo = (document.getElementById('dev-codigo')||{}).value || '';
@@ -3045,7 +2968,7 @@ async function devSalvarNovo() {
   var dev = {
     id:             'dev_' + Date.now(),
     criadoEm:       Date.now(),
-    operador:       state.currentUser ? state.currentUser.login : '—',
+    operador:       state.currentUser ? state.currentUser.login : '--',
     marketplace:    _devMarketplace,
     codigoEtiqueta: codigo.trim(),
     nomeProduto:    _devPedidoEncontrado ? _devPedidoEncontrado.nome : codigo.trim(),
@@ -3148,7 +3071,7 @@ function renderPontoPublico() {
 
 function pontoCriarCard(c, i, status) {
   var corStatus = status === 'trabalhando' ? 'var(--green)' : (status === 'saiu' ? 'var(--blue)' : 'var(--text3)');
-  var labelStatus = status === 'trabalhando' ? '● Trabalhando' : (status === 'saiu' ? '✓ Saída efetuada' : '○ Sem registro hoje');
+  var labelStatus = status === 'trabalhando' ? '● Trabalhando' : (status === 'saiu' ? 'v Saída efetuada' : '○ Sem registro hoje');
   var inicialLetra = (c.nome || '?')[0].toUpperCase();
   var corAvatar = ['#16a34a','#2563eb','#9333ea','#ea580c','#0891b2','#be185d'][i % 6];
 
@@ -3185,13 +3108,13 @@ function renderPontoColabAberto(idx) {
   var JORNADA = [
     { tipo: 'entrada', label: '▶ Entrada',      hora: '08:00', cor: '#16a34a', descricao: 'Entrada às 08h00' },
     { tipo: 'saida',   label: '🍽 Saída Almoço', hora: '12:00', cor: '#ea580c', descricao: 'Saída para almoço às 12h00' },
-    { tipo: 'entrada', label: '↩ Volta Almoço', hora: '13:00', cor: '#2563eb', descricao: 'Volta do almoço às 13h00' },
+    { tipo: 'entrada', label: '<- Volta Almoço', hora: '13:00', cor: '#2563eb', descricao: 'Volta do almoço às 13h00' },
     { tipo: 'saida',   label: '■ Saída',         hora: '17:00', cor: '#7c3aed', descricao: 'Saída às 17h00' },
   ];
 
   var hoje = pontoDataHoje();
   var regsHoje = state.ponto.registros.filter(function(r){ return r.colabIdx === idx && r.data === hoje; });
-  var etapaAtual = regsHoje.length; // próxima etapa a registrar (0–4)
+  var etapaAtual = regsHoje.length; // próxima etapa a registrar (0-4)
   if (etapaAtual > 4) etapaAtual = 4;
   var jornadaCompleta = etapaAtual >= 4;
 
@@ -3233,7 +3156,7 @@ function renderPontoColabAberto(idx) {
       pontoStatCard('❌', 'Faltas', String(stats.faltas)) +
     '</div>' +
 
-    // Jornada do dia — linha do tempo
+    // Jornada do dia -- linha do tempo
     '<div class="card" style="padding:1.25rem 1.5rem;margin-bottom:1rem">' +
       '<div style="font-weight:700;font-size:0.88rem;color:var(--text2);margin-bottom:1rem;text-transform:uppercase;letter-spacing:0.5px">Jornada de hoje</div>' +
       '<div style="display:flex;align-items:center;gap:0">' +
@@ -3284,10 +3207,10 @@ function renderPontoColabAberto(idx) {
         '</div>' +
       '</div>' +
 
-      // Campo de senha — admin não precisa digitar
+      // Campo de senha -- admin não precisa digitar
       (isAdmin() ?
         '<div style="margin-bottom:1.25rem;padding:10px 14px;background:var(--bg3);border-radius:8px;font-size:0.85rem;color:var(--text2)">' +
-          '🔑 Modo administrador — senha dispensada' +
+          '🔑 Modo administrador -- senha dispensada' +
         '</div>'
       :
         '<div style="margin-bottom:1.25rem">' +
@@ -3296,7 +3219,7 @@ function renderPontoColabAberto(idx) {
             '<input type="password" id="ponto-senha" placeholder="Digite sua senha" ' +
               'style="flex:1;padding:0.65rem 1rem;border:2px solid ' + (senhaOk?'var(--green)':'var(--border)') + ';border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.95rem;transition:border 0.2s;outline:none" ' +
               'oninput="pontoVerificarSenha(this.value,' + idx + ')" onkeydown="if(event.key===\'Enter\'&&' + (senhaOk?'true':'false') + ')pontoRegistrarEtapa(' + idx + ')">' +
-            '<div style="font-size:1.4rem;transition:opacity 0.2s;opacity:' + (senhaOk?'1':'0') + ';color:var(--green)">✓</div>' +
+            '<div style="font-size:1.4rem;transition:opacity 0.2s;opacity:' + (senhaOk?'1':'0') + ';color:var(--green)">v</div>' +
           '</div>' +
           '<div style="font-size:0.75rem;margin-top:5px;color:' + (senhaOk?'var(--green)':'var(--text3)') + '">' +
             (senhaOk ? 'Senha correta! Clique no botão abaixo para registrar.' : 'Digite sua senha para liberar o registro.') +
@@ -3304,7 +3227,7 @@ function renderPontoColabAberto(idx) {
         '</div>'
       ) +
 
-      // Botão único — registra a próxima etapa da jornada
+      // Botão único -- registra a próxima etapa da jornada
       '<button onclick="pontoRegistrarEtapa(' + idx + ')" ' +
         (!btnHabilitado ? 'disabled ' : '') +
         'style="width:100%;padding:0.9rem;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:' + (btnHabilitado?'pointer':'not-allowed') + ';' +
@@ -3320,9 +3243,9 @@ function renderPontoColabAberto(idx) {
     // Registros do dia (visível para admin) com botão de excluir
     (isAdmin() && regsHoje.length > 0 ?
       '<div class="card" style="padding:1.25rem;margin-top:1rem">' +
-        '<div style="font-weight:700;font-size:0.9rem;margin-bottom:1rem">🗂 Registros de hoje — clique em ✕ para excluir</div>' +
+        '<div style="font-weight:700;font-size:0.9rem;margin-bottom:1rem">🗂 Registros de hoje -- clique em x para excluir</div>' +
         regsHoje.map(function(r, ri) {
-          var ETAPA_LABELS = ['▶ Entrada','🍽 Saída Almoço','↩ Volta Almoço','■ Saída'];
+          var ETAPA_LABELS = ['▶ Entrada','🍽 Saída Almoço','<- Volta Almoço','■ Saída'];
           var ETAPA_CORES  = ['var(--green)','#ea580c','#2563eb','#7c3aed'];
           var etIdx = r.etapa !== undefined ? r.etapa : ri;
           var cor   = r.tipo === 'folga' ? '#0891b2' : (ETAPA_CORES[etIdx] || 'var(--text2)');
@@ -3334,7 +3257,7 @@ function renderPontoColabAberto(idx) {
               (r.manual ? '<span style="font-size:0.7rem;background:var(--amber)18;color:var(--amber);border-radius:4px;padding:1px 6px">manual</span>' : '') +
             '</div>' +
             '<button onclick="pontoAdminExcluirRegistro(' + r.id + ')" ' +
-              'style="padding:3px 10px;border:1px solid var(--red);border-radius:6px;background:transparent;color:var(--red);cursor:pointer;font-size:0.78rem;font-weight:600">✕ Excluir</button>' +
+              'style="padding:3px 10px;border:1px solid var(--red);border-radius:6px;background:transparent;color:var(--red);cursor:pointer;font-size:0.78rem;font-weight:600">x Excluir</button>' +
           '</div>';
         }).join('') +
       '</div>'
@@ -3403,7 +3326,7 @@ function renderPontoAdminColabs() {
     var status = pontoStatusHoje(i);
     var stats  = pontoCalcStats(i, now.getMonth(), now.getFullYear());
     var corStatus = status==='trabalhando'?'var(--green)':(status==='saiu'?'var(--blue)':'var(--text3)');
-    var labelStatus = status==='trabalhando'?'● Trabalhando':(status==='saiu'?'✓ Saída efetuada':'○ Sem registro hoje');
+    var labelStatus = status==='trabalhando'?'● Trabalhando':(status==='saiu'?'v Saída efetuada':'○ Sem registro hoje');
     var corAvatar = ['#16a34a','#2563eb','#9333ea','#ea580c','#0891b2','#be185d'][i % 6];
     var inicialLetra = (c.nome||'?')[0].toUpperCase();
 
@@ -3418,7 +3341,7 @@ function renderPontoAdminColabs() {
         '</div>' +
         '<div style="display:flex;gap:4px" onclick="event.stopPropagation()">' +
           '<button class="btn btn-sm" onclick="pontoAbrirModalColab(' + i + ')" title="Editar">✏️</button>' +
-          '<button class="btn btn-sm btn-red" onclick="pontoExcluirColab(' + i + ')" title="Excluir">✕</button>' +
+          '<button class="btn btn-sm btn-red" onclick="pontoExcluirColab(' + i + ')" title="Excluir">x</button>' +
         '</div>' +
       '</div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px">' +
@@ -3561,7 +3484,7 @@ function renderPontoAdminHistorico() {
   '</div>';
 
   // -- Tabela agrupada por dia -------------------------------
-  var ETAPA_LABELS = ['▶ Entrada','🍽 Saída Almoço','↩ Volta Almoço','■ Saída'];
+  var ETAPA_LABELS = ['▶ Entrada','🍽 Saída Almoço','<- Volta Almoço','■ Saída'];
   var ETAPA_CORES  = ['var(--green)','#ea580c','#2563eb','#7c3aed'];
 
   // Agrupa por data
@@ -3601,7 +3524,7 @@ function renderPontoAdminHistorico() {
           '<span style="padding:2px 10px;border-radius:12px;font-size:0.75rem;font-weight:700;background:' + cor + '18;color:' + cor + '">' + label + '</span>' +
         '</td>' +
         '<td style="padding:7px 12px;text-align:center;font-weight:700">' + esc(r.hora) + (r.manual ? ' <span title="' + esc(r.obs||'') + '" style="font-size:0.65rem;font-weight:600;background:var(--amber)18;color:var(--amber);border-radius:4px;padding:1px 5px">manual</span>' : '') + '</td>' +
-        '<td style="padding:7px 12px;text-align:center;color:var(--text2)">' + (r.horasTrabalhadas || '—') + '</td>' +
+        '<td style="padding:7px 12px;text-align:center;color:var(--text2)">' + (r.horasTrabalhadas || '--') + '</td>' +
       '</tr>';
       rowIdx++;
     });
@@ -3650,7 +3573,7 @@ function pontoCalcStats(colabIdx, mes, ano) {
     return parseInt(partes[1])-1 === mes && parseInt(partes[2]) === ano;
   });
 
-  // Dias com folga/feriado — não contam como falta
+  // Dias com folga/feriado -- não contam como falta
   var diasFolga = {};
   regs.forEach(function(r){ if (r.tipo === 'folga') diasFolga[r.data] = true; });
 
@@ -3814,9 +3737,9 @@ function pontoRegistrarEtapa(idx) {
   var statusEl = document.getElementById('ponto-status');
   if (statusEl) {
     statusEl.style.color = e.tipo === 'entrada' ? 'var(--green)' : 'var(--blue)';
-    statusEl.textContent = '✓ ' + e.label + ' registrada às ' + hora + (horasTrabalhadas ? ' — ' + horasTrabalhadas + ' trabalhadas' : '');
+    statusEl.textContent = 'v ' + e.label + ' registrada às ' + hora + (horasTrabalhadas ? ' -- ' + horasTrabalhadas + ' trabalhadas' : '');
     if (etapa === 3) {
-      // Jornada completa — volta automaticamente em 3s
+      // Jornada completa -- volta automaticamente em 3s
       setTimeout(function(){ pontoVoltar(); }, 3000);
     }
   }
@@ -3888,7 +3811,7 @@ function pontoBaixarPDF() {
       doc.setTextColor(255,255,255);
       doc.setFont('helvetica','bold');
       doc.setFontSize(13);
-      doc.text('COSTA NATURE LIFE — Relatório de Ponto', px, 14);
+      doc.text('COSTA NATURE LIFE -- Relatório de Ponto', px, 14);
       doc.setFontSize(8);
       doc.setFont('helvetica','normal');
       doc.text('Período: ' + mesLabel + '  |  Colaborador: ' + colabLabel, px, 19.5);
@@ -3954,7 +3877,7 @@ function pontoBaixarPDF() {
       if (y + rowH > maxY) {
         // Rodapé
         doc.setFontSize(7); doc.setTextColor(120,120,120);
-        doc.text('Costa Nature Life — Relatório de Ponto — ' + mesLabel, px, PH - 6);
+        doc.text('Costa Nature Life -- Relatório de Ponto -- ' + mesLabel, px, PH - 6);
         doc.addPage();
         pageNum++;
         cabecalho(pageNum);
@@ -3999,7 +3922,7 @@ function pontoBaixarPDF() {
       doc.setTextColor(0,0,0); doc.setFont('helvetica','bold'); doc.setFontSize(7.5);
       doc.text(r.hora, colX.hora + cols_w.hora/2, y + 4.8, { align:'center' });
       doc.setFont('helvetica','normal');
-      doc.text(r.horasTrabalhadas || '—', colX.trab + 2, y + 4.8);
+      doc.text(r.horasTrabalhadas || '--', colX.trab + 2, y + 4.8);
 
       y += rowH;
     });
@@ -4014,7 +3937,7 @@ function pontoBaixarPDF() {
     cabecalho(pageNum);
 
     doc.setFont('helvetica','bold'); doc.setFontSize(11);
-    doc.text('Resumo por Colaborador — ' + mesLabel, px, 32);
+    doc.text('Resumo por Colaborador -- ' + mesLabel, px, 32);
 
     var ry = 40;
     var nomes = Object.keys(resumoPorColab);
@@ -4063,7 +3986,7 @@ function pontoBaixarPDF() {
 
     // Rodapé última página
     doc.setFontSize(7); doc.setTextColor(120,120,120);
-    doc.text('Costa Nature Life — CNPJ 44.168.874/0001-28 — Relatório de Ponto — ' + mesLabel, px, PH - 6);
+    doc.text('Costa Nature Life -- CNPJ 44.168.874/0001-28 -- Relatório de Ponto -- ' + mesLabel, px, PH - 6);
 
     var nomeArq = 'ponto-' + mesLabel.replace(' ','-').toLowerCase() + (filtroColab!=='todos'?'-'+colabLabel.replace(/\s+/g,'-').toLowerCase():'') + '.pdf';
     doc.save(nomeArq);
@@ -4138,7 +4061,7 @@ function pontoAbrirModalManual(idx) {
   var ETAPAS = [
     { label: '▶ Entrada (08h)',       tipo: 'entrada', etapa: 0, labelEtapa: 'Entrada' },
     { label: '🍽 Saída Almoço (12h)', tipo: 'saida',   etapa: 1, labelEtapa: 'Saída para Almoço' },
-    { label: '↩ Volta Almoço (13h)', tipo: 'entrada', etapa: 2, labelEtapa: 'Volta do Almoço' },
+    { label: '<- Volta Almoço (13h)', tipo: 'entrada', etapa: 2, labelEtapa: 'Volta do Almoço' },
     { label: '■ Saída (17h)',          tipo: 'saida',   etapa: 3, labelEtapa: 'Saída' },
   ];
 
@@ -4156,7 +4079,7 @@ function pontoAbrirModalManual(idx) {
       '<div style="font-size:1.1rem;font-weight:700;margin-bottom:4px">⏱ Registro Manual</div>' +
       '<div style="font-size:0.82rem;color:var(--text3);margin-bottom:1.25rem">Colaborador: <strong>' + esc(c.nome) + '</strong></div>' +
 
-      // Tipo de registro — toggle entre Ponto e Feriado/Folga
+      // Tipo de registro -- toggle entre Ponto e Feriado/Folga
       '<div style="display:flex;gap:6px;margin-bottom:1.25rem">' +
         '<button id="pm-tipo-ponto" onclick="pontoManualTipoToggle(\'ponto\')" ' +
           'style="flex:1;padding:8px;border:2px solid var(--green);border-radius:8px;background:var(--green);color:#fff;font-weight:700;cursor:pointer;font-size:0.85rem">⏱ Ponto</button>' +
@@ -4193,7 +4116,7 @@ function pontoAbrirModalManual(idx) {
         '</div>' +
       '</div>' +
 
-      // Campo de motivo — aparece só no modo folga
+      // Campo de motivo -- aparece só no modo folga
       '<div id="pm-campos-folga" style="display:none;margin-bottom:1.25rem">' +
         '<label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:5px;font-weight:600">📋 Motivo</label>' +
         '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px">' +
@@ -4207,7 +4130,7 @@ function pontoAbrirModalManual(idx) {
             '<input type="radio" name="pm-motivo" value="Atestado" style="accent-color:var(--blue)"> <span>🏥 Atestado</span>' +
           '</label>' +
         '</div>' +
-        '<div style="padding:10px 12px;background:var(--bg3);border-radius:8px;font-size:0.78rem;color:var(--text2)">✓ Este dia <strong>não será contado como falta</strong> para o colaborador.</div>' +
+        '<div style="padding:10px 12px;background:var(--bg3);border-radius:8px;font-size:0.78rem;color:var(--text2)">v Este dia <strong>não será contado como falta</strong> para o colaborador.</div>' +
       '</div>' +
 
       '<div style="margin-bottom:1.25rem">' +
@@ -4218,7 +4141,7 @@ function pontoAbrirModalManual(idx) {
 
       '<div style="display:flex;gap:8px">' +
         '<button class="btn" style="flex:1" onclick="closeModal()">Cancelar</button>' +
-        '<button class="btn btn-green" style="flex:1" onclick="pontoSalvarManual(' + idx + ')">✓ Salvar</button>' +
+        '<button class="btn btn-green" style="flex:1" onclick="pontoSalvarManual(' + idx + ')">v Salvar</button>' +
       '</div>' +
       '<div id="pm-status" style="font-size:0.82rem;color:var(--red);text-align:center;margin-top:8px;min-height:1.2em"></div>' +
     '</div>';
@@ -4268,7 +4191,7 @@ function pontoManualAtualizarEtapas(idx) {
   if (n === 0) { aviso.textContent = ''; return; }
   var LABELS = ['Entrada','Saída Almoço','Volta Almoço','Saída'];
   var feitos = regsData.map(function(r,i){ return LABELS[i] || r.tipo; }).join(', ');
-  aviso.textContent = n >= 4 ? '⚠ Jornada completa neste dia.' : '⚠ Já registrado: ' + feitos + '. Próxima etapa disponível: ' + (LABELS[n]||'—');
+  aviso.textContent = n >= 4 ? '⚠ Jornada completa neste dia.' : '⚠ Já registrado: ' + feitos + '. Próxima etapa disponível: ' + (LABELS[n]||'--');
 }
 
 function pontoSalvarManual(idx) {
@@ -4303,7 +4226,7 @@ function pontoSalvarManual(idx) {
       nomeColab:  c.nome,
       cargo:      c.cargo || '',
       data:       data,
-      hora:       '—',
+      hora:       '--',
       tipo:       'folga',
       etapa:      -1,
       labelEtapa: motivo,
@@ -4453,7 +4376,7 @@ function renderEstoqueCards() {
       '<div style="position:relative">' +
         '<button onclick="estoqueToggleOrdem()" style="display:flex;align-items:center;gap:6px;padding:0.55rem 1rem;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text2);cursor:pointer;font-size:0.88rem;white-space:nowrap">' +
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="9" y2="18"/></svg>' +
-          'Ordenar' + (ordem !== 'nome' ? ' <span style="color:var(--green);font-weight:700">•</span>' : '') +
+          'Ordenar' + (ordem !== 'nome' ? ' <span style="color:var(--green);font-weight:700">*</span>' : '') +
         '</button>' +
         (ordemAberto ?
           '<div style="position:absolute;right:0;top:calc(100% + 6px);background:var(--card);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,0.22);z-index:999;min-width:210px;overflow:hidden">' +
@@ -4495,7 +4418,7 @@ function renderEstoqueCards() {
           (isAdmin() ?
             '<div style="display:flex;gap:4px;flex-shrink:0">' +
               '<button class="btn btn-sm" onclick="estoqueAbrirModalProduto(' + i + ')" title="Editar" style="padding:4px 7px">✏️</button>' +
-              '<button class="btn btn-sm btn-red" onclick="estoqueExcluirProduto(' + i + ')" title="Excluir" style="padding:4px 7px">✕</button>' +
+              '<button class="btn btn-sm btn-red" onclick="estoqueExcluirProduto(' + i + ')" title="Excluir" style="padding:4px 7px">x</button>' +
             '</div>'
           : '') +
         '</div>' +
@@ -4505,7 +4428,7 @@ function renderEstoqueCards() {
         '<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:10px">' +
           '<div>' +
             '<div style="font-size:2rem;font-weight:800;line-height:1;color:' + cor + '">' + p.qtd + '</div>' +
-            '<div style="font-size:0.7rem;color:var(--text3);margin-top:2px">em estoque' + (p.minimo ? ' · mín. ' + p.minimo : '') + '</div>' +
+            '<div style="font-size:0.7rem;color:var(--text3);margin-top:2px">em estoque' + (p.minimo ? ' . mín. ' + p.minimo : '') + '</div>' +
           '</div>' +
           '<div style="font-size:0.72rem;font-weight:600;color:' + cor + ';background:' + cor + '18;padding:3px 8px;border-radius:20px;white-space:nowrap">' + badge + '</div>' +
         '</div>' +
@@ -4553,7 +4476,7 @@ function renderEstoqueMovimentacao() {
         '</div>' +
       '</div>' +
       '<div style="margin-top:10px;display:flex;gap:8px;align-items:center">' +
-        '<button class="btn btn-green" onclick="estoqueRegistrarMov()">✓ Registrar</button>' +
+        '<button class="btn btn-green" onclick="estoqueRegistrarMov()">v Registrar</button>' +
         '<span id="est-mov-status" style="font-size:0.85rem;color:var(--text2)"></span>' +
       '</div>' +
     '</div>';
@@ -4588,9 +4511,9 @@ function renderEstoqueMovimentacao() {
           '</span>' +
         '</td>' +
         '<td style="padding:7px 10px;text-align:center;font-weight:700;color:' + (isEnt ? 'var(--green)' : 'var(--red)') + '">' + (isEnt ? '+' : '-') + m.qtd + '</td>' +
-        '<td style="padding:7px 10px;color:var(--text2)">' + (m.saldoApos !== undefined ? m.saldoApos : '—') + '</td>' +
-        '<td style="padding:7px 10px;color:var(--text3)">' + esc(m.usuario || '—') + '</td>' +
-        '<td style="padding:7px 10px;color:var(--text2)">' + esc(m.obs || '—') + '</td>' +
+        '<td style="padding:7px 10px;color:var(--text2)">' + (m.saldoApos !== undefined ? m.saldoApos : '--') + '</td>' +
+        '<td style="padding:7px 10px;color:var(--text3)">' + esc(m.usuario || '--') + '</td>' +
+        '<td style="padding:7px 10px;color:var(--text2)">' + esc(m.obs || '--') + '</td>' +
       '</tr>';
     });
     html += '</tbody></table></div>';
@@ -4672,13 +4595,13 @@ function estoqueRegistrarMov() {
     tipo: tipo,
     qtd: qtd,
     saldoApos: p.qtd,
-    usuario: state.currentUser ? state.currentUser.login : '—',
+    usuario: state.currentUser ? state.currentUser.login : '--',
     obs: obs,
   });
 
   addLog((tipo === 'entrada' ? 'Entrada' : 'Saída') + ' de estoque: ' + qtd + 'x ' + p.nome + ' (antes: ' + anterior + ' → agora: ' + p.qtd + ')');
   saveState();
-  if (status) { status.textContent = '✓ Registrado!'; setTimeout(function(){ status.textContent=''; }, 2000); }
+  if (status) { status.textContent = 'v Registrado!'; setTimeout(function(){ status.textContent=''; }, 2000); }
   navigate('estoque');
 }
 
@@ -4765,7 +4688,7 @@ function estoqueLimparHistorico() {
   navigate('estoque');
 }
 
-// --- VENDAS — MERCADO LIVRE ---------------------------------------------------
+// --- VENDAS -- MERCADO LIVRE ---------------------------------------------------
 const ML_CLIENT_ID     = '3307309227859868';
 const ML_CLIENT_SECRET = 'c2yBzHKBjJNFbM3JIlh6ppld3JgE5k5u';
 const ML_REDIRECT_URI  = 'https://edsonandradecf.github.io/plataforma-costa';
@@ -4824,7 +4747,7 @@ async function vendaCarregarCacheFirebase(chave) {
   return null;
 }
 
-// Restaura caches ao iniciar (localStorage — Firebase é carregado sob demanda)
+// Restaura caches ao iniciar (localStorage -- Firebase é carregado sob demanda)
 (function() {
   try {
     var ml = localStorage.getItem('costa_ml_cache');
@@ -5132,7 +5055,7 @@ function renderShopeeVendas(el, data) {
 
   var html =
     '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:1.25rem">' +
-      '<span style="font-size:0.85rem;color:var(--text3)">🧡 Shopee • Loja conectada</span>' +
+      '<span style="font-size:0.85rem;color:var(--text3)">🧡 Shopee * Loja conectada</span>' +
       '<div style="display:flex;gap:8px">' +
         '<button class="btn btn-sm" onclick="shopeeCarregarVendas(true)">🔄 Atualizar</button>' +
         '<button class="btn btn-sm btn-red" onclick="shopeeDesconectar()">Desconectar</button>' +
@@ -5153,7 +5076,7 @@ function renderShopeeVendas(el, data) {
     '</div>' +
 
     '<div class="card" style="padding:1.25rem;margin-bottom:1.25rem">' +
-      '<div style="font-weight:700;font-size:0.9rem;margin-bottom:1rem">📈 Pedidos por Dia — ' + mesNome + '</div>' +
+      '<div style="font-weight:700;font-size:0.9rem;margin-bottom:1rem">📈 Pedidos por Dia -- ' + mesNome + '</div>' +
       '<div style="position:relative;height:160px;display:flex;align-items:flex-end;gap:3px;padding-bottom:20px">';
 
   var maxDia = Math.max.apply(null, Object.values(pedidosPorDia).concat([1]));
@@ -5171,7 +5094,7 @@ function renderShopeeVendas(el, data) {
   html += '</div></div>' +
     (top5.length > 0 ?
       '<div class="card" style="padding:1.25rem">' +
-        '<div style="font-weight:700;font-size:0.9rem;margin-bottom:1rem">🏆 Top Produtos — ' + mesNome + '</div>' +
+        '<div style="font-weight:700;font-size:0.9rem;margin-bottom:1rem">🏆 Top Produtos -- ' + mesNome + '</div>' +
         top5.map(function(p, i) {
           var medalhas = ['🥇','🥈','🥉','4️⃣','5️⃣'];
           var pctBar = top5[0].qtd > 0 ? Math.round((p.qtd / top5[0].qtd) * 100) : 0;
@@ -5370,7 +5293,7 @@ function renderCombinado(el) {
 
     // Gráfico combinado
     '<div class="card" style="padding:1.25rem;margin-bottom:1.25rem">' +
-      '<div style="font-weight:700;font-size:0.9rem;margin-bottom:0.5rem">📈 Pedidos por Dia — ' + mesNome + '</div>' +
+      '<div style="font-weight:700;font-size:0.9rem;margin-bottom:0.5rem">📈 Pedidos por Dia -- ' + mesNome + '</div>' +
       '<div style="display:flex;gap:12px;margin-bottom:0.75rem;font-size:0.75rem">' +
         (mlOk ? '<span>' + dotML + 'ML</span>' : '') +
         (shopeeOk ? '<span>' + dotSh + 'Shopee</span>' : '') +
@@ -5518,7 +5441,7 @@ function mlDashHtml(result) {
   var totalPedidosMes = result.totalMonth;
   var totalVendidoMes = ordersMonth.reduce(function(s,o){ return s+(o.total_amount||0); }, 0);
 
-  // Monthly chart data — orders per day of month
+  // Monthly chart data -- orders per day of month
   var daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
   var chartData = new Array(daysInMonth).fill(0);
   var pedidosPorDia = {};
@@ -5553,7 +5476,7 @@ function mlDashHtml(result) {
   var topDia = Object.entries(dayProdMap).sort(function(a,b){ return b[1]-a[1]; }).slice(0,5);
 
   var html = '<div style="margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center">' +
-    '<span style="font-size:0.85rem;color:var(--text3)">Olá, <b>' + esc(me.nickname||me.first_name||'') + '</b> · Mercado Livre ✓</span>' +
+    '<span style="font-size:0.85rem;color:var(--text3)">Olá, <b>' + esc(me.nickname||me.first_name||'') + '</b> . Mercado Livre v</span>' +
     '<div style="display:flex;gap:8px">' +
       '<button class="btn btn-sm" onclick="mlAtualizar()">🔄 Atualizar</button>' +
       '<button class="btn btn-sm btn-red" onclick="mlDesconectar()">Desconectar</button>' +
@@ -5561,7 +5484,7 @@ function mlDashHtml(result) {
   '</div>' +
 
   // Day cards
-  '<div style="margin-bottom:0.5rem;font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Hoje — ' + now.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'}) + '</div>' +
+  '<div style="margin-bottom:0.5rem;font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Hoje -- ' + now.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'}) + '</div>' +
   '<div class="stats-grid" style="margin-bottom:1.25rem">' +
     '<div class="stat-card"><div class="stat-icon">🛍️</div><div class="stat-label">Pedidos Hoje</div><div class="stat-value">' + totalPedidosDia + '</div></div>' +
     '<div class="stat-card"><div class="stat-icon">💰</div><div class="stat-label">Faturado Hoje</div><div class="stat-value">R$ ' + totalVendidoDia.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '</div></div>' +
@@ -5577,7 +5500,7 @@ function mlDashHtml(result) {
 
   // Monthly chart
   '<div class="card" style="margin-bottom:1.25rem">' +
-    '<div class="card-header"><span class="card-title">📈 Pedidos por Dia — ' + monthName.charAt(0).toUpperCase()+monthName.slice(1) + '</span></div>' +
+    '<div class="card-header"><span class="card-title">📈 Pedidos por Dia -- ' + monthName.charAt(0).toUpperCase()+monthName.slice(1) + '</span></div>' +
     '<div style="display:flex;align-items:flex-end;gap:3px;height:100px;padding:8px 0">';
 
   chartData.forEach(function(val, idx) {
@@ -5703,8 +5626,8 @@ async function mlLoadInicio() {
       var noData = '<span style="color:var(--text3);font-size:0.8rem">Conecte o Mercado Livre em Vendas</span>';
       if (chartEl) chartEl.innerHTML = noData;
       if (rankEl)  rankEl.innerHTML  = noData;
-      if (diaEl)   diaEl.textContent = '—';
-      if (mesEl)   mesEl.textContent = '—';
+      if (diaEl)   diaEl.textContent = '--';
+      if (mesEl)   mesEl.textContent = '--';
       return;
     }
   }
@@ -5718,7 +5641,7 @@ async function mlLoadInicio() {
     // Counts
     if (diaEl) diaEl.textContent = result.totalDay;
 
-    // Shopee hoje — usa cache se disponível, senão tenta carregar
+    // Shopee hoje -- usa cache se disponível, senão tenta carregar
     var shopeeEl = document.getElementById('inicio-pedidos-shopee-dia');
     if (shopeeEl) {
       if (shopeeTokenValid()) {
@@ -5732,10 +5655,10 @@ async function mlLoadInicio() {
             if (el2) el2.textContent = data.pedidosHoje || 0;
             var mesEl2 = document.getElementById('inicio-pedidos-mes');
             if (mesEl2) mesEl2.textContent = result.totalMonth + (data.totalPedidos || 0);
-          }).catch(function(){ var el2 = document.getElementById('inicio-pedidos-shopee-dia'); if(el2) el2.textContent = '—'; });
+          }).catch(function(){ var el2 = document.getElementById('inicio-pedidos-shopee-dia'); if(el2) el2.textContent = '--'; });
         }
       } else {
-        shopeeEl.textContent = '—';
+        shopeeEl.textContent = '--';
         if (mesEl) mesEl.textContent = result.totalMonth;
       }
     } else {
@@ -5809,7 +5732,7 @@ async function mlLoadInicio() {
           // Today dot + label
           '<circle cx="' + tx + '" cy="' + ty + '" r="4" fill="var(--green)"/>' +
           '<text x="' + tx + '" y="' + (parseFloat(ty)-8) + '" fill="var(--green)" font-size="9" text-anchor="middle" font-weight="bold">' + chartData[todayIdx] + '</text>' +
-          // X labels — every day
+          // X labels -- every day
           xLabels +
         '</svg>';
     }

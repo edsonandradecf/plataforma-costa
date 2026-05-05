@@ -2387,31 +2387,6 @@ async function driveUpload(blob, nome, mimeType) {
 }
 
 function driveViewUrl(fileId) { return 'https://drive.google.com/file/d/' + fileId + '/view'; }
-  return new Promise(function(resolve, reject) {
-    var w = window.open(
-      'https://accounts.google.com/o/oauth2/v2/auth?' +
-      'client_id=' + DRIVE_CLIENT_ID +
-      '&redirect_uri=' + encodeURIComponent('https://edsonandradecf.github.io/plataforma-costa') +
-      '&response_type=token' +
-      '&scope=' + encodeURIComponent(DRIVE_SCOPE) +
-      '&prompt=consent',
-      'drive_auth', 'width=500,height=600'
-    );
-    var check = setInterval(function() {
-      try {
-        if (!w || w.closed) { clearInterval(check); reject(new Error('Janela fechada')); return; }
-        var hash = w.location.hash;
-        if (hash && hash.includes('access_token')) {
-          clearInterval(check);
-          var params = new URLSearchParams(hash.slice(1));
-          _driveToken = params.get('access_token');
-          w.close();
-          resolve(_driveToken);
-        }
-      } catch(e) {}
-    }, 500);
-  });
-}
 
 async function driveUpload(blob, nome, mimeType) {
   if (!_driveToken) await driveAutenticar();

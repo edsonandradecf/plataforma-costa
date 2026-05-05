@@ -354,13 +354,17 @@ function dataSize(d) {
   if (!d) return 0;
   var t = d.tasks || {};
   var est = d.estoque || {};
+  var pt = d.ponto || {};
   return (Array.isArray(t.expedicao)         ? t.expedicao.length         : 0) +
          (Array.isArray(t.producao)           ? t.producao.length          : 0) +
          (Array.isArray(d.compras)            ? d.compras.length           : 0) +
          (Array.isArray(d.mural)              ? d.mural.length             : 0) +
          (Array.isArray(d.agenda)             ? d.agenda.length            : 0) +
          (Array.isArray(d.tabnutri)           ? d.tabnutri.length          : 0) +
-         (Array.isArray(est.produtos)         ? est.produtos.length        : 0);
+         (Array.isArray(est.produtos)         ? est.produtos.length        : 0) +
+         (Array.isArray(d.devolucoes)         ? d.devolucoes.length        : 0) +
+         (Array.isArray(pt.colaboradores)     ? pt.colaboradores.length    : 0) +
+         (Array.isArray(pt.registros)         ? pt.registros.length        : 0);
 }
 
 function applyParsed(parsed, forceMerge) {
@@ -399,7 +403,9 @@ function applyParsed(parsed, forceMerge) {
     colaboradores: Array.isArray(pt.colaboradores) ? pt.colaboradores : [],
     registros:     Array.isArray(pt.registros)     ? pt.registros     : [],
   };
-  state.devolucoes = Array.isArray(parsed.devolucoes) ? parsed.devolucoes : [];
+  state.devolucoes = Array.isArray(parsed.devolucoes) && parsed.devolucoes.length > 0
+    ? parsed.devolucoes
+    : (Array.isArray(state.devolucoes) && state.devolucoes.length > 0 ? state.devolucoes : []);
   if (parsed.mlToken) {
     state.mlToken = parsed.mlToken;
     localStorage.setItem('ml_token', JSON.stringify(parsed.mlToken));

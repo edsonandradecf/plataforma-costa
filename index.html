@@ -2565,10 +2565,12 @@ function renderDevolucaoNovo() {
     '</div>' +
 
     // Resultado
-    '<div id="dev-pedido-encontrado" style="display:none;margin-top:1rem;padding:12px;background:var(--bg3);border-radius:8px;border-left:4px solid var(--green)">' +
-      '<div style="font-weight:700;margin-bottom:4px" id="dev-pedido-nome"></div>' +
-      '<div style="font-size:0.82rem;color:var(--text2)" id="dev-pedido-info"></div>' +
-      '<div style="font-size:0.82rem;color:var(--text3);margin-top:4px" id="dev-pedido-extra"></div>' +
+    '<div id="dev-pedido-encontrado" style="display:none;margin-top:1rem;padding:14px;background:var(--bg3);border-radius:10px;border-left:4px solid var(--green)">' +
+      '<div style="font-weight:700;margin-bottom:6px;font-size:0.95rem" id="dev-pedido-nome"></div>' +
+      '<div style="font-size:0.82rem;color:var(--text2);margin-bottom:4px" id="dev-pedido-info"></div>' +
+      '<div style="font-size:0.78rem;color:var(--text3);margin-bottom:10px" id="dev-pedido-extra"></div>' +
+      // Grid de detalhes
+      '<div id="dev-pedido-detalhes" style="display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:0.8rem;border-top:1px solid var(--border);padding-top:10px"></div>' +
     '</div>' +
 
     // Ou pular busca
@@ -2743,8 +2745,36 @@ async function devBuscarPedido() {
         if (nomeEl)  nomeEl.textContent  = resultado.nome;
         if (infoEl)  infoEl.textContent  = resultado.info;
         if (extraEl) extraEl.textContent = resultado.extra || '';
-        if (found)   found.style.display = 'block';
-        // Muda cor do card se for resultado manual
+
+        // Popula grid de detalhes
+        var detEl = document.getElementById('dev-pedido-detalhes');
+        if (detEl && resultado.detalhes) {
+          var d = resultado.detalhes;
+          var campos = [
+            ['👤 Comprador',    d.comprador],
+            ['📄 CPF/Doc',      d.cpf],
+            ['📞 Telefone',     d.telefone],
+            ['📧 Email',        d.email],
+            ['📦 Destinatário', d.destinatario],
+            ['📞 Tel. Entrega', d.telefDest],
+            ['🏠 Endereço',     d.endereco],
+            ['📮 CEP',          d.cep],
+            ['💰 Total',        d.total],
+            ['📅 Data',         d.data],
+            ['🔖 Status',       d.status],
+            ['🔢 Pedido(s)',     d.pedidos || '--'],
+          ];
+          detEl.innerHTML = campos.map(function(c) {
+            return '<div style="min-width:0">' +
+              '<div style="color:var(--text3);font-size:0.72rem;font-weight:600">' + c[0] + '</div>' +
+              '<div style="color:var(--text);word-break:break-word">' + esc(c[1] || '--') + '</div>' +
+            '</div>';
+          }).join('');
+        } else if (detEl) {
+          detEl.innerHTML = '';
+        }
+
+        if (found) found.style.display = 'block';
         if (resultado.manual) {
           found.style.borderLeftColor = 'var(--amber)';
           if (st) { st.textContent = '⚠ Pedido não encontrado via API. Confirme pelo link abaixo.'; st.style.color = 'var(--amber)'; }
@@ -2807,20 +2837,45 @@ async function devBuscarML(valor, tipo) {
           } catch(e2) {}
         }
         if (ordersDetails.length > 0) {
-          // Combina os itens de todos os pedidos do pack
           var allItems = [];
           ordersDetails.forEach(function(op) {
             (op.order_items || []).forEach(function(i) { if (i.item) allItems.push(i.item.title); });
           });
           var firstOrder = ordersDetails[0];
-          var buyer = firstOrder.buyer ? (firstOrder.buyer.nickname || firstOrder.buyer.full_name || '') : '';
-          var total = ordersDetails.reduce(function(s, op) { return s + (op.total_amount || 0); }, 0);
+          var buyer  = firstOrder.buyer || {};
+          var ship   = firstOrder.shipping || {};
+          var total  = ordersDetails.reduce(function(s, op) { return s + (op.total_amount || 0); }, 0);
+          var status = firstOrder.status || '--';
+          var dataPed = firstOrder.date_created ? new Date(firstOrder.date_created).toLocaleDateString('pt-BR') : '--';
+
           return {
-            id:    valor, // usa o ID do pack como identificador
+            id:    valor,
             nome:  allItems.join(', ') || 'Pack #' + valor,
-            info:  'Pack ML #' + valor + (buyer ? ' * Comprador: ' + buyer : '') + (total ? ' * R$ ' + total.toLocaleString('pt-BR',{minimumFractionDigits:2}) : ''),
-            extra: 'Pedidos no pack: ' + rPack.orders.map(function(o){return o.id;}).join(', '),
+            info:  'Pack ML #' + valor + ' * Comprador: ' + (buyer.nickname || buyer.full_name || '--') + ' * R$ ' + total.toLocaleString('pt-BR',{minimumFractionDigits:2}),
+            extra: 'Status: ' + status + ' * Data: ' + dataPed + ' * Pedidos no pack: ' + rPack.orders.map(function(o){return o.id;}).join(', '),
             link:  'https://www.mercadolivre.com.br/vendas/' + firstOrder.id,
+            detalhes: {
+              comprador:   buyer.nickname || buyer.full_name || '--',
+              compradorId: buyer.id || '--',
+              email:       buyer.email || '--',
+              telefone:    buyer.phone ? (buyer.phone.area_code || '') + ' ' + (buyer.phone.number || '') : '--',
+              cpf:         buyer.identification ? (buyer.identification.type || '') + ': ' + (buyer.identification.number || '--') : '--',
+              endereco:    ship.receiver_address ? [
+                ship.receiver_address.street_name || '',
+                ship.receiver_address.street_number || '',
+                ship.receiver_address.comment || '',
+                (ship.receiver_address.city || {}).name || '',
+                (ship.receiver_address.state || {}).name || '',
+                ship.receiver_address.zip_code || '',
+              ].filter(Boolean).join(', ') : '--',
+              cep:         ship.receiver_address ? ship.receiver_address.zip_code || '--' : '--',
+              destinatario:ship.receiver_address ? ship.receiver_address.receiver_name || '--' : '--',
+              telefDest:   ship.receiver_address ? ship.receiver_address.receiver_phone || '--' : '--',
+              total:       'R$ ' + total.toLocaleString('pt-BR',{minimumFractionDigits:2}),
+              status,
+              data:        dataPed,
+              pedidos:     rPack.orders.map(function(o){return o.id;}).join(', '),
+            },
           };
         }
       }
@@ -2892,15 +2947,40 @@ async function devBuscarML(valor, tipo) {
 }
 
 function devFormatarPedidoML(order) {
-  var items = (order.order_items || []).map(function(i){ return i.item ? i.item.title : ''; }).filter(Boolean).join(', ');
-  var buyer  = order.buyer ? (order.buyer.nickname || order.buyer.full_name || '') : '';
-  var total  = order.total_amount ? 'R$ ' + Number(order.total_amount).toLocaleString('pt-BR',{minimumFractionDigits:2}) : '';
+  var items  = (order.order_items || []).map(function(i){ return i.item ? i.item.title : ''; }).filter(Boolean).join(', ');
+  var buyer  = order.buyer || {};
+  var ship   = order.shipping || {};
+  var total  = order.total_amount || 0;
+  var status = order.status || '--';
+  var dataPed = order.date_created ? new Date(order.date_created).toLocaleDateString('pt-BR') : '--';
+
   return {
     id:    order.id,
     nome:  items || 'Pedido #' + order.id,
-    info:  'Pedido ML #' + order.id + (buyer ? ' * Comprador: ' + buyer : '') + (total ? ' * ' + total : ''),
-    extra: 'Status: ' + (order.status || '--') + ' * Data: ' + (order.date_created ? new Date(order.date_created).toLocaleDateString('pt-BR') : '--'),
+    info:  'Pedido ML #' + order.id + ' * Comprador: ' + (buyer.nickname || buyer.full_name || '--') + ' * R$ ' + Number(total).toLocaleString('pt-BR',{minimumFractionDigits:2}),
+    extra: 'Status: ' + status + ' * Data: ' + dataPed,
     link:  'https://www.mercadolivre.com.br/vendas/' + order.id,
+    detalhes: {
+      comprador:   buyer.nickname || buyer.full_name || '--',
+      compradorId: buyer.id || '--',
+      email:       buyer.email || '--',
+      telefone:    buyer.phone ? (buyer.phone.area_code || '') + ' ' + (buyer.phone.number || '') : '--',
+      cpf:         buyer.identification ? (buyer.identification.type || '') + ': ' + (buyer.identification.number || '--') : '--',
+      endereco:    ship.receiver_address ? [
+        ship.receiver_address.street_name || '',
+        ship.receiver_address.street_number || '',
+        ship.receiver_address.comment || '',
+        (ship.receiver_address.city || {}).name || '',
+        (ship.receiver_address.state || {}).name || '',
+        ship.receiver_address.zip_code || '',
+      ].filter(Boolean).join(', ') : '--',
+      cep:         ship.receiver_address ? ship.receiver_address.zip_code || '--' : '--',
+      destinatario:ship.receiver_address ? ship.receiver_address.receiver_name || '--' : '--',
+      telefDest:   ship.receiver_address ? ship.receiver_address.receiver_phone || '--' : '--',
+      total:       'R$ ' + Number(total).toLocaleString('pt-BR',{minimumFractionDigits:2}),
+      status,
+      data:        dataPed,
+    },
   };
 }
 

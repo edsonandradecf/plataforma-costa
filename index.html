@@ -2744,7 +2744,14 @@ async function devBuscarPedido() {
         if (infoEl)  infoEl.textContent  = resultado.info;
         if (extraEl) extraEl.textContent = resultado.extra || '';
         if (found)   found.style.display = 'block';
-        if (st) { st.textContent = '✅ Pedido encontrado!'; st.style.color = 'var(--green)'; }
+        // Muda cor do card se for resultado manual
+        if (resultado.manual) {
+          found.style.borderLeftColor = 'var(--amber)';
+          if (st) { st.textContent = '⚠ Pedido não encontrado via API. Confirme pelo link abaixo.'; st.style.color = 'var(--amber)'; }
+        } else {
+          found.style.borderLeftColor = 'var(--green)';
+          if (st) { st.textContent = '✅ Pedido encontrado!'; st.style.color = 'var(--green)'; }
+        }
       } else {
         if (st) { st.textContent = '⚠ Pedido não encontrado. Tente outro campo ou clique em "Registrar sem associar".'; st.style.color = 'var(--amber)'; }
       }
@@ -2831,14 +2838,18 @@ async function devBuscarML(valor, tipo) {
       }
     } catch(e) { console.log('DEBUG claims erro:', e.message); }
 
-    // Último recurso: busca nos últimos pedidos e filtra pelo ID
-    try {
-      var rAll = await mlGet('/orders/search?seller=' + sellerId + '&sort=date_desc&limit=50&offset=0');
-      if (rAll && rAll.results) {
-        var foundAll = rAll.results.find(function(o){ return String(o.id) === String(valor); });
-        if (foundAll) return devFormatarPedidoML(foundAll);
-      }
-    } catch(e) { console.log('DEBUG all orders erro:', e.message); }
+    // Se chegou aqui, não encontrou — cria um resultado manual com link direto
+    var linkDireto = _devMarketplace === 'ml'
+      ? 'https://www.mercadolivre.com.br/vendas/' + valor
+      : 'https://seller.shopee.com.br/portal/sale/all?keyword=' + valor;
+    return {
+      id:    valor,
+      nome:  'Pedido #' + valor,
+      info:  'Não foi possível buscar detalhes via API. Verifique o link abaixo.',
+      extra: '🔗 Clique em "Ver no Marketplace" para confirmar o pedido.',
+      link:  linkDireto,
+      manual: true,
+    };
   } else if (tipo === 'cliente') {
     var r3 = await mlGet('/orders/search?seller=' + sellerId + '&q=' + encodeURIComponent(valor) + '&sort=date_desc&limit=1');
     if (r3 && r3.results && r3.results[0]) return devFormatarPedidoML(r3.results[0]);

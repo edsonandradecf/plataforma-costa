@@ -2656,19 +2656,24 @@ function renderDevolucaoDetalhe(id) {
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 20px">' +
         [
           ['👤 Comprador',     det.comprador],
+          ['🏷 Nickname ML',   det.nickname],
           ['📄 CPF/Doc',       det.cpf],
           ['📞 Telefone',      det.telefone],
           ['📧 Email',         det.email],
           ['📦 Destinatário',  det.destinatario],
-          ['📞 Tel. Entrega',  det.telefDest],
           ['💰 Total',         det.total],
           ['📅 Data',          det.data],
           ['🔖 Status',        det.status],
-          ['🏠 Endereço',      det.endereco],
           ['📮 CEP',           det.cep],
+          ['🏙 Bairro',        det.bairro],
+          ['🏙 Cidade',        det.cidade],
+          ['🗺 Estado',        det.estado],
+          ['🏠 Endereço',      det.endereco],
+          ['🚚 Rastreio',      det.rastreio],
+          ['🧾 Nota Fiscal',   det.nf],
           ['🔢 Pedido(s)',     det.pedidos],
         ].filter(function(c){ return c[1] && c[1] !== '--'; }).map(function(c) {
-          var fullWidth = c[0].includes('Endereço') || c[0].includes('Pedido');
+          var fullWidth = c[0].includes('Endereço') || c[0].includes('Pedido') || c[0].includes('Rastreio');
           return '<div style="' + (fullWidth ? 'grid-column:1/-1;' : '') + 'min-width:0">' +
             '<div style="font-size:0.72rem;font-weight:600;color:var(--text3);margin-bottom:2px">' + c[0] + '</div>' +
             '<div style="font-size:0.85rem;color:var(--text);word-break:break-word">' + esc(c[1] || '--') + '</div>' +
@@ -2997,13 +3002,50 @@ async function devBuscarML(valor, tipo) {
   return null;
 }
 
-function devFormatarPedidoML(order) {
+async function devFormatarPedidoML(order) {
   var items  = (order.order_items || []).map(function(i){ return i.item ? i.item.title : ''; }).filter(Boolean).join(', ');
   var buyer  = order.buyer || {};
-  var ship   = order.shipping || {};
   var total  = order.total_amount || 0;
   var status = order.status || '--';
   var dataPed = order.date_created ? new Date(order.date_created).toLocaleDateString('pt-BR') : '--';
+
+  // Busca detalhes completos do envio (endereço, destinatário, rastreio)
+  var shipData = order.shipping || {};
+  var shipId   = shipData.id || (order.shipping && order.shipping.id);
+  if (shipId) {
+    try {
+      var fullShip = await mlGet('/shipments/' + shipId);
+      if (fullShip) shipData = fullShip;
+    } catch(e) {}
+  }
+
+  var recAddr  = shipData.receiver_address || {};
+  var tracking = shipData.tracking_number || shipData.tracking_method || '--';
+  var endParts = [
+    recAddr.street_name || '',
+    recAddr.street_number || '',
+    recAddr.comment || '',
+    recAddr.neighborhood || '',
+    (recAddr.city || {}).name || '',
+    (recAddr.state || {}).name || '',
+  ].filter(Boolean);
+
+  // Busca dados fiscais (CPF/NF)
+  var cpfStr = '--';
+  var nfStr  = '--';
+  try {
+    var fiscal = await mlGet('/orders/' + order.id + '/fiscal_data');
+    if (fiscal) {
+      var docBuyer = fiscal.doc_buyer || fiscal.buyer_doc || {};
+      cpfStr = (docBuyer.type || '') + ': ' + (docBuyer.number || '--');
+      if (fiscal.invoice_number) nfStr = 'NF-e #' + fiscal.invoice_number + '/' + (fiscal.invoice_series || '');
+    }
+  } catch(e) {
+    // CPF via buyer.identification se disponível
+    if (buyer.identification && buyer.identification.number) {
+      cpfStr = (buyer.identification.type || 'Doc') + ': ' + buyer.identification.number;
+    }
+  }
 
   return {
     id:    order.id,
@@ -3012,24 +3054,21 @@ function devFormatarPedidoML(order) {
     extra: 'Status: ' + status + ' * Data: ' + dataPed,
     link:  'https://www.mercadolivre.com.br/vendas/' + order.id,
     detalhes: {
-      comprador:   buyer.nickname || buyer.full_name || '--',
-      compradorId: buyer.id || '--',
+      comprador:   buyer.full_name || buyer.nickname || '--',
+      nickname:    buyer.nickname || '--',
+      cpf:         cpfStr,
       email:       buyer.email || '--',
-      telefone:    buyer.phone ? (buyer.phone.area_code || '') + ' ' + (buyer.phone.number || '') : '--',
-      cpf:         buyer.identification ? (buyer.identification.type || '') + ': ' + (buyer.identification.number || '--') : '--',
-      endereco:    ship.receiver_address ? [
-        ship.receiver_address.street_name || '',
-        ship.receiver_address.street_number || '',
-        ship.receiver_address.comment || '',
-        (ship.receiver_address.city || {}).name || '',
-        (ship.receiver_address.state || {}).name || '',
-        ship.receiver_address.zip_code || '',
-      ].filter(Boolean).join(', ') : '--',
-      cep:         ship.receiver_address ? ship.receiver_address.zip_code || '--' : '--',
-      destinatario:ship.receiver_address ? ship.receiver_address.receiver_name || '--' : '--',
-      telefDest:   ship.receiver_address ? ship.receiver_address.receiver_phone || '--' : '--',
+      telefone:    buyer.phone ? ((buyer.phone.area_code||'') + ' ' + (buyer.phone.number||'')).trim() : '--',
+      destinatario:recAddr.receiver_name || shipData.receiver_name || '--',
+      endereco:    endParts.join(', ') || '--',
+      cep:         recAddr.zip_code || '--',
+      bairro:      recAddr.neighborhood || '--',
+      cidade:      (recAddr.city || {}).name || '--',
+      estado:      (recAddr.state || {}).name || '--',
+      rastreio:    tracking,
+      nf:          nfStr,
       total:       'R$ ' + Number(total).toLocaleString('pt-BR',{minimumFractionDigits:2}),
-      status,
+      status:      status,
       data:        dataPed,
     },
   };

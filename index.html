@@ -2360,9 +2360,32 @@ async function driveAutenticar() {
   });
 }
 
-async function driveUpload(blob, nome, mimeType) {
+async function driveCreateFolder(nome, parentId) {
   if (!_driveToken) await driveAutenticar();
-  var meta = JSON.stringify({ name: nome, parents: [DRIVE_FOLDER_ID] });
+  var meta = JSON.stringify({
+    name: nome,
+    mimeType: 'application/vnd.google-apps.folder',
+    parents: [parentId || DRIVE_FOLDER_ID],
+  });
+  var resp = await fetch('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + _driveToken, 'Content-Type': 'application/json' },
+    body: meta,
+  });
+  if (!resp.ok) { var err = await resp.text(); throw new Error('Erro ao criar pasta (' + resp.status + '): ' + err.slice(0,100)); }
+  var data = await resp.json();
+  // Torna a pasta pública para leitura
+  await fetch('https://www.googleapis.com/drive/v3/files/' + data.id + '/permissions', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + _driveToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role: 'reader', type: 'anyone' }),
+  });
+  return data.id;
+}
+
+async function driveUpload(blob, nome, mimeType, folderId) {
+  if (!_driveToken) await driveAutenticar();
+  var meta = JSON.stringify({ name: nome, parents: [folderId || DRIVE_FOLDER_ID] });
   var form = new FormData();
   form.append('metadata', new Blob([meta], { type: 'application/json' }));
   form.append('file', blob, nome);
@@ -2374,7 +2397,7 @@ async function driveUpload(blob, nome, mimeType) {
   if (resp.status === 401) {
     localStorage.removeItem('drive_token'); _driveToken = null;
     await driveAutenticar();
-    return driveUpload(blob, nome, mimeType);
+    return driveUpload(blob, nome, mimeType, folderId);
   }
   if (!resp.ok) { var err = await resp.text(); throw new Error('Drive upload falhou (' + resp.status + '): ' + err.slice(0,100)); }
   var data = await resp.json();
@@ -2952,11 +2975,17 @@ async function devSalvarNovo() {
   if (_devMediaFiles.length > 0) {
     try {
       if (!_driveToken) await driveAutenticar();
+
+      // Cria pasta com o número do pedido
+      var nomePasta = codigo.trim() + ' - ' + new Date().toLocaleDateString('pt-BR').replace(/\//g,'-');
+      if (st) st.textContent = '⏳ Criando pasta no Drive...';
+      driveFolderId = await driveCreateFolder(nomePasta, DRIVE_FOLDER_ID);
+
       for (var i = 0; i < _devMediaFiles.length; i++) {
         var m = _devMediaFiles[i];
         if (st) st.textContent = '⏳ Enviando ' + (m.tipo==='foto'?'foto':'vídeo') + ' ' + (i+1) + '/' + _devMediaFiles.length + '...';
         var mimeType = m.tipo === 'foto' ? 'image/jpeg' : 'video/webm';
-        var driveId = await driveUpload(m.blob, m.nome, mimeType);
+        var driveId = await driveUpload(m.blob, m.nome, mimeType, driveFolderId);
         midias.push({ tipo: m.tipo, nome: m.nome, driveId });
       }
     } catch(e) {

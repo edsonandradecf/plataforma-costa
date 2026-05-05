@@ -2793,13 +2793,36 @@ async function devBuscarML(valor, tipo) {
       if (r && r.id) return devFormatarPedidoML(r);
     } catch(e) { console.log('DEBUG /orders/ erro:', e.message); }
 
-    // Tenta /packs (alguns pedidos estão em packs)
+    // Tenta /packs (alguns pedidos estão agrupados em packs)
     try {
       var rPack = await mlGet('/packs/' + valor);
       console.log('DEBUG /packs/:', JSON.stringify(rPack).slice(0,200));
-      if (rPack && rPack.orders && rPack.orders[0]) {
-        var orderP = await mlGet('/orders/' + rPack.orders[0].id);
-        if (orderP && orderP.id) return devFormatarPedidoML(orderP);
+      if (rPack && rPack.orders && rPack.orders.length > 0) {
+        // Busca detalhes do primeiro pedido dentro do pack
+        var ordersDetails = [];
+        for (var oi = 0; oi < rPack.orders.length; oi++) {
+          try {
+            var orderP = await mlGet('/orders/' + rPack.orders[oi].id);
+            if (orderP && orderP.id) ordersDetails.push(orderP);
+          } catch(e2) {}
+        }
+        if (ordersDetails.length > 0) {
+          // Combina os itens de todos os pedidos do pack
+          var allItems = [];
+          ordersDetails.forEach(function(op) {
+            (op.order_items || []).forEach(function(i) { if (i.item) allItems.push(i.item.title); });
+          });
+          var firstOrder = ordersDetails[0];
+          var buyer = firstOrder.buyer ? (firstOrder.buyer.nickname || firstOrder.buyer.full_name || '') : '';
+          var total = ordersDetails.reduce(function(s, op) { return s + (op.total_amount || 0); }, 0);
+          return {
+            id:    valor, // usa o ID do pack como identificador
+            nome:  allItems.join(', ') || 'Pack #' + valor,
+            info:  'Pack ML #' + valor + (buyer ? ' * Comprador: ' + buyer : '') + (total ? ' * R$ ' + total.toLocaleString('pt-BR',{minimumFractionDigits:2}) : ''),
+            extra: 'Pedidos no pack: ' + rPack.orders.map(function(o){return o.id;}).join(', '),
+            link:  'https://www.mercadolivre.com.br/vendas/' + firstOrder.id,
+          };
+        }
       }
     } catch(e) { console.log('DEBUG /packs/ erro:', e.message); }
     try {

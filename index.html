@@ -269,7 +269,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
     <label class="login-remember">
       <input type="checkbox" id="login-remember"> Manter login salvo
     </label>
-    <button class="btn-primary" type="button" onclick="doLogin()">Entrar</button>
+    <button class="btn-primary" onclick="doLogin()">Entrar</button>
     <div class="login-error" id="login-error"></div>
   </div>
 </div>
@@ -326,6 +326,7 @@ let state = {
   tabnutri: [],
   estoque: { produtos: [], movimentacoes: [] },
   ponto: { colaboradores: [], registros: [] },
+  devolucoes: [],
   mlToken: null,
   shopeeToken: null,
   currentUser: null,
@@ -398,6 +399,7 @@ function applyParsed(parsed, forceMerge) {
     colaboradores: Array.isArray(pt.colaboradores) ? pt.colaboradores : [],
     registros:     Array.isArray(pt.registros)     ? pt.registros     : [],
   };
+  state.devolucoes = Array.isArray(parsed.devolucoes) ? parsed.devolucoes : [];
   if (parsed.mlToken) {
     state.mlToken = parsed.mlToken;
     localStorage.setItem('ml_token', JSON.stringify(parsed.mlToken));
@@ -531,16 +533,17 @@ function stopSync() {
 // ── Salvar dados no Firebase ──────────────────────────────────────────────
 function saveState() {
   const data = {
-    tasks:    state.tasks,
-    compras:  state.compras,
-    mural:    state.mural,
-    agenda:   state.agenda,
-    logs:     state.logs,
-    tabnutri: state.tabnutri,
-    estoque:  state.estoque,
-    ponto:    state.ponto,
-    mlToken:      state.mlToken || null,
-    shopeeToken:  state.shopeeToken || null,
+    tasks:       state.tasks,
+    compras:     state.compras,
+    mural:       state.mural,
+    agenda:      state.agenda,
+    logs:        state.logs,
+    tabnutri:    state.tabnutri,
+    estoque:     state.estoque,
+    ponto:       state.ponto,
+    devolucoes:  state.devolucoes,
+    mlToken:     state.mlToken     || null,
+    shopeeToken: state.shopeeToken || null,
   };
   localStorage.setItem('costa_state', JSON.stringify(data));
   if (_saveTimer) clearTimeout(_saveTimer);
@@ -670,16 +673,6 @@ function toggleTheme() {
   });
 })();
 
-function togglePassVis() {
-  const inp = document.getElementById('login-pass');
-  const btn = document.getElementById('pass-eye-btn');
-  const isHidden = inp.type === 'password';
-  inp.type = isHidden ? 'text' : 'password';
-  btn.querySelector('svg').innerHTML = isHidden
-    ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>'
-    : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
-}
-
 // Try saved login
 (function checkSavedLogin() {
   try {
@@ -737,21 +730,32 @@ function togglePassVis() {
   }
 })();
 
+function togglePassVis() {
+  const inp = document.getElementById('login-pass');
+  const btn = document.getElementById('pass-eye-btn');
+  const isHidden = inp.type === 'password';
+  inp.type = isHidden ? 'text' : 'password';
+  btn.querySelector('svg').innerHTML = isHidden
+    ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/>'
+    : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+}
+
 // ─── NAVIGATION ────────────────────────────────────────────────────────────────
 function getPagesAdmin() {
   return [
-    { id: 'inicio',    label: 'Início',               icon: iconHome() },
-    { id: 'expedicao', label: 'Expedição',             icon: iconTruck() },
-    { id: 'producao',  label: 'Produção',              icon: iconFactory() },
-    { id: 'compras',   label: 'Compras',               icon: iconCart() },
-    { id: 'estoque',   label: 'Estoque',               icon: iconEstoque() },
-    { id: 'ponto',     label: 'Ponto Virtual',         icon: iconPonto() },
-    { id: 'mural',     label: 'Mural',                 icon: iconMural() },
-    { id: 'etiquetas', label: 'Gerador de Etiquetas',  icon: iconLabel() },
-    { id: 'agenda',    label: 'Agenda',                icon: iconCal() },
-    { id: 'tabnutri',  label: 'Tabela Nutricional',    icon: iconTabNutri() },
-    { id: 'vendas',    label: 'Vendas',                icon: iconVendas() },
-    { id: 'logs',      label: 'Logs',                  icon: iconLog() },
+    { id: 'inicio',     label: 'Início',               icon: iconHome() },
+    { id: 'expedicao',  label: 'Expedição',             icon: iconTruck() },
+    { id: 'producao',   label: 'Produção',              icon: iconFactory() },
+    { id: 'compras',    label: 'Compras',               icon: iconCart() },
+    { id: 'estoque',    label: 'Estoque',               icon: iconEstoque() },
+    { id: 'devolucao',  label: 'Devolução',             icon: iconDevolucao() },
+    { id: 'ponto',      label: 'Ponto Virtual',         icon: iconPonto() },
+    { id: 'mural',      label: 'Mural',                 icon: iconMural() },
+    { id: 'etiquetas',  label: 'Gerador de Etiquetas',  icon: iconLabel() },
+    { id: 'agenda',     label: 'Agenda',                icon: iconCal() },
+    { id: 'tabnutri',   label: 'Tabela Nutricional',    icon: iconTabNutri() },
+    { id: 'vendas',     label: 'Vendas',                icon: iconVendas() },
+    { id: 'logs',       label: 'Logs',                  icon: iconLog() },
   ];
 }
 function getPagesLimited() {
@@ -826,7 +830,7 @@ function startApp() {
 
 function renderPage() {
   if (!state.currentUser) return;
-  var titles = { inicio:'Início', expedicao:'Expedição', producao:'Produção', compras:'Compras', estoque:'Estoque', ponto:'Ponto Virtual', mural:'Mural', etiquetas:'Gerador de Etiquetas', agenda:'Agenda', tabnutri:'Tabela Nutricional', vendas:'Vendas', logs:'Logs' };
+  var titles = { inicio:'Início', expedicao:'Expedição', producao:'Produção', compras:'Compras', estoque:'Estoque', devolucao:'Devolução', ponto:'Ponto Virtual', mural:'Mural', etiquetas:'Gerador de Etiquetas', agenda:'Agenda', tabnutri:'Tabela Nutricional', vendas:'Vendas', logs:'Logs' };
   var titleEl = document.getElementById('page-title');
   if (titleEl) titleEl.textContent = titles[state.currentPage] || '';
   var c = document.getElementById('page-content');
@@ -841,6 +845,7 @@ function renderPage() {
   if (pg === 'agenda')    { c.innerHTML = renderAgenda(); return; }
   if (pg === 'tabnutri')  { c.innerHTML = renderTabNutri(); setupTabNutri(); return; }
   if (pg === 'estoque')   { c.innerHTML = renderEstoque(); setupEstoque(); return; }
+  if (pg === 'devolucao') { c.innerHTML = renderDevolucao(); setupDevolucao(); return; }
   if (pg === 'ponto')     { c.innerHTML = renderPonto(); return; }
   if (pg === 'vendas')    { c.innerHTML = renderVendas(); bindVendas(); return; }
   if (pg === 'logs')      { c.innerHTML = renderLogs(); return; }
@@ -2301,6 +2306,522 @@ function tnGeneratePDF(qtdEtiquetas) {
 }
 
 
+// ─── DEVOLUÇÃO ────────────────────────────────────────────────────────────────
+
+const DRIVE_CLIENT_ID     = '392251148360-q2krd1inocunl9b48pablbotm5r17tli.apps.googleusercontent.com';
+const DRIVE_FOLDER_ID     = '17XWzZ-_2NGjWUrMA2U_nVFokRt374QBn';
+const DRIVE_SCOPE         = 'https://www.googleapis.com/auth/drive.file';
+
+var _devTab        = 'lista';   // 'lista' | 'novo'
+var _devSel        = null;      // id da devolução selecionada
+var _devOrdem      = 'data';    // 'data' | 'status'
+var _devFiltroStatus = 'todos';
+var _driveToken    = null;
+var _webcamStream  = null;
+var _devMediaFiles = [];        // [{tipo:'foto'|'video', blob, nome, driveId}]
+
+// ── Drive OAuth ───────────────────────────────────────────────────────────────
+async function driveAutenticar() {
+  return new Promise(function(resolve, reject) {
+    var w = window.open(
+      'https://accounts.google.com/o/oauth2/v2/auth?' +
+      'client_id=' + DRIVE_CLIENT_ID +
+      '&redirect_uri=' + encodeURIComponent('https://edsonandradecf.github.io/plataforma-costa') +
+      '&response_type=token' +
+      '&scope=' + encodeURIComponent(DRIVE_SCOPE) +
+      '&prompt=consent',
+      'drive_auth', 'width=500,height=600'
+    );
+    var check = setInterval(function() {
+      try {
+        if (!w || w.closed) { clearInterval(check); reject(new Error('Janela fechada')); return; }
+        var hash = w.location.hash;
+        if (hash && hash.includes('access_token')) {
+          clearInterval(check);
+          var params = new URLSearchParams(hash.slice(1));
+          _driveToken = params.get('access_token');
+          w.close();
+          resolve(_driveToken);
+        }
+      } catch(e) {}
+    }, 500);
+  });
+}
+
+async function driveUpload(blob, nome, mimeType) {
+  if (!_driveToken) await driveAutenticar();
+  var meta = JSON.stringify({ name: nome, parents: [DRIVE_FOLDER_ID] });
+  var form = new FormData();
+  form.append('metadata', new Blob([meta], { type: 'application/json' }));
+  form.append('file', blob, nome);
+  var resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + _driveToken },
+    body: form,
+  });
+  if (!resp.ok) throw new Error('Drive upload falhou: ' + resp.status);
+  var data = await resp.json();
+  // Torna público para leitura
+  await fetch('https://www.googleapis.com/drive/v3/files/' + data.id + '/permissions', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + _driveToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role: 'reader', type: 'anyone' }),
+  });
+  return data.id;
+}
+
+function driveViewUrl(fileId) {
+  return 'https://drive.google.com/file/d/' + fileId + '/view';
+}
+
+// ── Render principal ──────────────────────────────────────────────────────────
+function renderDevolucao() {
+  if (_devSel) return renderDevolucaoDetalhe(_devSel);
+  if (_devTab === 'novo') return renderDevolucaoNovo();
+  return renderDevolucaoLista();
+}
+
+function setupDevolucao() {
+  if (_devTab === 'novo') setupWebcam();
+}
+
+// ── LISTA ─────────────────────────────────────────────────────────────────────
+function renderDevolucaoLista() {
+  var devs = state.devolucoes.slice();
+  var STATUS_COR   = { aguardando:'var(--amber)', aprovado:'var(--green)', reprovado:'var(--red)', recusa:'#7c3aed' };
+  var STATUS_LABEL = { aguardando:'⏳ Aguardando', aprovado:'✅ Aprovado', reprovado:'❌ Reprovado', recusa:'⚠ Recusa' };
+
+  // Filtro status
+  if (_devFiltroStatus !== 'todos') devs = devs.filter(function(d){ return d.status === _devFiltroStatus; });
+
+  // Ordenação
+  if (_devOrdem === 'status') {
+    var ordem = ['aguardando','reprovado','recusa','aprovado'];
+    devs.sort(function(a,b){ return ordem.indexOf(a.status) - ordem.indexOf(b.status); });
+  } else {
+    devs.sort(function(a,b){ return (b.criadoEm||0) - (a.criadoEm||0); });
+  }
+
+  var html =
+    '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:1.25rem">' +
+      '<button class="btn btn-green" onclick="devSetTab(\'novo\')">+ Nova Devolução</button>' +
+      '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+        ['todos','aguardando','aprovado','reprovado','recusa'].map(function(s) {
+          var ativo = _devFiltroStatus === s;
+          var cor = s === 'todos' ? 'var(--text2)' : (STATUS_COR[s] || 'var(--text2)');
+          return '<button onclick="devSetFiltro(\'' + s + '\')" style="padding:4px 12px;border:1px solid ' + (ativo ? cor : 'var(--border)') + ';border-radius:20px;background:' + (ativo ? cor + '18' : 'transparent') + ';color:' + (ativo ? cor : 'var(--text2)') + ';cursor:pointer;font-size:0.78rem;font-weight:' + (ativo?'700':'400') + '">' +
+            (s === 'todos' ? 'Todos' : STATUS_LABEL[s]) +
+          '</button>';
+        }).join('') +
+      '</div>' +
+      '<div style="margin-left:auto;display:flex;gap:6px">' +
+        '<button onclick="devSetOrdem(\'data\')" style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:' + (_devOrdem==='data'?'var(--green)':'var(--bg2)') + ';color:' + (_devOrdem==='data'?'#fff':'var(--text2)') + ';cursor:pointer;font-size:0.78rem">📅 Data</button>' +
+        '<button onclick="devSetOrdem(\'status\')" style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:' + (_devOrdem==='status'?'var(--green)':'var(--bg2)') + ';color:' + (_devOrdem==='status'?'#fff':'var(--text2)') + ';cursor:pointer;font-size:0.78rem">🔖 Status</button>' +
+      '</div>' +
+    '</div>';
+
+  if (!devs.length) {
+    return html + '<div class="empty-state">' + iconEmpty() + '<p>' + (_devFiltroStatus !== 'todos' ? 'Nenhuma devolução com status "' + STATUS_LABEL[_devFiltroStatus] + '".' : 'Nenhuma devolução registrada ainda.') + '</p></div>';
+  }
+
+  html += '<div style="display:flex;flex-direction:column;gap:10px">';
+  devs.forEach(function(d) {
+    var cor   = STATUS_COR[d.status]   || 'var(--text3)';
+    var label = STATUS_LABEL[d.status] || d.status;
+    var plat  = d.marketplace === 'shopee' ? '🧡 Shopee' : '🛒 ML';
+    var dt    = d.criadoEm ? new Date(d.criadoEm).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '—';
+    html +=
+      '<div onclick="devAbrirDetalhe(\'' + d.id + '\')" class="card" style="padding:1rem;cursor:pointer;display:flex;align-items:center;gap:14px;transition:box-shadow 0.15s" onmouseover="this.style.boxShadow=\'0 4px 16px rgba(0,0,0,0.12)\'" onmouseout="this.style.boxShadow=\'\'">' +
+        // Badge status
+        '<div style="width:10px;height:10px;border-radius:50%;background:' + cor + ';flex-shrink:0"></div>' +
+        // Info principal
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-weight:700;font-size:0.95rem">' + esc(d.codigoEtiqueta || '—') + '</div>' +
+          '<div style="font-size:0.78rem;color:var(--text3);margin-top:2px">' + plat + ' • ' + esc(d.nomeProduto || 'Produto não identificado') + '</div>' +
+        '</div>' +
+        // Status + data
+        '<div style="text-align:right;flex-shrink:0">' +
+          '<div style="font-size:0.78rem;font-weight:700;color:' + cor + '">' + label + '</div>' +
+          '<div style="font-size:0.72rem;color:var(--text3);margin-top:2px">' + dt + '</div>' +
+        '</div>' +
+        // Operador
+        '<div style="font-size:0.75rem;color:var(--text3);flex-shrink:0;min-width:60px;text-align:right">' + esc(d.operador || '') + '</div>' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;color:var(--text3);flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>' +
+      '</div>';
+  });
+  html += '</div>';
+  return html;
+}
+
+// ── NOVO PROCESSO ─────────────────────────────────────────────────────────────
+function renderDevolucaoNovo() {
+  return '<button onclick="devSetTab(\'lista\')" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--text2);cursor:pointer;font-size:0.88rem;margin-bottom:1.25rem;padding:0">' +
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="15 18 9 12 15 6"/></svg> Voltar' +
+  '</button>' +
+
+  '<div style="max-width:600px">' +
+
+  // Etapa 1 — Câmera
+  '<div class="card" style="padding:1.25rem;margin-bottom:1rem">' +
+    '<div style="font-weight:700;font-size:0.95rem;margin-bottom:1rem">📷 Etapa 1 — Registro de Mídia</div>' +
+
+    // Preview webcam
+    '<div style="position:relative;background:#000;border-radius:10px;overflow:hidden;margin-bottom:10px;aspect-ratio:4/3;max-height:300px">' +
+      '<video id="dev-webcam" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover"></video>' +
+      '<div id="dev-no-cam" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:0.9rem">📷 Inicializando câmera...</div>' +
+    '</div>' +
+
+    // Botões câmera
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">' +
+      '<button onclick="devTirarFoto()" class="btn btn-green" style="display:flex;align-items:center;gap:6px">📸 Tirar Foto</button>' +
+      '<button id="dev-btn-video" onclick="devToggleVideo()" class="btn" style="display:flex;align-items:center;gap:6px">🎥 Gravar Vídeo</button>' +
+    '</div>' +
+
+    // Miniaturas
+    '<div id="dev-midias" style="display:flex;flex-wrap:wrap;gap:8px"></div>' +
+    '<div id="dev-upload-status" style="font-size:0.8rem;color:var(--text3);margin-top:6px"></div>' +
+  '</div>' +
+
+  // Etapa 2 — Marketplace e código
+  '<div class="card" style="padding:1.25rem;margin-bottom:1rem">' +
+    '<div style="font-weight:700;font-size:0.95rem;margin-bottom:1rem">🏷 Etapa 2 — Identificação do Pedido</div>' +
+    '<div style="margin-bottom:12px">' +
+      '<label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:5px;font-weight:600">Marketplace</label>' +
+      '<div style="display:flex;gap:8px">' +
+        '<button id="dev-btn-ml" onclick="devSetMarket(\'ml\')" style="flex:1;padding:10px;border:2px solid var(--green);border-radius:8px;background:var(--green);color:#fff;font-weight:700;cursor:pointer">🛒 Mercado Livre</button>' +
+        '<button id="dev-btn-sh" onclick="devSetMarket(\'shopee\')" style="flex:1;padding:10px;border:2px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text2);font-weight:600;cursor:pointer">🧡 Shopee</button>' +
+      '</div>' +
+    '</div>' +
+    '<div>' +
+      '<label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:5px;font-weight:600">Código da Etiqueta / Pedido</label>' +
+      '<div style="display:flex;gap:8px">' +
+        '<input id="dev-codigo" type="text" class="tn-input" placeholder="Leia o código de barras ou digite manualmente" style="flex:1;margin:0" onkeydown="if(event.key===\'Enter\') devBuscarPedido()">' +
+        '<button onclick="devBuscarPedido()" class="btn btn-green">🔍 Buscar</button>' +
+      '</div>' +
+      '<div id="dev-busca-status" style="font-size:0.82rem;margin-top:6px;min-height:1.2em"></div>' +
+    '</div>' +
+    // Resultado da busca
+    '<div id="dev-pedido-encontrado" style="display:none;margin-top:1rem;padding:12px;background:var(--bg3);border-radius:8px;border-left:4px solid var(--green)">' +
+      '<div style="font-weight:700;margin-bottom:4px" id="dev-pedido-nome"></div>' +
+      '<div style="font-size:0.82rem;color:var(--text2)" id="dev-pedido-info"></div>' +
+    '</div>' +
+  '</div>' +
+
+  // Etapa 3 — Salvar
+  '<div class="card" style="padding:1.25rem">' +
+    '<div style="font-weight:700;font-size:0.95rem;margin-bottom:1rem">✅ Etapa 3 — Registrar</div>' +
+    '<div style="margin-bottom:12px">' +
+      '<label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:5px;font-weight:600">Observações iniciais</label>' +
+      '<textarea id="dev-obs-inicial" rows="2" style="width:100%;padding:0.65rem 0.9rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.88rem;resize:vertical" placeholder="Descreva o estado do produto, embalagem, etc."></textarea>' +
+    '</div>' +
+    '<button onclick="devSalvarNovo()" class="btn btn-green" style="width:100%;padding:0.85rem;font-size:1rem">💾 Registrar Devolução</button>' +
+    '<div id="dev-salvar-status" style="font-size:0.85rem;text-align:center;margin-top:8px;min-height:1.2em"></div>' +
+  '</div>' +
+
+  '</div>'; // max-width
+}
+
+// ── DETALHE ───────────────────────────────────────────────────────────────────
+function renderDevolucaoDetalhe(id) {
+  var d = state.devolucoes.find(function(x){ return x.id === id; });
+  if (!d) { _devSel = null; return renderDevolucaoLista(); }
+
+  var STATUS_COR   = { aguardando:'var(--amber)', aprovado:'var(--green)', reprovado:'var(--red)', recusa:'#7c3aed' };
+  var STATUS_LABEL = { aguardando:'⏳ Aguardando', aprovado:'✅ Aprovado', reprovado:'❌ Reprovado', recusa:'⚠ Recusa' };
+  var cor   = STATUS_COR[d.status]   || 'var(--text3)';
+  var label = STATUS_LABEL[d.status] || d.status;
+  var dt    = d.criadoEm ? new Date(d.criadoEm).toLocaleString('pt-BR') : '—';
+
+  return '<button onclick="devFecharDetalhe()" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--text2);cursor:pointer;font-size:0.88rem;margin-bottom:1.25rem;padding:0">' +
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="15 18 9 12 15 6"/></svg> Voltar' +
+  '</button>' +
+
+  '<div style="max-width:600px">' +
+
+  // Header
+  '<div class="card" style="padding:1.25rem;margin-bottom:1rem">' +
+    '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:1rem">' +
+      '<div>' +
+        '<div style="font-size:1.2rem;font-weight:800">' + esc(d.codigoEtiqueta || '—') + '</div>' +
+        '<div style="font-size:0.82rem;color:var(--text3);margin-top:2px">' + (d.marketplace === 'shopee' ? '🧡 Shopee' : '🛒 Mercado Livre') + ' • ' + dt + ' • ' + esc(d.operador || '') + '</div>' +
+      '</div>' +
+      '<span style="padding:4px 12px;border-radius:20px;font-size:0.82rem;font-weight:700;background:' + cor + '18;color:' + cor + ';white-space:nowrap">' + label + '</span>' +
+    '</div>' +
+
+    // Info do pedido
+    (d.nomeProduto ? '<div style="padding:10px 14px;background:var(--bg3);border-radius:8px;margin-bottom:1rem">' +
+      '<div style="font-weight:700;margin-bottom:2px">' + esc(d.nomeProduto) + '</div>' +
+      '<div style="font-size:0.82rem;color:var(--text2)">' + esc(d.infoPedido || '') + '</div>' +
+    '</div>' : '') +
+
+    // Botões de ação
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+      (d.linkMarketplace ? '<a href="' + esc(d.linkMarketplace) + '" target="_blank" class="btn btn-sm" style="text-decoration:none">🔗 Ver no Marketplace</a>' : '') +
+      (d.driveFolderId ? '<a href="https://drive.google.com/drive/folders/' + esc(d.driveFolderId) + '" target="_blank" class="btn btn-sm" style="text-decoration:none">📁 Ver no Drive</a>' : '') +
+    '</div>' +
+  '</div>' +
+
+  // Mídias
+  (d.midias && d.midias.length > 0 ?
+    '<div class="card" style="padding:1.25rem;margin-bottom:1rem">' +
+      '<div style="font-weight:700;font-size:0.9rem;margin-bottom:10px">📎 Mídias</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:8px">' +
+        d.midias.map(function(m) {
+          var icon = m.tipo === 'video' ? '🎥' : '📸';
+          return '<a href="' + esc(driveViewUrl(m.driveId)) + '" target="_blank" style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg3);border-radius:6px;text-decoration:none;color:var(--text);font-size:0.82rem">' + icon + ' ' + esc(m.nome) + '</a>';
+        }).join('') +
+      '</div>' +
+    '</div>'
+  : '') +
+
+  // Status + observações
+  '<div class="card" style="padding:1.25rem;margin-bottom:1rem">' +
+    '<div style="font-weight:700;font-size:0.9rem;margin-bottom:1rem">📋 Status da Devolução</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem">' +
+      ['aprovado','reprovado','recusa','aguardando'].map(function(s) {
+        var c2 = STATUS_COR[s]; var ativo = d.status === s;
+        return '<button onclick="devMudarStatus(\'' + id + '\',\'' + s + '\')" style="flex:1;min-width:100px;padding:8px;border:2px solid ' + (ativo ? c2 : 'var(--border)') + ';border-radius:8px;background:' + (ativo ? c2 + '18' : 'transparent') + ';color:' + (ativo ? c2 : 'var(--text2)') + ';font-weight:' + (ativo?'700':'400') + ';cursor:pointer;font-size:0.82rem">' + STATUS_LABEL[s] + '</button>';
+      }).join('') +
+    '</div>' +
+
+    '<label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:5px;font-weight:600">Observações</label>' +
+    '<textarea id="dev-obs-edit" rows="3" style="width:100%;padding:0.65rem 0.9rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.88rem;resize:vertical;margin-bottom:10px">' + esc(d.obs || '') + '</textarea>' +
+    '<button onclick="devSalvarObs(\'' + id + '\')" class="btn btn-green">💾 Salvar Observações</button>' +
+    '<div id="dev-obs-status" style="font-size:0.82rem;margin-top:6px;min-height:1.2em"></div>' +
+  '</div>' +
+
+  '</div>'; // max-width
+}
+
+// ── SETUP WEBCAM ──────────────────────────────────────────────────────────────
+var _devGravando = false;
+var _devRecorder = null;
+var _devMarketplace = 'ml';
+var _devPedidoEncontrado = null;
+
+function setupWebcam() {
+  _devMediaFiles = [];
+  _devGravando   = false;
+  _devPedidoEncontrado = null;
+  navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then(function(stream) {
+    _webcamStream = stream;
+    var video = document.getElementById('dev-webcam');
+    var noCAm  = document.getElementById('dev-no-cam');
+    if (video) { video.srcObject = stream; }
+    if (noCAm) noCAm.style.display = 'none';
+  }).catch(function(e) {
+    var noCAm = document.getElementById('dev-no-cam');
+    if (noCAm) noCAm.textContent = '⚠ Câmera não disponível: ' + e.message;
+  });
+}
+
+function devTirarFoto() {
+  var video = document.getElementById('dev-webcam');
+  if (!video || !_webcamStream) { alert('Câmera não disponível'); return; }
+  var canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth || 640;
+  canvas.height = video.videoHeight || 480;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  canvas.toBlob(function(blob) {
+    var nome = 'foto_' + Date.now() + '.jpg';
+    _devMediaFiles.push({ tipo:'foto', blob, nome, driveId: null });
+    devRenderMidias();
+  }, 'image/jpeg', 0.9);
+}
+
+function devToggleVideo() {
+  var btn = document.getElementById('dev-btn-video');
+  if (!_devGravando) {
+    if (!_webcamStream) { alert('Câmera não disponível'); return; }
+    var chunks = [];
+    _devRecorder = new MediaRecorder(_webcamStream);
+    _devRecorder.ondataavailable = function(e){ if(e.data.size > 0) chunks.push(e.data); };
+    _devRecorder.onstop = function() {
+      var blob = new Blob(chunks, { type: 'video/webm' });
+      var nome = 'video_' + Date.now() + '.webm';
+      _devMediaFiles.push({ tipo:'video', blob, nome, driveId: null });
+      devRenderMidias();
+    };
+    _devRecorder.start();
+    _devGravando = true;
+    if (btn) { btn.textContent = '⏹ Parar Gravação'; btn.style.background = 'var(--red)'; btn.style.color = '#fff'; btn.style.border = '2px solid var(--red)'; }
+  } else {
+    _devRecorder.stop();
+    _devGravando = false;
+    if (btn) { btn.textContent = '🎥 Gravar Vídeo'; btn.style.background = ''; btn.style.color = ''; btn.style.border = ''; }
+  }
+}
+
+function devRenderMidias() {
+  var el = document.getElementById('dev-midias');
+  if (!el) return;
+  el.innerHTML = _devMediaFiles.map(function(m, i) {
+    var icon = m.tipo === 'video' ? '🎥' : '📸';
+    var url  = URL.createObjectURL(m.blob);
+    return '<div style="position:relative">' +
+      (m.tipo === 'foto' ?
+        '<img src="' + url + '" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:2px solid var(--border)">' :
+        '<video src="' + url + '" style="width:80px;height:80px;object-fit:cover;border-radius:6px;border:2px solid var(--border)" controls muted></video>') +
+      '<div style="position:absolute;top:2px;left:2px;font-size:0.65rem;background:rgba(0,0,0,0.6);color:#fff;padding:1px 4px;border-radius:4px">' + icon + '</div>' +
+      '<button onclick="devRemoverMidia(' + i + ')" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:var(--red);border:none;color:#fff;cursor:pointer;font-size:0.7rem;display:flex;align-items:center;justify-content:center">✕</button>' +
+    '</div>';
+  }).join('');
+}
+
+function devRemoverMidia(i) {
+  _devMediaFiles.splice(i, 1);
+  devRenderMidias();
+}
+
+function devSetMarket(m) {
+  _devMarketplace = m;
+  var ml = document.getElementById('dev-btn-ml');
+  var sh = document.getElementById('dev-btn-sh');
+  if (ml) { ml.style.background = m==='ml'?'var(--green)':'var(--bg2)'; ml.style.color = m==='ml'?'#fff':'var(--text2)'; ml.style.borderColor = m==='ml'?'var(--green)':'var(--border)'; }
+  if (sh) { sh.style.background = m==='shopee'?'#f4630a':'var(--bg2)'; sh.style.color = m==='shopee'?'#fff':'var(--text2)'; sh.style.borderColor = m==='shopee'?'#f4630a':'var(--border)'; }
+}
+
+async function devBuscarPedido() {
+  var codigo = (document.getElementById('dev-codigo')||{}).value || '';
+  codigo = codigo.trim();
+  if (!codigo) return;
+  var st = document.getElementById('dev-busca-status');
+  var found = document.getElementById('dev-pedido-encontrado');
+  if (st) st.textContent = '🔍 Buscando...'; if (st) st.style.color = 'var(--text3)';
+  if (found) found.style.display = 'none';
+  _devPedidoEncontrado = null;
+
+  try {
+    if (_devMarketplace === 'ml') {
+      if (!mlTokenValid()) throw new Error('Mercado Livre não conectado');
+      var resp = await fetch(ML_PROXY + '?url=' + encodeURIComponent('https://api.mercadolibre.com/orders/' + codigo));
+      var data = await resp.json();
+      if (data.id) {
+        _devPedidoEncontrado = { id: data.id, nome: (data.order_items||[]).map(function(i){ return i.item.title; }).join(', '), info: 'Pedido #' + data.id + ' • ' + (data.status||''), link: 'https://www.mercadolivre.com.br/vendas/' + data.id };
+      } else {
+        // Tenta buscar pelo número da etiqueta
+        var resp2 = await fetch(ML_PROXY + '?url=' + encodeURIComponent('https://api.mercadolibre.com/shipments/search?tracking_number=' + codigo));
+        var data2 = await resp2.json();
+        if (data2.results && data2.results[0]) {
+          var ship = data2.results[0];
+          _devPedidoEncontrado = { id: ship.order_id, nome: 'Envio #' + ship.id, info: 'Rastreio: ' + codigo, link: 'https://www.mercadolivre.com.br/vendas/' + ship.order_id };
+        }
+      }
+    } else {
+      if (!shopeeTokenValid()) throw new Error('Shopee não conectada');
+      var det = await shopeeGet('/api/v2/order/get_order_detail', { order_sn_list: codigo, response_optional_fields: 'item_list' });
+      var orders = det.response && det.response.order_list;
+      if (orders && orders[0]) {
+        var o = orders[0];
+        _devPedidoEncontrado = { id: o.order_sn, nome: (o.item_list||[]).map(function(i){ return i.item_name; }).join(', ') || codigo, info: 'Pedido Shopee #' + o.order_sn, link: 'https://seller.shopee.com.br/portal/sale/all?keyword=' + o.order_sn };
+      }
+    }
+
+    if (_devPedidoEncontrado) {
+      if (st) { st.textContent = '✅ Pedido encontrado!'; st.style.color = 'var(--green)'; }
+      var nome = document.getElementById('dev-pedido-nome');
+      var info = document.getElementById('dev-pedido-info');
+      if (nome) nome.textContent = _devPedidoEncontrado.nome;
+      if (info) info.textContent = _devPedidoEncontrado.info;
+      if (found) found.style.display = 'block';
+    } else {
+      if (st) { st.textContent = '⚠ Pedido não encontrado — você pode continuar assim mesmo.'; st.style.color = 'var(--amber)'; }
+      _devPedidoEncontrado = { id: codigo, nome: codigo, info: 'Identificado manualmente', link: null };
+    }
+  } catch(e) {
+    if (st) { st.textContent = '⚠ ' + e.message + ' — continuando sem busca.'; st.style.color = 'var(--amber)'; }
+    _devPedidoEncontrado = { id: codigo, nome: codigo, info: 'Identificado manualmente', link: null };
+  }
+}
+
+async function devSalvarNovo() {
+  var codigo = (document.getElementById('dev-codigo')||{}).value || '';
+  var obs    = (document.getElementById('dev-obs-inicial')||{}).value || '';
+  var st     = document.getElementById('dev-salvar-status');
+
+  if (!codigo.trim()) { if(st){ st.textContent='⚠ Informe o código da etiqueta.'; st.style.color='var(--red)'; } return; }
+  if (st) { st.textContent = '⏳ Fazendo upload das mídias...'; st.style.color = 'var(--text3)'; }
+
+  // Upload das mídias para o Drive
+  var midias = [];
+  var driveFolderId = DRIVE_FOLDER_ID;
+
+  if (_devMediaFiles.length > 0) {
+    try {
+      if (!_driveToken) await driveAutenticar();
+      for (var i = 0; i < _devMediaFiles.length; i++) {
+        var m = _devMediaFiles[i];
+        if (st) st.textContent = '⏳ Enviando ' + (m.tipo==='foto'?'foto':'vídeo') + ' ' + (i+1) + '/' + _devMediaFiles.length + '...';
+        var mimeType = m.tipo === 'foto' ? 'image/jpeg' : 'video/webm';
+        var driveId = await driveUpload(m.blob, m.nome, mimeType);
+        midias.push({ tipo: m.tipo, nome: m.nome, driveId });
+      }
+    } catch(e) {
+      if (st) { st.textContent = '⚠ Erro no upload: ' + e.message; st.style.color = 'var(--amber)'; }
+    }
+  }
+
+  // Salva no Firebase
+  var dev = {
+    id:             'dev_' + Date.now(),
+    criadoEm:       Date.now(),
+    operador:       state.currentUser ? state.currentUser.login : '—',
+    marketplace:    _devMarketplace,
+    codigoEtiqueta: codigo.trim(),
+    nomeProduto:    _devPedidoEncontrado ? _devPedidoEncontrado.nome : codigo.trim(),
+    infoPedido:     _devPedidoEncontrado ? _devPedidoEncontrado.info : '',
+    linkMarketplace:_devPedidoEncontrado ? _devPedidoEncontrado.link : null,
+    status:         'aguardando',
+    obs:            obs,
+    midias:         midias,
+    driveFolderId:  driveFolderId,
+  };
+
+  state.devolucoes.unshift(dev);
+  addLog('Nova devolução registrada: ' + codigo.trim() + ' (' + _devMarketplace + ')');
+  saveState();
+
+  // Para webcam
+  if (_webcamStream) { _webcamStream.getTracks().forEach(function(t){ t.stop(); }); _webcamStream = null; }
+
+  if (st) { st.textContent = '✅ Devolução registrada com sucesso!'; st.style.color = 'var(--green)'; }
+  setTimeout(function() { _devTab = 'lista'; navigate('devolucao'); }, 1200);
+}
+
+// ── AÇÕES ─────────────────────────────────────────────────────────────────────
+function devSetTab(tab) {
+  if (_webcamStream && tab !== 'novo') {
+    _webcamStream.getTracks().forEach(function(t){ t.stop(); });
+    _webcamStream = null;
+  }
+  _devTab = tab;
+  navigate('devolucao');
+}
+
+function devSetOrdem(o)       { _devOrdem = o; navigate('devolucao'); }
+function devSetFiltro(s)      { _devFiltroStatus = s; navigate('devolucao'); }
+function devAbrirDetalhe(id)  { _devSel = id; navigate('devolucao'); }
+function devFecharDetalhe()   { _devSel = null; navigate('devolucao'); }
+
+function devMudarStatus(id, status) {
+  var d = state.devolucoes.find(function(x){ return x.id === id; });
+  if (!d) return;
+  d.status = status;
+  addLog('Status de devolução alterado: ' + d.codigoEtiqueta + ' → ' + status);
+  saveState();
+  navigate('devolucao');
+}
+
+function devSalvarObs(id) {
+  var d   = state.devolucoes.find(function(x){ return x.id === id; });
+  var obs = (document.getElementById('dev-obs-edit')||{}).value || '';
+  var st  = document.getElementById('dev-obs-status');
+  if (!d) return;
+  d.obs = obs;
+  saveState();
+  if (st) { st.textContent = '✅ Observações salvas!'; st.style.color = 'var(--green)'; setTimeout(function(){ st.textContent=''; }, 2000); }
+}
+
 // ─── PONTO VIRTUAL ────────────────────────────────────────────────────────────
 
 var _pontoTab        = 'cards';
@@ -2569,11 +3090,6 @@ function pontoStatCard(icon, label, valor) {
 
 // ── VISÃO ADMIN ───────────────────────────────────────────────────────────────
 function renderPontoAdmin() {
-  // Se um colaborador foi selecionado, abre a tela de detalhes dele
-  if (_pontoColabSel !== null && state.ponto.colaboradores[_pontoColabSel]) {
-    return renderPontoColabAberto(_pontoColabSel);
-  }
-
   var isCards = _pontoTab === 'cards';
   var tabBar =
     '<div style="display:flex;border-bottom:2px solid var(--border);margin-bottom:1.5rem">' +
@@ -2954,8 +3470,6 @@ function pontoAdminExcluirRegistro(regId) {
   if (el) el.innerHTML = renderPontoColabAberto(_pontoColabSel);
   pontoIniciarRelogio();
 }
-
-function pontoRegistrarEtapa(idx) {
   if (!_pontoSenhaOk) return;
   var c = state.ponto.colaboradores[idx];
   if (!c) return;
@@ -3025,7 +3539,6 @@ function pontoRegistrarEtapa(idx) {
 
 function pontoAdminSetTab(tab) {
   _pontoTab = tab;
-  _pontoColabSel = null; // Volta para a lista ao trocar de aba
   if (tab === 'historico' && !_pontoHistMes) _pontoHistMes = pontoMesAnoAtual();
   navigate('ponto');
 }
@@ -5083,6 +5596,7 @@ function closeModalOutside(e) { if(e.target.id === 'modal') closeModal(); }
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 function esc(str) { return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+function iconDevolucao() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>`; }
 function iconPonto() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`; }
 function iconEstoque() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>`; }
 function iconHome() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`; }

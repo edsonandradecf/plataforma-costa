@@ -2646,6 +2646,7 @@ function renderDevolucaoDetalhe(id) {
       (linkML ? '<a href="' + esc(linkML) + '" target="_blank" class="btn btn-sm" style="text-decoration:none">🔗 Ver no Marketplace</a>' : '') +
       (d.driveFolderId && d.driveFolderId !== '17XWzZ-_2NGjWUrMA2U_nVFokRt374QBn' ?
         '<a href="https://drive.google.com/drive/folders/' + esc(d.driveFolderId) + '" target="_blank" class="btn btn-sm" style="text-decoration:none">📁 Ver no Drive</a>' : '') +
+      '<button onclick="devExcluirDevolucao(\'' + id + '\')" class="btn btn-sm btn-red" style="margin-left:auto">🗑 Excluir</button>' +
     '</div>' +
   '</div>' +
 
@@ -3286,6 +3287,17 @@ function devSetOrdem(o)       { _devOrdem = o; navigate('devolucao'); }
 function devSetFiltro(s)      { _devFiltroStatus = s; navigate('devolucao'); }
 function devAbrirDetalhe(id)  { _devSel = id; navigate('devolucao'); }
 function devFecharDetalhe()   { _devSel = null; navigate('devolucao'); }
+
+function devExcluirDevolucao(id) {
+  var d = state.devolucoes.find(function(x){ return x.id === id; });
+  if (!d) return;
+  if (!confirm('Excluir a devolução do pedido "' + (d.codigoEtiqueta || d.id) + '"?\n\nEsta ação não pode ser desfeita.')) return;
+  state.devolucoes = state.devolucoes.filter(function(x){ return x.id !== id; });
+  addLog('Devolução excluída: ' + (d.codigoEtiqueta || d.id));
+  saveState();
+  _devSel = null;
+  navigate('devolucao');
+}
 
 function devMudarStatus(id, status) {
   var d = state.devolucoes.find(function(x){ return x.id === id; });

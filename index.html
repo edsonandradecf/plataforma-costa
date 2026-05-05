@@ -2977,7 +2977,8 @@ async function devSalvarNovo() {
       if (!_driveToken) await driveAutenticar();
 
       // Cria pasta com o número do pedido
-      var nomePasta = codigo.trim() + ' - ' + new Date().toLocaleDateString('pt-BR').replace(/\//g,'-');
+      var numPedido = _devPedidoEncontrado ? (_devPedidoEncontrado.id || codigo.trim()) : codigo.trim();
+      var nomePasta = numPedido + ' - ' + new Date().toLocaleDateString('pt-BR').replace(/\//g,'-');
       if (st) st.textContent = '⏳ Criando pasta no Drive...';
       driveFolderId = await driveCreateFolder(nomePasta, DRIVE_FOLDER_ID);
 

@@ -309,7 +309,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 </div>
 
 <script>
-// ─── DATA STORE ───────────────────────────────────────────────────────────────
+// --- DATA STORE ---------------------------------------------------------------
 const USERS = [
   { login: 'Edson', senha: '@Edanco_10', role: 'admin' },
   { login: 'Julia', senha: 'juliaRS2', role: 'admin' },
@@ -335,7 +335,7 @@ let state = {
   calYear: new Date().getFullYear(),
 };
 
-// ─── FIREBASE REALTIME DATABASE CONFIG ──────────────────────────────────────
+// --- FIREBASE REALTIME DATABASE CONFIG --------------------------------------
 const FIREBASE_URL = 'https://plataforma-costa-default-rtdb.firebaseio.com';
 
 let _saveTimer = null;
@@ -410,7 +410,7 @@ function applyParsed(parsed, forceMerge) {
   }
 }
 
-// ── Carrega dados do Firebase uma vez (no login) ──────────────────────────
+// -- Carrega dados do Firebase uma vez (no login) --------------------------
 async function loadState() {
   // 1. Cache local instantâneo para não piscar
   try {
@@ -448,7 +448,7 @@ async function loadState() {
   }
 }
 
-// ── Listener em tempo real via SSE do Firebase ────────────────────────────
+// -- Listener em tempo real via SSE do Firebase ----------------------------
 // O Firebase Realtime Database suporta Server-Sent Events nativamente.
 // Quando qualquer usuário salva, todos os outros recebem o dado novo em ~1s
 // sem precisar recarregar a página.
@@ -499,7 +499,7 @@ function startRealtimeSync() {
   }
 }
 
-// ── Fallback: polling a cada 8s se SSE não funcionar ─────────────────────
+// -- Fallback: polling a cada 8s se SSE não funcionar ---------------------
 let _pollTimer = null;
 function startPolling() {
   if (_pollTimer) return;
@@ -530,7 +530,7 @@ function stopSync() {
   if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
 }
 
-// ── Salvar dados no Firebase ──────────────────────────────────────────────
+// -- Salvar dados no Firebase ----------------------------------------------
 function saveState() {
   const data = {
     tasks:       state.tasks,
@@ -604,7 +604,7 @@ function addLog(action) {
   }));
 }
 
-// ─── AUTH ──────────────────────────────────────────────────────────────────────
+// --- AUTH ----------------------------------------------------------------------
 function doLogin() {
   const u = document.getElementById('login-user').value.trim();
   const p = document.getElementById('login-pass').value;
@@ -651,7 +651,7 @@ function doLogout() {
 document.getElementById('login-user').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('login-pass').focus(); });
 document.getElementById('login-pass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
 
-// ─── THEME ─────────────────────────────────────────────────────────────────────
+// --- THEME ---------------------------------------------------------------------
 function toggleTheme() {
   const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
   const t = isDark ? 'light' : 'dark';
@@ -741,7 +741,7 @@ function togglePassVis() {
 })();
 
 
-// ─── NAVIGATION ────────────────────────────────────────────────────────────────
+// --- NAVIGATION ----------------------------------------------------------------
 function getPagesAdmin() {
   return [
     { id: 'inicio',     label: 'Início',               icon: iconHome() },
@@ -876,7 +876,7 @@ function safeRenderPage() {
   renderPage();
 }
 
-// ─── INICIO ────────────────────────────────────────────────────────────────────
+// --- INICIO --------------------------------------------------------------------
 function renderInicio() {
   const today = new Date();
   today.setHours(0,0,0,0);
@@ -998,7 +998,7 @@ function renderInicio() {
 }
 
 
-// ─── TASKS ─────────────────────────────────────────────────────────────────────
+// --- TASKS ---------------------------------------------------------------------
 function renderTasks(area) {
   if (!state.currentUser) return '';
   const isAdmin = state.currentUser.role === 'admin';
@@ -1107,7 +1107,7 @@ function deleteTask(area, i) {
   bindTasks(area);
 }
 
-// ─── COMPRAS ──────────────────────────────────────────────────────────────────
+// --- COMPRAS ------------------------------------------------------------------
 function renderCompras() {
   let html = `<div class="card">
     <div class="add-task-form mb-2">
@@ -1164,7 +1164,7 @@ function deleteCompra(i) {
   bindCompras();
 }
 
-// ─── MURAL ────────────────────────────────────────────────────────────────────
+// --- MURAL --------------------------------------------------------------------
 function renderMural() {
   let html = `<div class="card mb-2">
     <div class="add-task-form">
@@ -1216,7 +1216,7 @@ function deleteMural(i) {
   bindMural();
 }
 
-// ─── ETIQUETAS ────────────────────────────────────────────────────────────────
+// --- ETIQUETAS ----------------------------------------------------------------
 function etqSetTab(tab) {
   _etqTab = tab;
   navigate('etiquetas');
@@ -1268,7 +1268,7 @@ function renderEtiquetas() {
   </div>`;
   }
 
-  // ── ETIQUETA TRANSPORTADORA ──────────────────────────────────────────
+  // -- ETIQUETA TRANSPORTADORA ------------------------------------------
   return tabBar +
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;max-width:960px">' +
       '<div class="card">' +
@@ -1568,7 +1568,7 @@ async function gerarEtiqueta() {
   }
 }
 
-// ─── AGENDA ──────────────────────────────────────────────────────────────────
+// --- AGENDA ------------------------------------------------------------------
 function renderAgenda() {
   const months = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   const days = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
@@ -1698,7 +1698,7 @@ function deleteEvento(id) {
   document.getElementById('page-content').innerHTML = renderAgenda();
 }
 
-// ─── TABELA NUTRICIONAL ───────────────────────────────────────────────────────
+// --- TABELA NUTRICIONAL -------------------------------------------------------
 var _tnEdit = null; // id do item sendo editado
 
 function tnDefaultForm() {
@@ -1726,14 +1726,14 @@ function renderTabNutri() {
   var tab = (typeof _tnTab !== 'undefined') ? _tnTab : 'biblioteca';
   var tabBib = tab === 'biblioteca';
 
-  // ── Tab bar ──
+  // -- Tab bar --
   var tabBar = '<div style="display:flex;gap:0;margin-bottom:1.5rem;border-bottom:2px solid var(--border)">' +
     '<button onclick="tnSetTab(\'biblioteca\')" style="padding:0.65rem 1.5rem;background:none;border:none;border-bottom:' + (tabBib ? '3px solid var(--green);color:var(--green);font-weight:600' : 'none;color:var(--text2)') + ';cursor:pointer;font-size:0.95rem;margin-bottom:-2px;transition:all 0.15s">📚 Biblioteca</button>' +
     '<button onclick="tnSetTab(\'criar\')" style="padding:0.65rem 1.5rem;background:none;border:none;border-bottom:' + (!tabBib ? '3px solid var(--green);color:var(--green);font-weight:600' : 'none;color:var(--text2)') + ';cursor:pointer;font-size:0.95rem;margin-bottom:-2px;transition:all 0.15s">' + (_tnEdit !== null ? '✏️ Editando' : '➕ Criar Tabela') + '</button>' +
   '</div>';
 
   if (tabBib) {
-    // ── BIBLIOTECA ──
+    // -- BIBLIOTECA --
     var searchVal = (typeof _tnSearch !== 'undefined') ? _tnSearch.toLowerCase() : '';
     var saved = state.tabnutri;
     var filtered = saved.map(function(item, i){ return { item: item, i: i }; })
@@ -1775,7 +1775,7 @@ function renderTabNutri() {
     return tabBar + savedHtml;
   }
 
-  // ── CRIAR / EDITAR ──
+  // -- CRIAR / EDITAR --
   var formTitle = _tnEdit !== null ? ('Editando: ' + (state.tabnutri[_tnEdit] ? state.tabnutri[_tnEdit].nome : '')) : 'Nova Tabela Nutricional';
 
   var formHtml =
@@ -2125,14 +2125,14 @@ function tnGeneratePDF(qtdEtiquetas) {
     var bcH = qrSize * 0.6;
 
     function desenharPagina(doc, numEtiqueta, totalEtiquetas) {
-      // ── Contagem no canto superior esquerdo ───────────────
+      // -- Contagem no canto superior esquerdo ---------------
       if (totalEtiquetas > 1) {
         doc.setFontSize(5.5); doc.setFont('helvetica','normal'); doc.setTextColor(130,130,130);
         doc.text(numEtiqueta + '/' + totalEtiquetas, px, py - 0.5);
         doc.setTextColor(0,0,0);
       }
 
-      // ── Nome do produto ───────────────────────────────────
+      // -- Nome do produto -----------------------------------
       doc.setFontSize(12); doc.setFont('helvetica','bold');
       doc.text(d.nome || 'Produto', W/2, py+5, { align:'center' });
       if (d.descricao) { doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.text(d.descricao, W/2, py+10, { align:'center' }); }
@@ -2140,7 +2140,7 @@ function tnGeneratePDF(qtdEtiquetas) {
       var y = py + 13;
       var tabelaTop = y;
 
-      // ── Header preto ──────────────────────────────────────
+      // -- Header preto --------------------------------------
       doc.setFillColor(0,0,0); doc.rect(px, y, lw, 6, 'F');
       doc.setTextColor(255,255,255); doc.setFontSize(9.5); doc.setFont('helvetica','bold');
       doc.text('INFORMAÇÃO NUTRICIONAL', px+2, y+4.2);
@@ -2153,7 +2153,7 @@ function tnGeneratePDF(qtdEtiquetas) {
       doc.text('Porção: ' + (d.porcao||'—'), px+1, y+3.2);
       y += 5;
 
-      // ── Header de colunas (BRANCO — sem fill) ─────────────
+      // -- Header de colunas (BRANCO — sem fill) -------------
       doc.setLineWidth(0.5); doc.setDrawColor(0,0,0);
       doc.line(px, y, px+lw, y);                   // linha grossa acima
       doc.setFont('helvetica','bold'); doc.setFontSize(6.5);
@@ -2164,7 +2164,7 @@ function tnGeneratePDF(qtdEtiquetas) {
       doc.setLineWidth(0.2);
       y += 5;
 
-      // ── Linhas nutricionais ───────────────────────────────
+      // -- Linhas nutricionais -------------------------------
       function nutriRow(label, v100, vPorc, vd, bold, grosso, indent) {
         var rowH = 4.5;
         doc.setFontSize(7);
@@ -2195,14 +2195,14 @@ function tnGeneratePDF(qtdEtiquetas) {
       // Borda ao redor da tabela
       doc.setLineWidth(0.5); doc.rect(px, tabelaTop, lw, y - tabelaTop); doc.setLineWidth(0.2);
 
-      // ── Nota %VD ─────────────────────────────────────────
+      // -- Nota %VD -----------------------------------------
       y += 2;
       doc.setFontSize(5.8); doc.setFont('helvetica','normal');
       var vdNote = '*% Valores Diários de referência com base em uma dieta de 2000kcal. Seus valores diários podem ser maiores ou menores dependendo de suas necessidades energéticas.';
       var vdLines = doc.splitTextToSize(vdNote, lw);
       doc.text(vdLines, px, y+3); y += vdLines.length * 3.1 + 2;
 
-      // ── Ingredientes ──────────────────────────────────────
+      // -- Ingredientes --------------------------------------
       if (d.ingredientes) {
         doc.setFontSize(6.5); doc.setFont('helvetica','bold');
         doc.text('Ingredientes:', px, y+3);
@@ -2211,19 +2211,19 @@ function tnGeneratePDF(qtdEtiquetas) {
         doc.text(iLines, px, y+6.5); y += iLines.length * 3.2 + 6;
       }
 
-      // ── Alérgenos ─────────────────────────────────────────
+      // -- Alérgenos -----------------------------------------
       if (d.alergicos) {
         doc.setFontSize(6.5); doc.setFont('helvetica','bold');
         var aLines = doc.splitTextToSize(d.alergicos, lw);
         doc.text(aLines, px, y+3); y += aLines.length * 3.2 + 3;
       }
 
-      // ── Peso / Validade / Lote ────────────────────────────
+      // -- Peso / Validade / Lote ----------------------------
       doc.setFontSize(6.5); doc.setFont('helvetica','normal');
       var infoLine = 'Peso Líq.: '+(d.peso||'—')+(d.validade?'  |  Validade: '+d.validade:'')+(d.lote?'  |  Lote: '+d.lote:'');
       doc.text(infoLine, px, y+3); y += 4.5;
 
-      // ── CNPJ + SAC ────────────────────────────────────────
+      // -- CNPJ + SAC ----------------------------------------
       if (d.cnpj || d.sac) {
         var cLine = (d.cnpj?'CNPJ: '+d.cnpj:'')+(d.cnpj&&d.sac?'  |  ':'')+(d.sac?'SAC WhatsApp: '+d.sac:'');
         doc.text(cLine, px, y+3); y += 4.5;
@@ -2237,7 +2237,7 @@ function tnGeneratePDF(qtdEtiquetas) {
     // Renderiza página 1 e coleta codeY
     var codeY = desenharPagina(doc, 1, qtdEtiquetas);
 
-    // ── QR Code fixo ──────────────────────────────────────────
+    // -- QR Code fixo ------------------------------------------
     var qrDiv = document.createElement('div');
     qrDiv.style.cssText = 'position:fixed;left:-9999px;top:0';
     document.body.appendChild(qrDiv);
@@ -2307,7 +2307,7 @@ function tnGeneratePDF(qtdEtiquetas) {
 }
 
 
-// ─── DEVOLUÇÃO ────────────────────────────────────────────────────────────────
+// --- DEVOLUÇÃO ----------------------------------------------------------------
 
 const DRIVE_CLIENT_ID     = '392251148360-q2krd1inocunl9b48pablbotm5r17tli.apps.googleusercontent.com';
 const DRIVE_FOLDER_ID     = '17XWzZ-_2NGjWUrMA2U_nVFokRt374QBn';
@@ -2322,7 +2322,7 @@ var _driveToken    = null;
 var _webcamStream  = null;
 var _devMediaFiles = [];
 
-// ── Drive OAuth via popup + postMessage ───────────────────────────────────────
+// -- Drive OAuth via popup + postMessage ---------------------------------------
 async function driveAutenticar() {
   // Tenta token salvo
   try {
@@ -2414,7 +2414,7 @@ function driveViewUrl(fileId) {
   return 'https://drive.google.com/file/d/' + fileId + '/view';
 }
 
-// ── Render principal ──────────────────────────────────────────────────────────
+// -- Render principal ----------------------------------------------------------
 function renderDevolucao() {
   if (_devSel) return renderDevolucaoDetalhe(_devSel);
   if (_devTab === 'novo') return renderDevolucaoNovo();
@@ -2429,7 +2429,7 @@ function setupDevolucao() {
   }
 }
 
-// ── LISTA ─────────────────────────────────────────────────────────────────────
+// -- LISTA ---------------------------------------------------------------------
 function renderDevolucaoLista() {
   var devs = state.devolucoes.slice();
   var STATUS_COR   = { aguardando:'var(--amber)', aprovado:'var(--green)', reprovado:'var(--red)', recusa:'#7c3aed' };
@@ -2497,7 +2497,7 @@ function renderDevolucaoLista() {
   return html;
 }
 
-// ── NOVO PROCESSO ─────────────────────────────────────────────────────────────
+// -- NOVO PROCESSO -------------------------------------------------------------
 function renderDevolucaoNovo() {
   return '<button onclick="devSetTab(\'lista\')" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--text2);cursor:pointer;font-size:0.88rem;margin-bottom:1.25rem;padding:0">' +
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="15 18 9 12 15 6"/></svg> Voltar' +
@@ -2592,7 +2592,7 @@ function renderDevolucaoNovo() {
   '</div>'; // max-width
 }
 
-// ── DETALHE ───────────────────────────────────────────────────────────────────
+// -- DETALHE -------------------------------------------------------------------
 function renderDevolucaoDetalhe(id) {
   var d = state.devolucoes.find(function(x){ return x.id === id; });
   if (!d) { _devSel = null; return renderDevolucaoLista(); }
@@ -2664,7 +2664,7 @@ function renderDevolucaoDetalhe(id) {
   '</div>'; // max-width
 }
 
-// ── SETUP WEBCAM ──────────────────────────────────────────────────────────────
+// -- SETUP WEBCAM --------------------------------------------------------------
 var _devGravando = false;
 var _devRecorder = null;
 var _devMarketplace = 'ml';
@@ -3067,7 +3067,7 @@ async function devSalvarNovo() {
   setTimeout(function() { _devTab = 'lista'; navigate('devolucao'); }, 1200);
 }
 
-// ── AÇÕES ─────────────────────────────────────────────────────────────────────
+// -- AÇÕES ---------------------------------------------------------------------
 function devSetTab(tab) {
   if (_webcamStream && tab !== 'novo') {
     _webcamStream.getTracks().forEach(function(t){ t.stop(); });
@@ -3101,7 +3101,7 @@ function devSalvarObs(id) {
   if (st) { st.textContent = '✅ Observações salvas!'; st.style.color = 'var(--green)'; setTimeout(function(){ st.textContent=''; }, 2000); }
 }
 
-// ─── PONTO VIRTUAL ────────────────────────────────────────────────────────────
+// --- PONTO VIRTUAL ------------------------------------------------------------
 
 var _pontoTab        = 'cards';
 var _pontoColabSel   = null;
@@ -3120,7 +3120,7 @@ function renderPonto() {
   return renderPontoPublico();
 }
 
-// ── VISÃO PÚBLICA (todos os usuários) ────────────────────────────────────────
+// -- VISÃO PÚBLICA (todos os usuários) ----------------------------------------
 function renderPontoPublico() {
   var cols = state.ponto.colaboradores;
 
@@ -3178,7 +3178,7 @@ function renderPontoColabAberto(idx) {
   var inicialLetra = (c.nome || '?')[0].toUpperCase();
   var nomesMes     = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
-  // ── Jornada: 4 etapas ────────────────────────────────────
+  // -- Jornada: 4 etapas ------------------------------------
   // 0 = Entrada (08h)  1 = Saída Almoço (12h)
   // 2 = Volta Almoço (13h)  3 = Saída (17h)
   var JORNADA = [
@@ -3367,7 +3367,7 @@ function pontoStatCard(icon, label, valor) {
   '</div>';
 }
 
-// ── VISÃO ADMIN ───────────────────────────────────────────────────────────────
+// -- VISÃO ADMIN ---------------------------------------------------------------
 function renderPontoAdmin() {
   if (_pontoColabSel !== null && state.ponto.colaboradores[_pontoColabSel]) {
     return renderPontoColabAberto(_pontoColabSel);
@@ -3457,7 +3457,7 @@ function renderPontoAdminHistorico() {
   var cols      = state.ponto.colaboradores;
   var nomesMes  = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
-  // ── Estado dos filtros ────────────────────────────────────
+  // -- Estado dos filtros ------------------------------------
   var filtroColab = (typeof _pontoHistColab !== 'undefined') ? _pontoHistColab : 'todos';
   var filtroMes   = (typeof _pontoHistMes   !== 'undefined') ? _pontoHistMes   : pontoMesAnoAtual();
 
@@ -3475,7 +3475,7 @@ function renderPontoAdminHistorico() {
   if (!mesesDisp[chaveAtual]) mesesDisp[chaveAtual] = { ano: String(ma.getFullYear()), mes: String(ma.getMonth()+1).padStart(2,'0'), label: nomesMes[ma.getMonth()] + ' ' + ma.getFullYear() };
   var mesesOrdenados = Object.keys(mesesDisp).sort().reverse();
 
-  // ── Filtros ────────────────────────────────────────────────
+  // -- Filtros ------------------------------------------------
   var html =
     '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:1.25rem">' +
 
@@ -3510,7 +3510,7 @@ function renderPontoAdminHistorico() {
       (registros.length ? '<button class="btn btn-sm btn-red" onclick="pontoLimparHistorico()" style="white-space:nowrap">Limpar tudo</button>' : '') +
     '</div>';
 
-  // ── Filtra registros ──────────────────────────────────────
+  // -- Filtra registros --------------------------------------
   var partesMes = filtroMes.split('-'); // ["2025","04"]
   var lista = registros.filter(function(r) {
     var p = r.data.split('/');
@@ -3530,7 +3530,7 @@ function renderPontoAdminHistorico() {
     return html + '<div class="empty-state">' + iconEmpty() + '<p>Nenhum registro para o período selecionado.</p></div>';
   }
 
-  // ── Totais do período ─────────────────────────────────────
+  // -- Totais do período -------------------------------------
   var totalMinPeriodo = 0;
   // Agrupa por colab+dia para somar horas
   var porColabDia = {};
@@ -3559,7 +3559,7 @@ function renderPontoAdminHistorico() {
     '</div>' +
   '</div>';
 
-  // ── Tabela agrupada por dia ───────────────────────────────
+  // -- Tabela agrupada por dia -------------------------------
   var ETAPA_LABELS = ['▶ Entrada','🍽 Saída Almoço','↩ Volta Almoço','■ Saída'];
   var ETAPA_CORES  = ['var(--green)','#ea580c','#2563eb','#7c3aed'];
 
@@ -3610,7 +3610,7 @@ function renderPontoAdminHistorico() {
   return html;
 }
 
-// ── HELPERS ───────────────────────────────────────────────────────────────────
+// -- HELPERS -------------------------------------------------------------------
 
 function pontoDataHoje() {
   var now = new Date();
@@ -3707,7 +3707,7 @@ function pontoHoraParaMs(hora) {
   return parseInt(p[0]||0)*60 + parseInt(p[1]||0);
 }
 
-// ── AÇÕES ─────────────────────────────────────────────────────────────────────
+// -- AÇÕES ---------------------------------------------------------------------
 
 function pontoSelecionarColab(idx) {
   _pontoColabSel = idx;
@@ -3917,7 +3917,7 @@ function pontoBaixarPDF() {
       });
     });
 
-    // ── Página 1: tabela detalhada ────────────────────────
+    // -- Página 1: tabela detalhada ------------------------
     var pageNum = 1;
     cabecalho(pageNum);
 
@@ -4007,7 +4007,7 @@ function pontoBaixarPDF() {
     doc.setDrawColor(150,150,150); doc.setLineWidth(0.4);
     doc.rect(px, headerY, tableW, y - headerY);
 
-    // ── Página de resumo por colaborador ─────────────────
+    // -- Página de resumo por colaborador -----------------
     doc.addPage();
     pageNum++;
     cabecalho(pageNum);
@@ -4286,7 +4286,7 @@ function pontoSalvarManual(idx) {
   var modoFolga = btnFolga && btnFolga.style.background !== 'var(--bg2)' && btnFolga.style.color === '#fff';
 
   if (modoFolga) {
-    // ── Salva feriado/folga ──────────────────────────────
+    // -- Salva feriado/folga ------------------------------
     var motivoEl = document.querySelector('input[name="pm-motivo"]:checked');
     var motivo   = motivoEl ? motivoEl.value : 'Folga';
 
@@ -4317,7 +4317,7 @@ function pontoSalvarManual(idx) {
     return;
   }
 
-  // ── Salva ponto normal ───────────────────────────────
+  // -- Salva ponto normal -------------------------------
   var horaEl = document.getElementById('pm-hora');
   var radios = document.querySelectorAll('input[name="pm-etapa"]');
   var hora = horaEl ? horaEl.value.trim() : '';
@@ -4388,7 +4388,7 @@ function pontoExcluirColab(idx) {
   navigate('ponto');
 }
 
-// ─── ESTOQUE ──────────────────────────────────────────────────────────────────
+// --- ESTOQUE ------------------------------------------------------------------
 var _estoqueTab = 'estoque';
 var _estoqueOrdem = 'nome';
 var _estoqueBusca = '';
@@ -4422,10 +4422,10 @@ function renderEstoqueCards() {
 
   var produtos = state.estoque.produtos.slice();
 
-  // ── Filtro por busca ──────────────────────────────────────
+  // -- Filtro por busca --------------------------------------
   if (busca) produtos = produtos.filter(function(p){ return p.nome.toLowerCase().indexOf(busca) !== -1; });
 
-  // ── Ordenação ─────────────────────────────────────────────
+  // -- Ordenação ---------------------------------------------
   if (ordem === 'qtd-asc')         produtos.sort(function(a,b){ return a.qtd - b.qtd; });
   else if (ordem === 'qtd-desc')   produtos.sort(function(a,b){ return b.qtd - a.qtd; });
   else if (ordem === 'status-asc') produtos.sort(function(a,b){
@@ -4439,7 +4439,7 @@ function renderEstoqueCards() {
 
   var ordemLabels = { 'nome':'Padrão', 'qtd-asc':'↑ Qtd crescente', 'qtd-desc':'↓ Qtd decrescente', 'status-asc':'🔴→🟢 Zerado p/ OK', 'status-desc':'🟢→🔴 OK p/ Zerado' };
 
-  // ── Header ────────────────────────────────────────────────
+  // -- Header ------------------------------------------------
   var html =
     '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:1.25rem">' +
       // Busca
@@ -4764,13 +4764,13 @@ function estoqueLimparHistorico() {
   navigate('estoque');
 }
 
-// ─── VENDAS — MERCADO LIVRE ───────────────────────────────────────────────────
+// --- VENDAS — MERCADO LIVRE ---------------------------------------------------
 const ML_CLIENT_ID     = '3307309227859868';
 const ML_CLIENT_SECRET = 'c2yBzHKBjJNFbM3JIlh6ppld3JgE5k5u';
 const ML_REDIRECT_URI  = 'https://edsonandradecf.github.io/plataforma-costa';
 const ML_PROXY         = 'https://ml-proxy.costanaturelife.workers.dev';
 
-// ─── SHOPEE ───────────────────────────────────────────────────────────────────
+// --- SHOPEE -------------------------------------------------------------------
 const SHOPEE_PARTNER_ID  = 2033820;
 const SHOPEE_SHOP_ID     = 1577798856;
 const SHOPEE_PROXY       = 'https://shopee-proxy.costanaturelife.workers.dev';
@@ -5680,7 +5680,7 @@ function mlDesconectar() {
   navigate('vendas');
 }
 
-// ─── VENDAS RESUMO (para funcionários na tela Início) ────────────────────────
+// --- VENDAS RESUMO (para funcionários na tela Início) ------------------------
 function renderVendasResumo() {
   // Triggers async data load into the inicio dashboard slots
   setTimeout(function() { mlLoadInicio(); }, 300);
@@ -5850,7 +5850,7 @@ async function mlLoadInicio() {
 }
 
 
-// ─── LOGS ─────────────────────────────────────────────────────────────────────
+// --- LOGS ---------------------------------------------------------------------
 function renderLogs() {
   if (!state.logs.length) return `<div class="card"><div class="empty-state">${iconEmpty()}<p>Nenhuma atividade registrada</p></div></div>`;
   let html = `<div class="card"><div class="card-header"><span class="card-title">Histórico de Atividades</span>
@@ -5874,11 +5874,11 @@ function clearLogs() {
   renderPage();
 }
 
-// ─── MODAL ────────────────────────────────────────────────────────────────────
+// --- MODAL --------------------------------------------------------------------
 function closeModal() { document.getElementById('modal').style.display = 'none'; }
 function closeModalOutside(e) { if(e.target.id === 'modal') closeModal(); }
 
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
+// --- HELPERS ------------------------------------------------------------------
 function esc(str) { return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 function iconDevolucao() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>`; }

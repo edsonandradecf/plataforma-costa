@@ -2601,44 +2601,87 @@ function renderDevolucaoDetalhe(id) {
   var cor   = STATUS_COR[d.status]   || 'var(--text3)';
   var label = STATUS_LABEL[d.status] || d.status;
   var dt    = d.criadoEm ? new Date(d.criadoEm).toLocaleString('pt-BR') : '--';
+  var plat  = d.marketplace === 'shopee' ? '🧡 Shopee' : '🛒 Mercado Livre';
+
+  // Link correto para o ML — abre a venda pelo número do pedido
+  var linkML = d.linkMarketplace;
+  if (d.marketplace === 'ml' && d.codigoEtiqueta) {
+    linkML = 'https://www.mercadolivre.com.br/vendas/gerenciar?search=' + d.codigoEtiqueta;
+  }
+
+  // Dados do pedido salvos
+  var det = d.detalhesPedido || {};
 
   return '<button onclick="devFecharDetalhe()" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--text2);cursor:pointer;font-size:0.88rem;margin-bottom:1.25rem;padding:0">' +
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="15 18 9 12 15 6"/></svg> Voltar' +
   '</button>' +
 
-  '<div style="max-width:600px">' +
+  '<div style="max-width:720px">' +
 
-  // Header
+  // Header com status
   '<div class="card" style="padding:1.25rem;margin-bottom:1rem">' +
     '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:1rem">' +
       '<div>' +
         '<div style="font-size:1.2rem;font-weight:800">' + esc(d.codigoEtiqueta || '--') + '</div>' +
-        '<div style="font-size:0.82rem;color:var(--text3);margin-top:2px">' + (d.marketplace === 'shopee' ? '🧡 Shopee' : '🛒 Mercado Livre') + ' * ' + dt + ' * ' + esc(d.operador || '') + '</div>' +
+        '<div style="font-size:0.82rem;color:var(--text3);margin-top:2px">' + plat + ' * ' + dt + ' * ' + esc(d.operador || '') + '</div>' +
       '</div>' +
-      '<span style="padding:4px 12px;border-radius:20px;font-size:0.82rem;font-weight:700;background:' + cor + '18;color:' + cor + ';white-space:nowrap">' + label + '</span>' +
+      '<span style="padding:4px 14px;border-radius:20px;font-size:0.85rem;font-weight:700;background:' + cor + '18;color:' + cor + ';white-space:nowrap">' + label + '</span>' +
     '</div>' +
 
-    // Info do pedido
-    (d.nomeProduto ? '<div style="padding:10px 14px;background:var(--bg3);border-radius:8px;margin-bottom:1rem">' +
-      '<div style="font-weight:700;margin-bottom:2px">' + esc(d.nomeProduto) + '</div>' +
-      '<div style="font-size:0.82rem;color:var(--text2)">' + esc(d.infoPedido || '') + '</div>' +
-    '</div>' : '') +
+    // Produto
+    (d.nomeProduto ?
+      '<div style="padding:10px 14px;background:var(--bg3);border-radius:8px;margin-bottom:1rem">' +
+        '<div style="font-weight:700;margin-bottom:2px">' + esc(d.nomeProduto) + '</div>' +
+        '<div style="font-size:0.82rem;color:var(--text2)">' + esc(d.infoPedido || '') + '</div>' +
+      '</div>' : '') +
 
-    // Botões de ação
+    // Botões
     '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-      (d.linkMarketplace ? '<a href="' + esc(d.linkMarketplace) + '" target="_blank" class="btn btn-sm" style="text-decoration:none">🔗 Ver no Marketplace</a>' : '') +
-      (d.driveFolderId ? '<a href="https://drive.google.com/drive/folders/' + esc(d.driveFolderId) + '" target="_blank" class="btn btn-sm" style="text-decoration:none">📁 Ver no Drive</a>' : '') +
+      (linkML ? '<a href="' + esc(linkML) + '" target="_blank" class="btn btn-sm" style="text-decoration:none">🔗 Ver no Marketplace</a>' : '') +
+      (d.driveFolderId && d.driveFolderId !== '17XWzZ-_2NGjWUrMA2U_nVFokRt374QBn' ?
+        '<a href="https://drive.google.com/drive/folders/' + esc(d.driveFolderId) + '" target="_blank" class="btn btn-sm" style="text-decoration:none">📁 Ver no Drive</a>' : '') +
     '</div>' +
   '</div>' +
+
+  // Dados do pedido (grid completo)
+  (Object.keys(det).length > 0 ?
+    '<div class="card" style="padding:1.25rem;margin-bottom:1rem">' +
+      '<div style="font-weight:700;font-size:0.9rem;margin-bottom:1rem">👤 Dados do Pedido</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 20px">' +
+        [
+          ['👤 Comprador',     det.comprador],
+          ['📄 CPF/Doc',       det.cpf],
+          ['📞 Telefone',      det.telefone],
+          ['📧 Email',         det.email],
+          ['📦 Destinatário',  det.destinatario],
+          ['📞 Tel. Entrega',  det.telefDest],
+          ['💰 Total',         det.total],
+          ['📅 Data',          det.data],
+          ['🔖 Status',        det.status],
+          ['🏠 Endereço',      det.endereco],
+          ['📮 CEP',           det.cep],
+          ['🔢 Pedido(s)',     det.pedidos],
+        ].filter(function(c){ return c[1] && c[1] !== '--'; }).map(function(c) {
+          var fullWidth = c[0].includes('Endereço') || c[0].includes('Pedido');
+          return '<div style="' + (fullWidth ? 'grid-column:1/-1;' : '') + 'min-width:0">' +
+            '<div style="font-size:0.72rem;font-weight:600;color:var(--text3);margin-bottom:2px">' + c[0] + '</div>' +
+            '<div style="font-size:0.85rem;color:var(--text);word-break:break-word">' + esc(c[1] || '--') + '</div>' +
+          '</div>';
+        }).join('') +
+      '</div>' +
+    '</div>'
+  : '') +
 
   // Mídias
   (d.midias && d.midias.length > 0 ?
     '<div class="card" style="padding:1.25rem;margin-bottom:1rem">' +
-      '<div style="font-weight:700;font-size:0.9rem;margin-bottom:10px">📎 Mídias</div>' +
+      '<div style="font-weight:700;font-size:0.9rem;margin-bottom:10px">📎 Mídias (' + d.midias.length + ')</div>' +
       '<div style="display:flex;flex-wrap:wrap;gap:8px">' +
         d.midias.map(function(m) {
           var icon = m.tipo === 'video' ? '🎥' : '📸';
-          return '<a href="' + esc(driveViewUrl(m.driveId)) + '" target="_blank" style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg3);border-radius:6px;text-decoration:none;color:var(--text);font-size:0.82rem">' + icon + ' ' + esc(m.nome) + '</a>';
+          return '<a href="' + esc(driveViewUrl(m.driveId)) + '" target="_blank" ' +
+            'style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg3);border-radius:6px;text-decoration:none;color:var(--text);font-size:0.82rem">' +
+            icon + ' ' + esc(m.nome) + '</a>';
         }).join('') +
       '</div>' +
     '</div>'
@@ -2650,10 +2693,12 @@ function renderDevolucaoDetalhe(id) {
     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem">' +
       ['aprovado','reprovado','recusa','aguardando'].map(function(s) {
         var c2 = STATUS_COR[s]; var ativo = d.status === s;
-        return '<button onclick="devMudarStatus(\'' + id + '\',\'' + s + '\')" style="flex:1;min-width:100px;padding:8px;border:2px solid ' + (ativo ? c2 : 'var(--border)') + ';border-radius:8px;background:' + (ativo ? c2 + '18' : 'transparent') + ';color:' + (ativo ? c2 : 'var(--text2)') + ';font-weight:' + (ativo?'700':'400') + ';cursor:pointer;font-size:0.82rem">' + STATUS_LABEL[s] + '</button>';
+        return '<button onclick="devMudarStatus(\'' + id + '\',\'' + s + '\')" ' +
+          'style="flex:1;min-width:100px;padding:8px;border:2px solid ' + (ativo?c2:'var(--border)') + ';border-radius:8px;' +
+          'background:' + (ativo?c2+'18':'transparent') + ';color:' + (ativo?c2:'var(--text2)') + ';' +
+          'font-weight:' + (ativo?'700':'400') + ';cursor:pointer;font-size:0.82rem">' + STATUS_LABEL[s] + '</button>';
       }).join('') +
     '</div>' +
-
     '<label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:5px;font-weight:600">Observações</label>' +
     '<textarea id="dev-obs-edit" rows="3" style="width:100%;padding:0.65rem 0.9rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.88rem;resize:vertical;margin-bottom:10px">' + esc(d.obs || '') + '</textarea>' +
     '<button onclick="devSalvarObs(\'' + id + '\')" class="btn btn-green">💾 Salvar Observações</button>' +
@@ -3164,6 +3209,7 @@ async function devSalvarNovo() {
     nomeProduto:    _devPedidoEncontrado ? _devPedidoEncontrado.nome : codigo.trim(),
     infoPedido:     _devPedidoEncontrado ? _devPedidoEncontrado.info : '',
     linkMarketplace:_devPedidoEncontrado ? _devPedidoEncontrado.link : null,
+    detalhesPedido: _devPedidoEncontrado ? (_devPedidoEncontrado.detalhes || {}) : {},
     status:         'aguardando',
     obs:            obs,
     midias:         midias,

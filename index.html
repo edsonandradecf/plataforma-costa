@@ -2779,18 +2779,36 @@ async function devBuscarML(valor, tipo) {
 
   var endpoint, params = '';
   if (tipo === 'numero') {
-    // Busca direta pelo ID do pedido
+    // Tenta busca direta pelo ID
     try {
       var r = await mlGet('/orders/' + valor);
       if (r && r.id) return devFormatarPedidoML(r);
     } catch(e) {}
-    // Tenta como tracking
+    // Tenta via orders/search com o ID
+    try {
+      var r1b = await mlGet('/orders/search?seller=' + sellerId + '&q=' + encodeURIComponent(valor) + '&sort=date_desc&limit=5');
+      if (r1b && r1b.results) {
+        var found1b = r1b.results.find(function(o){ return String(o.id) === String(valor); });
+        if (found1b) return devFormatarPedidoML(found1b);
+        // Se não achou exato, retorna o primeiro resultado
+        if (r1b.results[0]) return devFormatarPedidoML(r1b.results[0]);
+      }
+    } catch(e) {}
+    // Tenta como código de rastreio
     try {
       var r2 = await mlGet('/shipments/search?tracking_number=' + encodeURIComponent(valor) + '&seller_id=' + sellerId);
       if (r2 && r2.results && r2.results[0]) {
         var ship = r2.results[0];
         var order = await mlGet('/orders/' + ship.order_id);
         if (order) return devFormatarPedidoML(order);
+      }
+    } catch(e) {}
+    // Tenta buscar nas devoluções/reclamações
+    try {
+      var r3b = await mlGet('/post-purchase/v1/claims/search?seller_id=' + sellerId + '&resource_id=' + valor);
+      if (r3b && r3b.data && r3b.data[0]) {
+        var claim = r3b.data[0];
+        return { id: claim.resource_id, nome: 'Reclamação #' + claim.id, info: 'Pedido ML #' + claim.resource_id, extra: 'Tipo: ' + (claim.type||'--'), link: 'https://www.mercadolivre.com.br/vendas/' + claim.resource_id };
       }
     } catch(e) {}
   } else if (tipo === 'cliente') {

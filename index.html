@@ -2636,10 +2636,20 @@ function renderDevolucaoDetalhe(id) {
   var dt    = d.criadoEm ? new Date(d.criadoEm).toLocaleString('pt-BR') : '--';
   var plat  = d.marketplace === 'shopee' ? '🧡 Shopee' : '🛒 Mercado Livre';
 
-  // Link correto para o ML — abre a venda pelo número do pedido
+  // Link correto para o Marketplace
   var linkML = d.linkMarketplace;
   if (d.marketplace === 'ml' && d.codigoEtiqueta) {
     linkML = 'https://www.mercadolivre.com.br/vendas/gerenciar?search=' + d.codigoEtiqueta + '&filters=&subFilters=&limit=50&offset=0&startPeriod=WITH_DATE_CLOSED_2M_OLD&selectedTab=TAB_TODAY';
+  } else if (d.marketplace === 'shopee') {
+    // Usa order_id numérico se disponível nos detalhes salvos
+    var shOrderId = det && det.order_id && det.order_id !== '--' ? det.order_id : null;
+    if (shOrderId) {
+      linkML = 'https://seller.shopee.com.br/portal/sale/order/' + shOrderId;
+    } else if (d.linkMarketplace && d.linkMarketplace.includes('/order/')) {
+      linkML = d.linkMarketplace; // já tem o link correto
+    } else {
+      linkML = 'https://seller.shopee.com.br/portal/sale/all?keyword=' + (d.codigoEtiqueta || '');
+    }
   }
 
   // Dados do pedido salvos
@@ -3149,30 +3159,41 @@ async function devFormatarPedidoShopee(order) {
   var status2 = order.order_status || '--';
   var data2   = order.create_time ? new Date(order.create_time*1000).toLocaleDateString('pt-BR') : '--';
 
-  // Busca detalhes completos do pedido incluindo endereço
+  // order_id numérico para o link direto (diferente do order_sn alfanumérico)
+  var orderId  = order.order_id || order.orderId || null;
   var endereco = '--', cep = '--', destinatario = '--', cidade = '--', estado = '--';
+
   try {
     var det2 = await shopeeGet('/api/v2/order/get_order_detail', {
       order_sn_list: order.order_sn,
-      response_optional_fields: 'recipient_address,buyer_username,total_amount,item_list',
+      response_optional_fields: 'recipient_address,buyer_username,total_amount,item_list,order_id',
     });
     var fullOrder = det2.response && det2.response.order_list && det2.response.order_list[0];
-    if (fullOrder && fullOrder.recipient_address) {
-      var addr = fullOrder.recipient_address;
-      destinatario = addr.name || '--';
-      cep          = addr.zipcode || '--';
-      cidade       = addr.city || '--';
-      estado       = addr.state || '--';
-      endereco     = [addr.full_address || addr.district || '', addr.city, addr.state, addr.zipcode].filter(Boolean).join(', ');
+    if (fullOrder) {
+      // Pega o order_id numérico se disponível
+      if (fullOrder.order_id) orderId = fullOrder.order_id;
+      if (fullOrder.recipient_address) {
+        var addr = fullOrder.recipient_address;
+        destinatario = addr.name || '--';
+        cep          = addr.zipcode || '--';
+        cidade       = addr.city || '--';
+        estado       = addr.state || '--';
+        endereco     = [addr.full_address || addr.district || '', addr.city, addr.state, addr.zipcode].filter(Boolean).join(', ');
+      }
     }
   } catch(e) {}
+
+  // Link direto para o pedido — usa order_id numérico se disponível
+  var linkPedido = orderId
+    ? 'https://seller.shopee.com.br/portal/sale/order/' + orderId
+    : 'https://seller.shopee.com.br/portal/sale/all?keyword=' + order.order_sn;
 
   return {
     id:    order.order_sn,
     nome:  items2 || 'Pedido #' + order.order_sn,
     info:  'Pedido Shopee #' + order.order_sn + (order.buyer_username ? ' * Comprador: ' + order.buyer_username : '') + ' * R$ ' + total2,
     extra: 'Status: ' + status2 + ' * Data: ' + data2,
-    link:  'https://seller.shopee.com.br/portal/sale/all?keyword=' + order.order_sn,
+    link:  linkPedido,
     detalhes: {
       comprador:   order.buyer_username || '--',
       destinatario:destinatario,
@@ -3183,6 +3204,8 @@ async function devFormatarPedidoShopee(order) {
       total:       'R$ ' + total2,
       status:      status2,
       data:        data2,
+      order_sn:    order.order_sn,
+      order_id:    orderId ? String(orderId) : '--',
     },
   };
 }

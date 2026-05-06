@@ -2679,8 +2679,9 @@ function renderDevolucaoDetalhe(id) {
       '</div>' : '') +
 
     // Botões
-    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
       (linkML ? '<a href="' + esc(linkML) + '" target="_blank" class="btn btn-sm" style="text-decoration:none">🔗 Ver no Marketplace</a>' : '') +
+      '<button onclick="devEditarLink(\'' + id + '\')" class="btn btn-sm" style="font-size:0.75rem">✏️ Editar Link</button>' +
       (d.driveFolderId && d.driveFolderId !== '17XWzZ-_2NGjWUrMA2U_nVFokRt374QBn' ?
         '<a href="https://drive.google.com/drive/folders/' + esc(d.driveFolderId) + '" target="_blank" class="btn btn-sm" style="text-decoration:none">📁 Ver no Drive</a>' : '') +
       '<button onclick="devExcluirDevolucao(\'' + id + '\')" class="btn btn-sm btn-red" style="margin-left:auto">🗑 Excluir</button>' +
@@ -3170,7 +3171,8 @@ async function devFormatarPedidoShopee(order) {
     });
     var fullOrder = det2.response && det2.response.order_list && det2.response.order_list[0];
     if (fullOrder) {
-      // Pega o order_id numérico se disponível
+      console.log('DEBUG Shopee order fields:', Object.keys(fullOrder));
+      console.log('DEBUG order_id:', fullOrder.order_id, 'orderId:', fullOrder.orderId, 'id:', fullOrder.id);
       if (fullOrder.order_id) orderId = fullOrder.order_id;
       if (fullOrder.recipient_address) {
         var addr = fullOrder.recipient_address;
@@ -3372,6 +3374,25 @@ function devSetOrdem(o)       { _devOrdem = o; navigate('devolucao'); }
 function devSetFiltro(s)      { _devFiltroStatus = s; navigate('devolucao'); }
 function devAbrirDetalhe(id)  { _devSel = id; navigate('devolucao'); }
 function devFecharDetalhe()   { _devSel = null; navigate('devolucao'); }
+
+function devEditarLink(id) {
+  var d = state.devolucoes.find(function(x){ return x.id === id; });
+  if (!d) return;
+  var novoLink = prompt('Cole o link correto do pedido no marketplace:', d.linkMarketplace || '');
+  if (novoLink === null) return; // cancelou
+  novoLink = novoLink.trim();
+  if (!novoLink) return;
+  d.linkMarketplace = novoLink;
+  // Se for Shopee, tenta extrair e salvar o order_id do link
+  if (d.marketplace === 'shopee' && novoLink.includes('/order/')) {
+    var match = novoLink.match(/\/order\/(\d+)/);
+    if (match && d.detalhesPedido) {
+      d.detalhesPedido.order_id = match[1];
+    }
+  }
+  saveState();
+  navigate('devolucao');
+}
 
 function devExcluirDevolucao(id) {
   var d = state.devolucoes.find(function(x){ return x.id === id; });

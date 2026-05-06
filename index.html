@@ -823,16 +823,43 @@ function startApp() {
   if (!state.currentUser) { console.error('startApp called without currentUser!'); return; }
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
-  // Restore sidebar collapsed state
   if (localStorage.getItem('costa_sidebar_collapsed') === '1') {
     document.querySelector('.sidebar').classList.add('collapsed');
     document.querySelector('.main').classList.add('sidebar-collapsed');
   }
-  cleanOldTasks(); // limpa tarefas antigas uma vez ao entrar, não a cada render
+  cleanOldTasks();
   buildSidebar();
   renderPage();
-  // Start real-time sync after login
   startRealtimeSync();
+  // Renova tokens automaticamente a cada 30 minutos
+  iniciarRenovacaoAutomatica();
+}
+
+function iniciarRenovacaoAutomatica() {
+  // Renova imediatamente se necessário
+  renovarTokens();
+  // Depois renova a cada 30 minutos
+  setInterval(renovarTokens, 30 * 60 * 1000);
+}
+
+async function renovarTokens() {
+  // ML — renova se expira em menos de 1 hora
+  try {
+    var mlT = mlLoadToken();
+    if (mlT && mlT.refresh_token && mlT.expires_at && (mlT.expires_at - Date.now()) < 60 * 60 * 1000) {
+      await mlRefreshToken();
+      console.log('Token ML renovado automaticamente');
+    }
+  } catch(e) { console.log('Falha ao renovar token ML:', e.message); }
+
+  // Shopee — renova se expira em menos de 2 horas
+  try {
+    var shT = shopeeLoadToken();
+    if (shT && shT.refresh_token && shT.expires_at && (shT.expires_at - Date.now()) < 2 * 60 * 60 * 1000) {
+      await shopeeRefreshToken();
+      console.log('Token Shopee renovado automaticamente');
+    }
+  } catch(e) { console.log('Falha ao renovar token Shopee:', e.message); }
 }
 
 function renderPage() {

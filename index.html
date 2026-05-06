@@ -2904,7 +2904,7 @@ async function devBuscarML(valor, tipo) {
     try {
       var r = await mlGet('/orders/' + valor);
       console.log('DEBUG /orders/'+valor+':', JSON.stringify(r).slice(0,300));
-      if (r && r.id) return devFormatarPedidoML(r);
+      if (r && r.id) return await devFormatarPedidoML(r);
     } catch(e) { console.log('DEBUG /orders/ erro:', e.message); }
 
     // Tenta /packs (alguns pedidos estão agrupados em packs)
@@ -2969,8 +2969,8 @@ async function devBuscarML(valor, tipo) {
       console.log('DEBUG orders/search:', JSON.stringify(r1b).slice(0,300));
       if (r1b && r1b.results && r1b.results.length > 0) {
         var found1b = r1b.results.find(function(o){ return String(o.id) === String(valor); });
-        if (found1b) return devFormatarPedidoML(found1b);
-        if (r1b.results[0]) return devFormatarPedidoML(r1b.results[0]);
+        if (found1b) return await devFormatarPedidoML(found1b);
+        if (r1b.results[0]) return await devFormatarPedidoML(r1b.results[0]);
       }
     } catch(e) { console.log('DEBUG orders/search erro:', e.message); }
 
@@ -2981,7 +2981,7 @@ async function devBuscarML(valor, tipo) {
       if (r2 && r2.results && r2.results[0]) {
         var ship = r2.results[0];
         var order2 = await mlGet('/orders/' + ship.order_id);
-        if (order2 && order2.id) return devFormatarPedidoML(order2);
+        if (order2 && order2.id) return await devFormatarPedidoML(order2);
       }
     } catch(e) { console.log('DEBUG shipments erro:', e.message); }
 
@@ -2994,7 +2994,7 @@ async function devBuscarML(valor, tipo) {
         var orderId = claim.resource_id || valor;
         try {
           var orderC = await mlGet('/orders/' + orderId);
-          if (orderC && orderC.id) return devFormatarPedidoML(orderC);
+          if (orderC && orderC.id) return await devFormatarPedidoML(orderC);
         } catch(e2) {}
         return { id: orderId, nome: 'Reclamação ML #' + claim.id, info: 'Pedido #' + orderId + ' - ' + (claim.type||'devolução'), extra: 'Status: ' + (claim.status||'--'), link: 'https://www.mercadolivre.com.br/vendas/' + orderId };
       }
@@ -3014,17 +3014,17 @@ async function devBuscarML(valor, tipo) {
     };
   } else if (tipo === 'cliente') {
     var r3 = await mlGet('/orders/search?seller=' + sellerId + '&q=' + encodeURIComponent(valor) + '&sort=date_desc&limit=1');
-    if (r3 && r3.results && r3.results[0]) return devFormatarPedidoML(r3.results[0]);
+    if (r3 && r3.results && r3.results[0]) return await devFormatarPedidoML(r3.results[0]);
   } else if (tipo === 'cpf') {
     // Busca por comprador -- ML não expõe CPF diretamente, busca pelo nome/ID
     var r4 = await mlGet('/orders/search?seller=' + sellerId + '&buyer.nickname=' + encodeURIComponent(valor) + '&sort=date_desc&limit=1');
-    if (r4 && r4.results && r4.results[0]) return devFormatarPedidoML(r4.results[0]);
+    if (r4 && r4.results && r4.results[0]) return await devFormatarPedidoML(r4.results[0]);
   } else if (tipo === 'nf') {
     // Busca pela NF -- usa fiscal_data
     var r5 = await mlGet('/orders/search?seller=' + sellerId + '&sort=date_desc&limit=50');
     if (r5 && r5.results) {
       var found = r5.results.find(function(o){ return o.id && String(o.id).includes(valor); });
-      if (found) return devFormatarPedidoML(found);
+      if (found) return await devFormatarPedidoML(found);
     }
   }
   return null;
@@ -3115,7 +3115,7 @@ async function devBuscarShopee(valor, tipo) {
         response_optional_fields: 'item_list,buyer_user_id,buyer_username,total_amount',
       });
       var orders = det.response && det.response.order_list;
-      if (orders && orders[0]) return devFormatarPedidoShopee(orders[0]);
+      if (orders && orders[0]) return await devFormatarPedidoShopee(orders[0]);
     } catch(e) {}
   }
 
@@ -3137,21 +3137,53 @@ async function devBuscarShopee(valor, tipo) {
         response_optional_fields: 'item_list,buyer_username,total_amount',
       });
       var ords2 = det2.response && det2.response.order_list;
-      if (ords2 && ords2[0]) return devFormatarPedidoShopee(ords2[0]);
+      if (ords2 && ords2[0]) return await devFormatarPedidoShopee(ords2[0]);
     }
   }
   return null;
 }
 
-function devFormatarPedidoShopee(order) {
-  var items2 = (order.item_list || []).map(function(i){ return i.item_name; }).filter(Boolean).join(', ');
-  var total2  = order.total_amount ? 'R$ ' + Number(order.total_amount).toLocaleString('pt-BR',{minimumFractionDigits:2}) : '';
+async function devFormatarPedidoShopee(order) {
+  var items2  = (order.item_list || []).map(function(i){ return i.item_name; }).filter(Boolean).join(', ');
+  var total2  = order.total_amount ? Number(order.total_amount).toLocaleString('pt-BR',{minimumFractionDigits:2}) : '0,00';
+  var status2 = order.order_status || '--';
+  var data2   = order.create_time ? new Date(order.create_time*1000).toLocaleDateString('pt-BR') : '--';
+
+  // Busca detalhes completos do pedido incluindo endereço
+  var endereco = '--', cep = '--', destinatario = '--', cidade = '--', estado = '--';
+  try {
+    var det2 = await shopeeGet('/api/v2/order/get_order_detail', {
+      order_sn_list: order.order_sn,
+      response_optional_fields: 'recipient_address,buyer_username,total_amount,item_list',
+    });
+    var fullOrder = det2.response && det2.response.order_list && det2.response.order_list[0];
+    if (fullOrder && fullOrder.recipient_address) {
+      var addr = fullOrder.recipient_address;
+      destinatario = addr.name || '--';
+      cep          = addr.zipcode || '--';
+      cidade       = addr.city || '--';
+      estado       = addr.state || '--';
+      endereco     = [addr.full_address || addr.district || '', addr.city, addr.state, addr.zipcode].filter(Boolean).join(', ');
+    }
+  } catch(e) {}
+
   return {
     id:    order.order_sn,
     nome:  items2 || 'Pedido #' + order.order_sn,
-    info:  'Pedido Shopee #' + order.order_sn + (order.buyer_username ? ' * Comprador: ' + order.buyer_username : '') + (total2 ? ' * ' + total2 : ''),
-    extra: 'Status: ' + (order.order_status || '--') + ' * Data: ' + (order.create_time ? new Date(order.create_time*1000).toLocaleDateString('pt-BR') : '--'),
+    info:  'Pedido Shopee #' + order.order_sn + (order.buyer_username ? ' * Comprador: ' + order.buyer_username : '') + ' * R$ ' + total2,
+    extra: 'Status: ' + status2 + ' * Data: ' + data2,
     link:  'https://seller.shopee.com.br/portal/sale/all?keyword=' + order.order_sn,
+    detalhes: {
+      comprador:   order.buyer_username || '--',
+      destinatario:destinatario,
+      endereco:    endereco,
+      cep:         cep,
+      cidade:      cidade,
+      estado:      estado,
+      total:       'R$ ' + total2,
+      status:      status2,
+      data:        data2,
+    },
   };
 }
 
@@ -3244,22 +3276,25 @@ async function devSalvarNovo() {
   var st     = document.getElementById('dev-salvar-status');
 
   if (!codigo.trim()) { if(st){ st.textContent='⚠ Informe o código da etiqueta.'; st.style.color='var(--red)'; } return; }
-  if (st) { st.textContent = '⏳ Fazendo upload das mídias...'; st.style.color = 'var(--text3)'; }
+  if (st) { st.textContent = '⏳ Preparando...'; st.style.color = 'var(--text3)'; }
 
-  // Upload das mídias para o Drive
   var midias = [];
   var driveFolderId = DRIVE_FOLDER_ID;
+  var numPedido = _devPedidoEncontrado ? (_devPedidoEncontrado.id || codigo.trim()) : codigo.trim();
+  var nomePasta = numPedido + ' - ' + new Date().toLocaleDateString('pt-BR').replace(/\//g,'-');
 
+  // Sempre cria pasta no Drive (mesmo sem mídias)
+  try {
+    if (!_driveToken) await driveAutenticar();
+    if (st) st.textContent = '⏳ Criando pasta no Drive...';
+    driveFolderId = await driveCreateFolder(nomePasta, DRIVE_FOLDER_ID);
+  } catch(e) {
+    if (st) { st.textContent = '⚠ Erro ao criar pasta: ' + e.message; st.style.color = 'var(--amber)'; }
+  }
+
+  // Upload das mídias
   if (_devMediaFiles.length > 0) {
     try {
-      if (!_driveToken) await driveAutenticar();
-
-      // Cria pasta com o número do pedido
-      var numPedido = _devPedidoEncontrado ? (_devPedidoEncontrado.id || codigo.trim()) : codigo.trim();
-      var nomePasta = numPedido + ' - ' + new Date().toLocaleDateString('pt-BR').replace(/\//g,'-');
-      if (st) st.textContent = '⏳ Criando pasta no Drive...';
-      driveFolderId = await driveCreateFolder(nomePasta, DRIVE_FOLDER_ID);
-
       for (var i = 0; i < _devMediaFiles.length; i++) {
         var m = _devMediaFiles[i];
         if (st) st.textContent = '⏳ Enviando ' + (m.tipo==='foto'?'foto':'vídeo') + ' ' + (i+1) + '/' + _devMediaFiles.length + '...';
@@ -3278,7 +3313,7 @@ async function devSalvarNovo() {
     criadoEm:       Date.now(),
     operador:       state.currentUser ? state.currentUser.login : '--',
     marketplace:    _devMarketplace,
-    codigoEtiqueta: codigo.trim(),
+    codigoEtiqueta: numPedido,
     nomeProduto:    _devPedidoEncontrado ? _devPedidoEncontrado.nome : codigo.trim(),
     infoPedido:     _devPedidoEncontrado ? _devPedidoEncontrado.info : '',
     linkMarketplace:_devPedidoEncontrado ? _devPedidoEncontrado.link : null,

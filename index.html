@@ -248,6 +248,32 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .text-muted { color: var(--text2); }
 .w-full { width: 100%; }
 .section-title { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text3); padding: 0.5rem 1.25rem 0.25rem; }
+
+/* ── FINANCEIRO ─────────────────────────────────────────── */
+.fin-tabs { display:flex; border-bottom:2px solid var(--border); margin-bottom:1.5rem; gap:0; }
+.fin-tab { padding:0.6rem 1.4rem; background:none; border:none; border-bottom:3px solid transparent;
+  color:var(--text2); cursor:pointer; font-size:0.88rem; margin-bottom:-2px; transition:all 0.15s;
+  font-family:inherit; font-weight:500; }
+.fin-tab.active { border-bottom-color:var(--green); color:var(--green); font-weight:700; }
+.fin-tab:hover:not(.active) { color:var(--text); background:var(--bg3); }
+.fin-kpi { background:var(--card); border:1px solid var(--border); border-radius:12px;
+  padding:1rem 1.1rem; box-shadow:var(--shadow); }
+.fin-kpi-label { font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.6px;
+  color:var(--text3); margin-bottom:4px; display:flex; align-items:center; gap:5px; }
+.fin-kpi-val { font-size:1.3rem; font-weight:800; color:var(--text); line-height:1.1; }
+.fin-kpi-sub { font-size:0.71rem; color:var(--text3); margin-top:3px; }
+.fin-plat-bar { height:5px; background:var(--border); border-radius:99px; margin-top:8px; overflow:hidden; }
+.fin-plat-fill { height:100%; border-radius:99px; transition:width 0.5s; }
+.fin-rank-row { display:grid; grid-template-columns:1.7fr 0.55fr 0.55fr 0.55fr 0.75fr;
+  padding:7px 6px; border-bottom:1px solid var(--border); align-items:center; font-size:0.82rem; }
+.fin-rank-row:hover { background:var(--bg3); }
+.fin-upload-box { background:var(--card); border:1px solid var(--border); border-radius:12px;
+  padding:1.5rem; box-shadow:var(--shadow); }
+.fin-file-group { display:flex; flex-direction:column; gap:4px; }
+.fin-file-group label { font-size:0.8rem; font-weight:600; color:var(--text2); }
+.fin-file-group input[type=file] { font-size:0.82rem; color:var(--text2); cursor:pointer; }
+.fin-desp-row { display:grid; grid-template-columns:1fr 130px 90px;
+  gap:8px; align-items:center; padding:9px 0; border-bottom:1px solid var(--border); }
 </style>
 </head>
 <body>
@@ -6230,407 +6256,401 @@ function iconVendas() { return `<svg viewBox="0 0 24 24" fill="none" stroke="cur
 function iconFinanceiro() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M12 11v-4M9 9h6M9 13h6"/></svg>`; }
 function iconEmpty() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`; }
 
-// ════════════════════════════════════════════════════════════════
-// PÁGINA FINANCEIRO
-// ════════════════════════════════════════════════════════════════
+/* ════════════ FINANCEIRO ════════════════════════════════════════ */
 
-var _finTab = 'visao'; // 'visao' | 'despesas'
-var _finMesSel = '';   // mês selecionado ex: '2026-05'
+var _finTab    = 'visao';
+var _finMesSel = '';
 
-function finSetTab(t) { _finTab = t; navigate('financeiro'); }
-
-function finParseBRL(v) {
-  if (!v || String(v) === 'nan' || String(v) === 'None') return 0;
-  return parseFloat(String(v).replace(/BRL\s*/g,'').replace(/\./g,'').replace(',','.').trim()) || 0;
-}
-
-function finProcessarML(dados) {
-  var mlInvalid = ['Cancelada pelo comprador','Venda cancelada. Não envie.','Cancelada. Não despache',
-    'O seu comprador quer cancelar','Devolução em preparação sem custo de envio',
-    'Devolução a caminho sem custo de envio','Devolução a caminho'];
-  var rows = dados.filter(function(r) {
-    var estado = String(r['Estado'] || '');
-    if (mlInvalid.some(function(x){ return estado.indexOf(x) !== -1; })) return false;
-    if (estado.indexOf('Pacote de') !== -1) return false;
-    if (!r['SKU'] || r['SKU'] === 'nan') return false;
-    return true;
+function finSetTab(t) {
+  _finTab = t;
+  document.querySelectorAll('.fin-tab').forEach(function(el){
+    el.classList.toggle('active', el.dataset.tab === t);
   });
-  var fat = 0, taxas = 0;
-  var skuMap = {};
-  rows.forEach(function(r) {
-    var rec = parseFloat(r['Receita por produtos (BRL)']) || 0;
-    var tar = parseFloat(r['Tarifa de venda e impostos (BRL)']) || 0;
-    var uni = parseFloat(r['Unidades']) || 0;
-    var sku = String(r['SKU'] || '').trim();
-    fat += rec;
-    taxas += tar; // já é negativo
-    if (sku) { skuMap[sku] = (skuMap[sku] || 0) + uni; }
+  var sections = { visao: 'fin-visao', upload: 'fin-upload', despesas: 'fin-despesas' };
+  Object.values(sections).forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.style.display = 'none';
   });
-  return { fat: fat, taxas: Math.abs(taxas), skuMap: skuMap, rows: rows.length };
-}
-
-function finProcessarShopee(dados) {
-  var invalido = ['Cancelado'];
-  var rows = dados.filter(function(r) {
-    var status = String(r['Status do pedido'] || '');
-    return invalido.indexOf(status) === -1 && r['Nº de referência do SKU principal'];
-  });
-  var fat = 0, taxas = 0;
-  var skuMap = {};
-  rows.forEach(function(r) {
-    var vt = parseFloat(r['Valor Total']) || 0;
-    var com = parseFloat(r['Taxa de comissão bruta']) || 0;
-    var srv = parseFloat(r['Taxa de serviço bruta']) || 0;
-    var qty = parseInt(r['Quantidade']) || 0;
-    var sku = String(r['Nº de referência do SKU principal'] || '').trim();
-    fat += vt;
-    taxas += (com + srv);
-    if (sku) { skuMap[sku] = (skuMap[sku] || 0) + qty; }
-  });
-  return { fat: fat, taxas: taxas, skuMap: skuMap, rows: rows.length };
-}
-
-function finProcessarTikTok(dados) {
-  var invalido = ['Cancelado','Não pago'];
-  var rows = dados.filter(function(r) {
-    return invalido.indexOf(String(r['Order Status'] || '')) === -1;
-  });
-  var fat = 0;
-  var skuMap = {};
-  var seen = {};
-  rows.forEach(function(r) {
-    var orderId = String(r['Order ID'] || '');
-    var sku = String(r['Seller SKU'] || '').trim();
-    var qty = parseInt(r['Quantity']) || 0;
-    var val = finParseBRL(r['SKU Subtotal After Discount']);
-    var key = orderId + '|' + sku;
-    if (!seen[key]) {
-      seen[key] = true;
-      fat += val;
-      if (sku) { skuMap[sku] = (skuMap[sku] || 0) + qty; }
-    }
-  });
-  return { fat: fat, taxas: 0, skuMap: skuMap, rows: rows.length };
-}
-
-function finMergeSkus(mlMap, spMap, ttMap) {
-  var all = {};
-  var SKU_NAMES = {
-    'oleo3':'Óleo de Coco 3L','oleo1':'Óleo de Coco 1L','oleo500':'Óleo de Coco 500mL',
-    'aveia500':'Aveia Flocos 500g','aveia1':'Aveia Flocos 1Kg','chips50':'Chips Vegetais 50g',
-    'chips500':'Chips Vegetais 500g','chia100':'Semente de Chia 100g','chia1':'Semente de Chia 1Kg',
-    'chia':'Semente de Chia','caju100':'Castanha de Caju 100g','caju1':'Castanha de Caju 1Kg',
-    'uva100':'Uva Passa Preta 100g','uva1':'Uva Passa Preta 1Kg','uva':'Uva Passa Preta',
-    'sal100':'Flor de Sal 100g','sal1':'Flor de Sal 1Kg','flordesal':'Flor de Sal',
-    'frutas50':'Frutas Tropicais 50g','frutas500':'Frutas Tropicais 500g',
-    'psy100':'Psyllium 100g','psy1':'Psyllium 1Kg','psyllium':'Psyllium',
-    'nozes100':'Nozes Quartz 100g','nozes1':'Nozes Quartz 1Kg',
-    'linhaca100':'Linhaça Dourada 100g','linhaca1':'Linhaça Dourada 1Kg','linhaca':'Linhaça Dourada',
-    'beterraba100':'Beterraba 100g','beterraba1':'Beterraba 1Kg',
-    'abobora100':'Semente Abóbora 100g','abobora1':'Semente Abóbora 1Kg',
-    'arroz200':'Flocos Arroz Natural 200g','arroz400':'Flocos Arroz Natural 400g',
-    'cacau200':'Flocos Arroz Cacau 200g','cacau500':'Flocos Arroz Cacau 500g','cacau400':'Flocos Arroz Cacau 400g',
-    'coco400':'Chips de Coco 400g','coco100':'Chips de Coco 100g',
-  };
-  function addMap(map, plat) {
-    Object.keys(map).forEach(function(sku) {
-      var skuKey = sku.toLowerCase().trim();
-      if (!all[skuKey]) all[skuKey] = { name: SKU_NAMES[skuKey] || sku, ml:0, shopee:0, tiktok:0, total:0 };
-      all[skuKey][plat] += map[sku];
-      all[skuKey].total += map[sku];
-    });
-  }
-  addMap(mlMap, 'ml');
-  addMap(spMap, 'shopee');
-  addMap(ttMap, 'tiktok');
-  return Object.values(all).sort(function(a,b){ return b.total - a.total; });
-}
-
-function finGetMesAtual() {
-  var meses = state.financeiro.meses || {};
-  var keys = Object.keys(meses);
-  if (!_finMesSel && keys.length > 0) _finMesSel = keys.sort().reverse()[0];
-  return _finMesSel ? (meses[_finMesSel] || null) : null;
-}
-
-function finCalc() {
-  var mes = finGetMesAtual();
-  if (!mes) return { fat_ml:0, fat_sp:0, fat_tt:0, fat:0, taxas:0, despesas:0, imposto:0, lucro:0, skus:[] };
-  var ml  = mes.ml  ? finProcessarML(mes.ml)       : { fat:0, taxas:0, skuMap:{} };
-  var sp  = mes.sp  ? finProcessarShopee(mes.sp)   : { fat:0, taxas:0, skuMap:{} };
-  var tt  = mes.tt  ? finProcessarTikTok(mes.tt)   : { fat:0, taxas:0, skuMap:{} };
-  var fat = ml.fat + sp.fat + tt.fat;
-  var taxas = ml.taxas + sp.taxas + tt.taxas;
-  var desp = (state.financeiro.depesas || state.financeiro.despesas || []).reduce(function(s,d){ return s + (d.valor||0); }, 0);
-  var aliq = parseFloat(state.financeiro.aliquota) || 0;
-  var imposto = fat * (aliq / 100);
-  var lucro = fat - taxas - desp - imposto;
-  var skus = finMergeSkus(ml.skuMap, sp.skuMap, tt.skuMap);
-  return { fat_ml:ml.fat, fat_sp:sp.fat, fat_tt:tt.fat, fat:fat, taxas:taxas, despesas:desp, imposto:imposto, lucro:lucro, skus:skus };
+  var show = document.getElementById(sections[t] || 'fin-visao');
+  if (show) show.style.display = '';
 }
 
 function finFmt(v) {
-  return 'R$ ' + Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 });
+  var n = parseFloat(v) || 0;
+  return 'R$ ' + Math.abs(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function finParseBRL(v) {
+  if (!v) return 0;
+  return parseFloat(String(v).replace(/BRL\s*/g,'').replace(/\./g,'').replace(',','.').trim()) || 0;
+}
+
+var ML_INVALID = ['Cancelada pelo comprador','Venda cancelada. Não envie.','Cancelada. Não despache',
+  'O seu comprador quer cancelar','Devolução em preparação','Devolução a caminho'];
+
+var SKU_NAMES = {
+  'oleo3':'Óleo de Coco 3L','oleo1':'Óleo de Coco 1L','oleo500':'Óleo de Coco 500mL',
+  'aveia500':'Aveia Flocos 500g','aveia1':'Aveia Flocos 1Kg','chips50':'Chips Vegetais 50g',
+  'chips500':'Chips Vegetais 500g','chia100':'Semente de Chia 100g','chia1':'Semente de Chia 1Kg',
+  'chia':'Semente de Chia','caju100':'Castanha de Caju 100g','caju1':'Castanha de Caju 1Kg',
+  'uva100':'Uva Passa Preta 100g','uva1':'Uva Passa Preta 1Kg','uva':'Uva Passa Preta',
+  'sal100':'Flor de Sal 100g','sal1':'Flor de Sal 1Kg','flordesal':'Flor de Sal',
+  'frutas50':'Frutas Tropicais 50g','frutas500':'Frutas Tropicais 500g',
+  'psy100':'Psyllium 100g','psy1':'Psyllium 1Kg','psyllium':'Psyllium',
+  'nozes100':'Nozes Quartz 100g','nozes1':'Nozes Quartz 1Kg',
+  'linhaca100':'Linhaça Dourada 100g','linhaca1':'Linhaça Dourada 1Kg','linhaca':'Linhaça Dourada',
+  'beterraba100':'Beterraba 100g','beterraba1':'Beterraba 1Kg',
+  'abobora100':'Sem. Abóbora 100g','abobora1':'Sem. Abóbora 1Kg',
+  'arroz200':'Flocos Arroz Natural 200g','arroz400':'Flocos Arroz Natural 400g',
+  'cacau200':'Flocos Arroz Cacau 200g','cacau500':'Flocos Arroz Cacau 500g','cacau400':'Flocos Arroz Cacau 400g',
+  'coco400':'Chips de Coco 400g','coco100':'Chips de Coco 100g',
+};
+
+function finCalcMes() {
+  var meses = state.financeiro.meses || {};
+  if (!_finMesSel) {
+    var keys = Object.keys(meses).sort().reverse();
+    _finMesSel = keys[0] || '';
+  }
+  var mes = _finMesSel ? meses[_finMesSel] : null;
+  var res = { fat_ml:0, fat_sp:0, fat_tt:0, fat:0, taxas_ml:0, taxas_sp:0, taxas:0,
+              despesas:0, imposto:0, lucro:0, skus:[] };
+  if (!mes) return res;
+
+  var skuMl={}, skuSp={}, skuTt={};
+
+  // ML
+  if (mes.ml && mes.ml.length) {
+    mes.ml.forEach(function(r) {
+      var estado = String(r['Estado']||'');
+      if (ML_INVALID.some(function(x){ return estado.indexOf(x)!==-1; })) return;
+      if (estado.indexOf('Pacote de')!==-1) return;
+      var sku = String(r['SKU']||'').trim();
+      if (!sku || sku==='nan') return;
+      var rec = parseFloat(r['Receita por produtos (BRL)'])||0;
+      var tar = parseFloat(r['Tarifa de venda e impostos (BRL)'])||0;
+      var uni = parseFloat(r['Unidades'])||0;
+      res.fat_ml += rec;
+      res.taxas_ml += Math.abs(tar);
+      skuMl[sku] = (skuMl[sku]||0) + uni;
+    });
+  }
+
+  // Shopee
+  if (mes.sp && mes.sp.length) {
+    mes.sp.forEach(function(r) {
+      var status = String(r['Status do pedido']||'');
+      if (status==='Cancelado') return;
+      var sku = String(r['Nº de referência do SKU principal']||'').trim();
+      if (!sku) return;
+      var vt  = parseFloat(r['Valor Total'])||0;
+      var com = parseFloat(r['Taxa de comissão bruta'])||0;
+      var srv = parseFloat(r['Taxa de serviço bruta'])||0;
+      var qty = parseInt(r['Quantidade'])||0;
+      res.fat_sp += vt;
+      res.taxas_sp += (com+srv);
+      skuSp[sku] = (skuSp[sku]||0) + qty;
+    });
+  }
+
+  // TikTok
+  if (mes.tt && mes.tt.length) {
+    var ttSeen = {};
+    mes.tt.forEach(function(r) {
+      var st = String(r['Order Status']||'');
+      if (st==='Cancelado'||st==='Não pago') return;
+      var sku = String(r['Seller SKU']||'').trim();
+      var oid = String(r['Order ID']||'');
+      var qty = parseInt(r['Quantity'])||0;
+      var val = finParseBRL(r['SKU Subtotal After Discount']);
+      var key = oid+'|'+sku;
+      if (!ttSeen[key]) {
+        ttSeen[key]=true;
+        res.fat_tt += val;
+        skuTt[sku]=(skuTt[sku]||0)+qty;
+      }
+    });
+  }
+
+  res.fat   = res.fat_ml + res.fat_sp + res.fat_tt;
+  res.taxas = res.taxas_ml + res.taxas_sp;
+
+  var desp = state.financeiro.despesas || [];
+  res.despesas = desp.reduce(function(s,d){ return s+(d.valor||0);},0);
+
+  var aliq = parseFloat(state.financeiro.aliquota)||0;
+  res.imposto = res.fat * (aliq/100);
+  res.lucro   = res.fat - res.taxas - res.despesas - res.imposto;
+
+  // SKU merge
+  var all = {};
+  function addSku(map, plat) {
+    Object.keys(map).forEach(function(sku){
+      var k = sku.toLowerCase().trim();
+      if (!all[k]) all[k]={ name:SKU_NAMES[k]||sku, ml:0, shopee:0, tiktok:0, total:0 };
+      all[k][plat] += map[sku];
+      all[k].total += map[sku];
+    });
+  }
+  addSku(skuMl,'ml'); addSku(skuSp,'shopee'); addSku(skuTt,'tiktok');
+  res.skus = Object.values(all).sort(function(a,b){ return b.total-a.total; });
+
+  return res;
 }
 
 function renderFinanceiro() {
-  var meses = state.financeiro.meses || {};
-  var keys = Object.keys(meses).sort().reverse();
-  if (!_finMesSel && keys.length > 0) _finMesSel = keys[0];
-  var calc = finCalc();
-  var isVis = _finTab === 'visao';
+  var meses  = state.financeiro.meses || {};
+  var mesKeys = Object.keys(meses).sort().reverse();
+  if (!_finMesSel && mesKeys.length) _finMesSel = mesKeys[0];
 
-  // Tab bar
-  function finTabBtn(id, icon, label) {
-    return '<button onclick="finSetTab(\"' + id + '\")" class="fin-tab' + (_finTab === id ? ' fin-tab-active' : '') + '">' + icon + ' ' + label + '</button>';
-  }
-  var tabBar = '<div style="display:flex;border-bottom:2px solid var(--border);margin-bottom:1.25rem">' +
-    finTabBtn('visao','📊','Visão Geral') +
-    finTabBtn('upload','📁','Importar Planilhas') +
-    finTabBtn('despesas','💸','Despesas') +
-  '</div>';
+  var MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  var calc   = finCalcMes();
+  var desp   = state.financeiro.despesas || [];
+  var aliq   = parseFloat(state.financeiro.aliquota)||0;
 
-  // Mês selector
-  var mesSel = '<div style="display:flex;align-items:center;gap:12px;margin-bottom:1.25rem;flex-wrap:wrap">' +
-    '<span style="font-size:0.85rem;color:var(--text2);font-weight:600">Mês:</span>';
-  if (keys.length === 0) {
-    mesSel += '<span style="font-size:0.85rem;color:var(--text3)">Nenhum mês importado ainda</span>';
-  } else {
-    keys.forEach(function(k) {
-      var parts = k.split('-');
-      var label = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(parts[1])-1] + '/' + parts[0];
-      var active = k === _finMesSel;
-      mesSel += '<button onclick="finSelMes(\"' + k + '\")" style="padding:4px 14px;border-radius:99px;border:1px solid ' +
-        (active ? 'var(--green)' : 'var(--border)') + ';background:' + (active ? 'var(--green)' : 'transparent') +
-        ';color:' + (active ? '#fff' : 'var(--text2)') + ';font-size:0.82rem;cursor:pointer;font-weight:' + (active ? '600' : '400') + '">' + label + '</button>';
+  /* ── PILL SELETOR DE MÊS ── */
+  var mesPills = '';
+  mesKeys.forEach(function(k){
+    var p=k.split('-'); var lbl=MONTHS[parseInt(p[1])-1]+'/'+p[0];
+    var act=k===_finMesSel;
+    mesPills += '<button class="fin-mes-pill'+(act?' active':'')+'" onclick="finSelMes(\''+k+'\')">' + lbl + '</button>';
+  });
+
+  /* ── PIE CHART SVG ── */
+  function pieSVG(fatMl, fatSp, fatTt) {
+    var total = fatMl+fatSp+fatTt || 1;
+    var segs = [
+      {v:fatMl, c:'#f97316', l:'Mercado Livre'},
+      {v:fatSp, c:'#EE4D2D', l:'Shopee'},
+      {v:fatTt, c:'#6366f1', l:'TikTok'},
+    ];
+    var cx=85,cy=85,r=68, out='', angle=-Math.PI/2;
+    segs.forEach(function(s){
+      if(s.v<=0) return;
+      var a=s.v/total*2*Math.PI;
+      var x1=cx+r*Math.cos(angle), y1=cy+r*Math.sin(angle);
+      var x2=cx+r*Math.cos(angle+a), y2=cy+r*Math.sin(angle+a);
+      var lg=a>Math.PI?1:0;
+      out+='<path d="M'+cx+' '+cy+' L'+x1.toFixed(1)+' '+y1.toFixed(1)+' A'+r+' '+r+' 0 '+lg+' 1 '+x2.toFixed(1)+' '+y2.toFixed(1)+' Z" fill="'+s.c+'" stroke="#fff" stroke-width="2.5"/>';
+      angle+=a;
     });
-  }
-  mesSel += '</div>';
-
-  if (_finTab === 'upload') return tabBar + renderFinUpload();
-  if (_finTab === 'despesas') return tabBar + mesSel + renderFinDespesas(calc);
-
-  // ── VISÃO GERAL ──────────────────────────────────────────────────────────
-  var mes = finGetMesAtual();
-  if (!mes && keys.length === 0) {
-    return tabBar + '<div class="card" style="text-align:center;padding:3rem;color:var(--text3)">' +
-      '<div style="font-size:2.5rem;margin-bottom:1rem">📊</div>' +
-      '<div style="font-size:1.1rem;font-weight:600;margin-bottom:0.5rem">Nenhum dado importado</div>' +
-      '<div style="font-size:0.9rem">Vá em <b>Importar Planilhas</b> para começar</div></div>';
-  }
-
-  var lucroColor = calc.lucro >= 0 ? 'var(--green)' : 'var(--red)';
-
-  // ── ROW 1: 5 cards + pizza ───────────────────────────────────────────────
-  var pieData = [
-    { label:'Mercado Livre', val:calc.fat_ml, color:'#f97316' },
-    { label:'Shopee', val:calc.fat_sp, color:'#EE4D2D' },
-    { label:'TikTok', val:calc.fat_tt, color:'#010101' },
-  ];
-  var pieTotal = calc.fat || 1;
-
-  function buildPieSVG() {
-    var cx=90, cy=90, r=70, gap=2;
-    var segments = '';
-    var legend = '';
-    var startAngle = -Math.PI/2;
-    pieData.forEach(function(d) {
-      var pct = d.val / pieTotal;
-      var angle = pct * 2 * Math.PI;
-      if (angle < 0.01) return;
-      var endAngle = startAngle + angle;
-      var x1=cx+r*Math.cos(startAngle), y1=cy+r*Math.sin(startAngle);
-      var x2=cx+r*Math.cos(endAngle), y2=cy+r*Math.sin(endAngle);
-      var large = angle > Math.PI ? 1 : 0;
-      segments += '<path d="M'+cx+' '+cy+' L'+x1+' '+y1+' A'+r+' '+r+' 0 '+large+' 1 '+x2+' '+y2+' Z" fill="'+d.color+'" stroke="#fff" stroke-width="2"/>';
-      legend += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">' +
-        '<div style="width:10px;height:10px;border-radius:2px;background:'+d.color+';flex-shrink:0"></div>' +
-        '<div style="font-size:0.75rem;color:var(--text2)">' + d.label + '</div>' +
-        '<div style="font-size:0.75rem;font-weight:700;color:var(--text);margin-left:auto">' + (pct*100).toFixed(1) + '%</div>' +
-      '</div>';
-      startAngle = endAngle;
+    var legend='';
+    segs.forEach(function(s){
+      var pct=total>0?(s.v/total*100).toFixed(1):'0.0';
+      legend+='<div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">'+
+        '<div style="width:10px;height:10px;border-radius:2px;flex-shrink:0;background:'+s.c+'"></div>'+
+        '<span style="font-size:0.78rem;color:var(--text2);flex:1">'+s.l+'</span>'+
+        '<span style="font-size:0.78rem;font-weight:700;color:var(--text)">'+pct+'%</span></div>';
     });
-    return '<svg viewBox="0 0 180 180" style="width:140px;height:140px">' + segments + '</svg>' +
-           '<div style="margin-top:10px;width:100%">' + legend + '</div>';
+    return '<div style="display:flex;flex-direction:column;align-items:center;gap:10px">'+
+      '<svg viewBox="0 0 170 170" style="width:150px;height:150px">'+out+'</svg>'+
+      '<div style="width:100%">'+legend+'</div>'+
+      '<div style="font-size:0.75rem;color:var(--text3);text-align:center">Total: '+finFmt(calc.fat)+'</div>'+
+    '</div>';
   }
 
-  var cards5 = [
-    { label:'Lucro Líquido', val:calc.lucro, color: lucroColor, icon:'📈', extra:'= Fat. - Despesas - Taxas - Imposto', clickable:false },
-    { label:'Faturamento Total', val:calc.fat, color:'var(--text)', icon:'💰', extra:'ML + Shopee + TikTok', clickable:false },
-    { label:'Taxas de Venda', val:calc.taxas, color:'var(--red)', icon:'🏦', extra:'Comissões das plataformas', clickable:false, neg:true },
-    { label:'Despesas', val:calc.despesas, color:'var(--red)', icon:'💸', extra:'Total lançado em despesas', clickable:false, neg:true },
-    { label:'Imposto (' + (state.financeiro.aliquota||0) + '%)', val:calc.imposto, color:'#f97316', icon:'🧾',
-      extra:'Clique para definir alíquota', clickable:true, onclick:'finEditAliquota()' },
-  ];
-
-  var row1 = '<div style="display:grid;grid-template-columns:1fr 1.4fr;gap:1.25rem;margin-bottom:1.25rem;align-items:start">' +
-    // Left: 5 cards
-    '<div style="display:flex;flex-direction:column;gap:0.75rem">';
-  cards5.forEach(function(c) {
-    row1 += '<div class="card" style="padding:0.9rem 1rem;cursor:' + (c.clickable?'pointer':'default') + '" ' +
-      (c.clickable ? 'onclick="'+c.onclick+'" title="Clique para editar"' : '') + '>' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">' +
-        '<span style="font-size:0.78rem;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">' + c.icon + ' ' + c.label + '</span>' +
-        (c.clickable ? '<span style="font-size:0.7rem;color:var(--text3)">✏️ editar</span>' : '') +
-      '</div>' +
-      '<div style="font-size:1.35rem;font-weight:800;color:' + c.color + '">' + (c.neg?'- ':'') + finFmt(c.val) + '</div>' +
-      '<div style="font-size:0.72rem;color:var(--text3);margin-top:2px">' + c.extra + '</div>' +
+  /* ── VISÃO GERAL ── */
+  var lucroColor = calc.lucro>=0?'var(--green)':'var(--red)';
+  var visaoHtml =
+    /* ROW 1 */
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem">'+
+      /* Left: 5 KPI cards */
+      '<div style="display:flex;flex-direction:column;gap:0.7rem">'+
+        /* Lucro */
+        '<div class="fin-kpi" style="border-left:4px solid '+(calc.lucro>=0?'var(--green)':'var(--red)')+'">'+
+          '<div class="fin-kpi-label">📈 Lucro Líquido</div>'+
+          '<div class="fin-kpi-val" style="color:'+lucroColor+'">'+(calc.lucro<0?'- ':'')+finFmt(calc.lucro)+'</div>'+
+          '<div class="fin-kpi-sub">= Faturamento - Despesas - Taxas - Imposto</div>'+
+        '</div>'+
+        /* Faturamento */
+        '<div class="fin-kpi" style="border-left:4px solid var(--blue)">'+
+          '<div class="fin-kpi-label">💰 Faturamento Total</div>'+
+          '<div class="fin-kpi-val">'+finFmt(calc.fat)+'</div>'+
+          '<div class="fin-kpi-sub">ML + Shopee + TikTok</div>'+
+        '</div>'+
+        /* Taxas */
+        '<div class="fin-kpi" style="border-left:4px solid var(--amber)">'+
+          '<div class="fin-kpi-label">🏦 Taxas de Venda</div>'+
+          '<div class="fin-kpi-val" style="color:var(--amber)">- '+finFmt(calc.taxas)+'</div>'+
+          '<div class="fin-kpi-sub">ML '+finFmt(calc.taxas_ml)+' · Shopee '+finFmt(calc.taxas_sp)+'</div>'+
+        '</div>'+
+        /* Despesas */
+        '<div class="fin-kpi" style="border-left:4px solid var(--red)">'+
+          '<div class="fin-kpi-label">💸 Despesas</div>'+
+          '<div class="fin-kpi-val" style="color:var(--red)">- '+finFmt(calc.despesas)+'</div>'+
+          '<div class="fin-kpi-sub">'+(desp.length)+' lançamento(s)</div>'+
+        '</div>'+
+        /* Imposto clicável */
+        '<div class="fin-kpi" style="border-left:4px solid #8b5cf6;cursor:pointer" onclick="finEditAliquota()" title="Clique para editar alíquota">'+
+          '<div class="fin-kpi-label">🧾 Imposto <span style="font-size:0.68rem;color:var(--text3);margin-left:auto">✏️ '+aliq+'% — clique para editar</span></div>'+
+          '<div class="fin-kpi-val" style="color:#8b5cf6">- '+finFmt(calc.imposto)+'</div>'+
+          '<div class="fin-kpi-sub">'+aliq+'% sobre o faturamento</div>'+
+        '</div>'+
+      '</div>'+
+      /* Right: pizza */
+      '<div class="fin-kpi" style="display:flex;flex-direction:column;justify-content:center;align-items:center;padding:1.5rem">'+
+        '<div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--text3);margin-bottom:1rem">Participação no Faturamento</div>'+
+        pieSVG(calc.fat_ml, calc.fat_sp, calc.fat_tt)+
+      '</div>'+
+    '</div>'+
+    /* ROW 2 */
+    '<div style="display:grid;grid-template-columns:1fr 1.5fr;gap:1.25rem">'+
+      /* Left: 3 plat cards */
+      '<div style="display:flex;flex-direction:column;gap:0.7rem">'+
+        (function(){
+          var cards=[
+            {icon:'🟠',l:'Mercado Livre',v:calc.fat_ml,c:'#f97316'},
+            {icon:'🔴',l:'Shopee',v:calc.fat_sp,c:'#EE4D2D'},
+            {icon:'⚫',l:'TikTok Shop',v:calc.fat_tt,c:'#6366f1'},
+          ];
+          return cards.map(function(c){
+            var pct=calc.fat>0?(c.v/calc.fat*100).toFixed(1):0;
+            return '<div class="fin-kpi">'+
+              '<div class="fin-kpi-label">'+c.icon+' '+c.l+'<span style="margin-left:auto;font-weight:500;color:var(--text3)">'+pct+'%</span></div>'+
+              '<div class="fin-kpi-val" style="color:'+c.c+'">'+finFmt(c.v)+'</div>'+
+              '<div class="fin-plat-bar"><div class="fin-plat-fill" style="width:'+pct+'%;background:'+c.c+'"></div></div>'+
+            '</div>';
+          }).join('');
+        })() +
+      '</div>'+
+      /* Right: ranking */
+      '<div class="fin-kpi" style="padding:1rem">'+
+        '<div style="font-size:0.8rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.75rem">🏆 Ranking de Produtos (unidades)</div>'+
+        '<div class="fin-rank-row" style="font-size:0.7rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.3px;border-bottom:2px solid var(--border)">'+
+          '<span>Produto</span><span style="text-align:center">🟠ML</span><span style="text-align:center">🔴SP</span><span style="text-align:center">⚫TT</span><span style="text-align:center;font-weight:800">Total</span>'+
+        '</div>'+
+        '<div style="max-height:260px;overflow-y:auto">'+
+          (calc.skus.length===0?'<div style="text-align:center;padding:2rem;color:var(--text3);font-size:0.85rem">Importe as planilhas para ver o ranking</div>':
+          calc.skus.slice(0,25).map(function(s,i){
+            var medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
+            return '<div class="fin-rank-row">'+
+              '<span style="font-size:0.8rem;color:var(--text);font-weight:'+(i<3?700:400)+'">'+medal+' '+s.name+'</span>'+
+              '<span style="text-align:center;font-size:0.82rem;color:'+(s.ml?'#f97316':'var(--text3)')+';font-weight:600">'+(s.ml||'—')+'</span>'+
+              '<span style="text-align:center;font-size:0.82rem;color:'+(s.shopee?'#EE4D2D':'var(--text3)')+';font-weight:600">'+(s.shopee||'—')+'</span>'+
+              '<span style="text-align:center;font-size:0.82rem;color:'+(s.tiktok?'#6366f1':'var(--text3)')+';font-weight:600">'+(s.tiktok||'—')+'</span>'+
+              '<span style="text-align:center;font-size:0.85rem;font-weight:800;color:var(--text)">'+s.total+'</span>'+
+            '</div>';
+          }).join(''))+
+        '</div>'+
+      '</div>'+
     '</div>';
-  });
-  row1 += '</div>' +
-    // Right: pizza
-    '<div class="card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.25rem;min-height:100%">' +
-      '<div style="font-size:0.85rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:1rem">Participação no Faturamento</div>' +
-      buildPieSVG() +
-      '<div style="margin-top:12px;font-size:0.8rem;color:var(--text3);text-align:center">Total: ' + finFmt(calc.fat) + '</div>' +
-    '</div>' +
-  '</div>';
 
-  // ── ROW 2: 3 cards plataformas + ranking ────────────────────────────────
-  var platCards = [
-    { label:'Mercado Livre', val:calc.fat_ml, color:'#f97316', icon:'🟠', pct: calc.fat > 0 ? (calc.fat_ml/calc.fat*100).toFixed(1) : 0 },
-    { label:'Shopee', val:calc.fat_sp, color:'#EE4D2D', icon:'🔴', pct: calc.fat > 0 ? (calc.fat_sp/calc.fat*100).toFixed(1) : 0 },
-    { label:'TikTok Shop', val:calc.fat_tt, color:'#010101', icon:'⚫', pct: calc.fat > 0 ? (calc.fat_tt/calc.fat*100).toFixed(1) : 0 },
-  ];
-
-  var row2 = '<div style="display:grid;grid-template-columns:1fr 1.4fr;gap:1.25rem">' +
-    '<div style="display:flex;flex-direction:column;gap:0.75rem">';
-  platCards.forEach(function(c) {
-    row2 += '<div class="card" style="padding:0.9rem 1rem">' +
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
-        '<span style="font-size:1rem">' + c.icon + '</span>' +
-        '<span style="font-size:0.82rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.4px">' + c.label + '</span>' +
-        '<span style="margin-left:auto;font-size:0.75rem;color:var(--text3)">' + c.pct + '% do total</span>' +
-      '</div>' +
-      '<div style="font-size:1.4rem;font-weight:800;color:' + c.color + '">' + finFmt(c.val) + '</div>' +
-      '<div style="height:4px;background:var(--border);border-radius:99px;margin-top:8px;overflow:hidden">' +
-        '<div style="height:100%;width:' + c.pct + '%;background:' + c.color + ';border-radius:99px;transition:width 0.4s"></div>' +
-      '</div>' +
+  /* ── UPLOAD ── */
+  var uploadHtml =
+    '<div style="max-width:640px">'+
+      '<div class="fin-upload-box" style="margin-bottom:1.25rem">'+
+        '<div class="card-header" style="margin-bottom:1rem"><span class="card-title">📁 Importar Planilhas</span></div>'+
+        '<div style="display:grid;gap:1rem">'+
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">'+
+            '<div class="fin-file-group">'+
+              '<label>📅 Mês de referência</label>'+
+              '<input type="month" id="fin-mes-input" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;background:var(--input-bg);color:var(--text);font-size:0.9rem;width:100%">'+
+            '</div>'+
+            '<div></div>'+
+          '</div>'+
+          '<div class="fin-file-group">'+
+            '<label>🟠 Mercado Livre (.xlsx)</label>'+
+            '<input type="file" id="fin-ml-file" accept=".xlsx,.xls">'+
+          '</div>'+
+          '<div class="fin-file-group">'+
+            '<label>🔴 Shopee (.xlsx)</label>'+
+            '<input type="file" id="fin-sp-file" accept=".xlsx,.xls">'+
+          '</div>'+
+          '<div class="fin-file-group">'+
+            '<label>⚫ TikTok Shop (.xlsx)</label>'+
+            '<input type="file" id="fin-tt-file" accept=".xlsx,.xls">'+
+          '</div>'+
+          '<div id="fin-upload-status" style="font-size:0.85rem;color:var(--text2);min-height:22px;padding:4px 0"></div>'+
+          '<button class="btn btn-green" id="fin-upload-btn" style="padding:0.75rem;font-size:0.95rem">⬆ Importar Planilhas</button>'+
+        '</div>'+
+      '</div>'+
+      (mesKeys.length?
+        '<div class="fin-upload-box">'+
+          '<div class="card-header" style="margin-bottom:0.75rem"><span class="card-title">📆 Meses Importados</span></div>'+
+          mesKeys.map(function(k){
+            var p=k.split('-'); var lbl=MONTHS[parseInt(p[1])-1]+'/'+p[0];
+            var mes=meses[k];
+            return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">'+
+              '<div>'+
+                '<div style="font-weight:600;font-size:0.9rem;color:var(--text)">'+lbl+'</div>'+
+                '<div style="font-size:0.75rem;color:var(--text3);margin-top:2px">'+
+                  (mes.ml?'✅ ML ':'⬜ ML ')+(mes.sp?'✅ Shopee ':'⬜ Shopee ')+(mes.tt?'✅ TikTok':'⬜ TikTok')+
+                '</div>'+
+              '</div>'+
+              '<button onclick="finExcluirMes(\''+k+'\')" style="background:var(--red);color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:0.78rem;cursor:pointer;font-family:inherit">🗑 Excluir</button>'+
+            '</div>';
+          }).join('')+
+        '</div>'
+      :'')+
     '</div>';
-  });
-  row2 += '</div>';
 
-  // Ranking produtos
-  var rankHtml = '<div class="card" style="padding:1rem">' +
-    '<div style="font-size:0.85rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.75rem">🏆 Ranking de Produtos (por unidades)</div>' +
-    '<div style="display:grid;grid-template-columns:1.8fr 0.6fr 0.6fr 0.6fr 0.8fr;gap:0;font-size:0.72rem;font-weight:700;color:var(--text3);padding:0 0 6px;border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:0.3px">' +
-      '<span>Produto</span><span style="text-align:center">🟠 ML</span><span style="text-align:center">🔴 Shopee</span><span style="text-align:center">⚫ TikTok</span><span style="text-align:center">Total</span>' +
-    '</div>' +
-    '<div style="max-height:280px;overflow-y:auto">';
-
-  calc.skus.slice(0,30).forEach(function(s, i) {
-    rankHtml += '<div style="display:grid;grid-template-columns:1.8fr 0.6fr 0.6fr 0.6fr 0.8fr;gap:0;padding:7px 0;border-bottom:1px solid var(--border);align-items:center;background:' + (i%2===0?'transparent':'var(--bg3)') + '">' +
-      '<div style="font-size:0.8rem;color:var(--text);font-weight:' + (i<3?'700':'400') + '">' + (i<3?['🥇','🥈','🥉'][i]+' ':'') + s.name + '</div>' +
-      '<div style="text-align:center;font-size:0.82rem;color:' + (s.ml>0?'#f97316':'var(--text3)') + ';font-weight:600">' + (s.ml||'—') + '</div>' +
-      '<div style="text-align:center;font-size:0.82rem;color:' + (s.shopee>0?'#EE4D2D':'var(--text3)') + ';font-weight:600">' + (s.shopee||'—') + '</div>' +
-      '<div style="text-align:center;font-size:0.82rem;color:' + (s.tiktok>0?'#555':'var(--text3)') + ';font-weight:600">' + (s.tiktok||'—') + '</div>' +
-      '<div style="text-align:center;font-size:0.85rem;font-weight:800;color:var(--text)">' + s.total + '</div>' +
+  /* ── DESPESAS ── */
+  var despTotal = desp.reduce(function(s,d){return s+(d.valor||0);},0);
+  var despHtml =
+    '<div style="max-width:640px">'+
+      '<div class="fin-upload-box" style="margin-bottom:1.25rem">'+
+        '<div class="card-header" style="margin-bottom:1rem"><span class="card-title">💸 Nova Despesa</span></div>'+
+        '<div style="display:grid;grid-template-columns:1fr 150px;gap:10px;margin-bottom:10px">'+
+          '<input type="text" id="fin-desp-desc" placeholder="Descrição (ex: Embalagens, Frete...)" style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:0.9rem;background:var(--input-bg);color:var(--text)">'+
+          '<input type="number" id="fin-desp-val" placeholder="Valor R$" min="0" step="0.01" style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:0.9rem;background:var(--input-bg);color:var(--text)">'+
+        '</div>'+
+        '<button class="btn btn-green" onclick="finAddDespesa()" style="padding:0.65rem 1.5rem">+ Adicionar Despesa</button>'+
+      '</div>'+
+      '<div class="fin-upload-box">'+
+        '<div class="card-header" style="margin-bottom:0.75rem">'+
+          '<span class="card-title">Lista de Despesas</span>'+
+          '<span style="font-size:0.88rem;font-weight:700;color:var(--red)">Total: '+finFmt(despTotal)+'</span>'+
+        '</div>'+
+        (desp.length===0?
+          '<div style="text-align:center;padding:2rem;color:var(--text3);font-size:0.9rem">Nenhuma despesa cadastrada</div>':
+          '<div class="fin-rank-row" style="font-size:0.72rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.4px;border-bottom:2px solid var(--border)">'+
+            '<span style="grid-column:1">Descrição</span><span style="grid-column:2;text-align:right">Valor</span><span></span>'+
+          '</div>'+
+          desp.map(function(d,i){
+            return '<div class="fin-desp-row">'+
+              '<span style="font-size:0.9rem;color:var(--text)">'+d.desc+'</span>'+
+              '<span style="font-size:0.9rem;font-weight:700;color:var(--red);text-align:right">- '+finFmt(d.valor)+'</span>'+
+              '<button onclick="finDelDespesa('+i+')" style="background:none;border:1px solid var(--border);color:var(--red);border-radius:6px;padding:4px 10px;font-size:0.78rem;cursor:pointer;font-family:inherit">🗑 Apagar</button>'+
+            '</div>';
+          }).join(''))+
+      '</div>'+
     '</div>';
-  });
-  rankHtml += '</div></div>';
-  row2 += rankHtml + '</div>';
 
-  return tabBar + mesSel + row1 + row2;
+  /* ── EMPTY STATE ── */
+  if (mesKeys.length===0 && _finTab==='visao') {
+    visaoHtml = '<div class="card" style="text-align:center;padding:3.5rem;color:var(--text3)">'+
+      '<div style="font-size:3rem;margin-bottom:1rem">📊</div>'+
+      '<div style="font-size:1.1rem;font-weight:700;color:var(--text);margin-bottom:0.5rem">Nenhum dado importado</div>'+
+      '<div style="font-size:0.9rem;margin-bottom:1.5rem">Importe as planilhas para ver o painel financeiro</div>'+
+      '<button class="btn btn-green" onclick="finSetTab(\'upload\')" style="padding:0.65rem 1.5rem">📁 Importar Planilhas</button>'+
+    '</div>';
+  }
+
+  /* ── PILL MÊS STYLE ── */
+  var pillStyle = '<style>.fin-mes-pill{padding:4px 14px;border-radius:99px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:0.8rem;cursor:pointer;font-family:inherit;transition:all 0.15s}.fin-mes-pill.active{background:var(--green);border-color:var(--green);color:#fff;font-weight:600}.fin-mes-pill:hover:not(.active){background:var(--bg3)}</style>';
+
+  return pillStyle+
+    '<div class="fin-tabs" id="fin-tabs">'+
+      '<button class="fin-tab'+(_finTab==='visao'?' active':'')+'" data-tab="visao" onclick="finSetTab(\'visao\')">📊 Visão Geral</button>'+
+      '<button class="fin-tab'+(_finTab==='upload'?' active':'')+'" data-tab="upload" onclick="finSetTab(\'upload\')">📁 Importar Planilhas</button>'+
+      '<button class="fin-tab'+(_finTab==='despesas'?' active':'')+'" data-tab="despesas" onclick="finSetTab(\'despesas\')">💸 Despesas</button>'+
+    '</div>'+
+    (mesKeys.length && _finTab==='visao'?
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:1.25rem;flex-wrap:wrap">'+
+        '<span style="font-size:0.8rem;font-weight:600;color:var(--text3)">MÊS:</span>'+mesPills+
+      '</div>':'')+
+    '<div id="fin-visao"  style="display:'+(_finTab==='visao'?'':'none')+'">'+visaoHtml+'</div>'+
+    '<div id="fin-upload" style="display:'+(_finTab==='upload'?'':'none')+'">'+uploadHtml+'</div>'+
+    '<div id="fin-despesas" style="display:'+(_finTab==='despesas'?'':'none')+'">'+despHtml+'</div>';
 }
 
-function renderFinUpload() {
-  var meses = state.financeiro.meses || {};
-  var keys = Object.keys(meses).sort().reverse();
-
-  var html = '<div style="max-width:700px">' +
-    '<div class="card" style="margin-bottom:1.25rem">' +
-      '<div class="card-header"><span class="card-title">📁 Importar Planilhas</span></div>' +
-      '<div style="display:grid;gap:1rem;margin-top:0.5rem">' +
-        '<div>' +
-          '<label style="font-size:0.82rem;font-weight:600;color:var(--text2);display:block;margin-bottom:6px">📅 Mês de referência</label>' +
-          '<input type="month" id="fin-mes-input" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:0.9rem;background:var(--input-bg);color:var(--text);width:200px">' +
-        '</div>' +
-        '<div>' +
-          '<label style="font-size:0.82rem;font-weight:600;color:var(--text2);display:block;margin-bottom:6px">🟠 Planilha Mercado Livre (.xlsx)</label>' +
-          '<input type="file" id="fin-ml-file" accept=".xlsx" style="font-size:0.85rem;color:var(--text2)">' +
-        '</div>' +
-        '<div>' +
-          '<label style="font-size:0.82rem;font-weight:600;color:var(--text2);display:block;margin-bottom:6px">🔴 Planilha Shopee (.xlsx)</label>' +
-          '<input type="file" id="fin-sp-file" accept=".xlsx" style="font-size:0.85rem;color:var(--text2)">' +
-        '</div>' +
-        '<div>' +
-          '<label style="font-size:0.82rem;font-weight:600;color:var(--text2);display:block;margin-bottom:6px">⚫ Planilha TikTok (.xlsx)</label>' +
-          '<input type="file" id="fin-tt-file" accept=".xlsx" style="font-size:0.85rem;color:var(--text2)">' +
-        '</div>' +
-        '<div id="fin-upload-status" style="font-size:0.85rem;color:var(--text2);min-height:1.2em"></div>' +
-        '<button class="btn btn-green" onclick="finImportar()" style="width:100%;padding:0.75rem">⬆ Importar Planilhas</button>' +
-      '</div>' +
-    '</div>';
-
-  // Meses importados
-  if (keys.length > 0) {
-    html += '<div class="card">' +
-      '<div class="card-header"><span class="card-title">📆 Meses Importados</span></div>' +
-      '<div style="margin-top:0.5rem;display:flex;flex-direction:column;gap:8px">';
-    keys.forEach(function(k) {
-      var mes = meses[k];
-      var parts = k.split('-');
-      var label = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][parseInt(parts[1])-1] + ' ' + parts[0];
-      html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">' +
-        '<div>' +
-          '<div style="font-weight:600;font-size:0.9rem;color:var(--text)">' + label + '</div>' +
-          '<div style="font-size:0.75rem;color:var(--text3);margin-top:2px">' +
-            (mes.ml ? '✓ ML ' : '✗ ML ') + (mes.sp ? '✓ Shopee ' : '✗ Shopee ') + (mes.tt ? '✓ TikTok' : '✗ TikTok') +
-          '</div>' +
-        '</div>' +
-        '<button onclick="finExcluirMes(\"' + k + '\")" style="background:var(--red);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:0.78rem;cursor:pointer">Excluir</button>' +
-      '</div>';
-    });
-    html += '</div></div>';
+function bindFinanceiro() {
+  var mesInp = document.getElementById('fin-mes-input');
+  if (mesInp && !mesInp.value) {
+    var now = new Date();
+    mesInp.value = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
   }
-
-  html += '</div>';
-  return html;
-}
-
-function renderFinDespesas(calc) {
-  var despesas = state.financeiro.despesas || [];
-  var total = despesas.reduce(function(s,d){ return s + (d.valor||0); }, 0);
-
-  var html = '<div style="max-width:700px">' +
-    '<div class="card" style="margin-bottom:1.25rem">' +
-      '<div class="card-header"><span class="card-title">💸 Nova Despesa</span></div>' +
-      '<div style="display:grid;grid-template-columns:1fr 150px auto;gap:10px;align-items:end;margin-top:0.5rem">' +
-        '<div>' +
-          '<label style="font-size:0.8rem;font-weight:600;color:var(--text2);display:block;margin-bottom:4px">Descrição</label>' +
-          '<input type="text" id="fin-desp-desc" placeholder="Ex: Embalagens, Frete, Funcionário..." style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:0.9rem;background:var(--input-bg);color:var(--text);width:100%">' +
-        '</div>' +
-        '<div>' +
-          '<label style="font-size:0.8rem;font-weight:600;color:var(--text2);display:block;margin-bottom:4px">Valor (R$)</label>' +
-          '<input type="number" id="fin-desp-val" placeholder="0,00" min="0" step="0.01" style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:0.9rem;background:var(--input-bg);color:var(--text);width:100%">' +
-        '</div>' +
-        '<button class="btn btn-green" onclick="finAddDespesa()" style="padding:8px 16px;white-space:nowrap">+ Adicionar</button>' +
-      '</div>' +
-    '</div>' +
-    '<div class="card">' +
-      '<div class="card-header">' +
-        '<span class="card-title">Lista de Despesas</span>' +
-        '<span style="font-size:0.85rem;color:var(--red);font-weight:700">Total: ' + finFmt(total) + '</span>' +
-      '</div>';
-
-  if (despesas.length === 0) {
-    html += '<div style="text-align:center;padding:2rem;color:var(--text3);font-size:0.9rem">Nenhuma despesa cadastrada</div>';
-  } else {
-    html += '<div style="margin-top:0.5rem">' +
-      '<div style="display:grid;grid-template-columns:1fr 120px 80px;gap:8px;padding:6px 0;border-bottom:2px solid var(--border);font-size:0.78rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.4px">' +
-        '<span>Descrição</span><span style="text-align:right">Valor</span><span></span>' +
-      '</div>';
-    despesas.forEach(function(d, i) {
-      html += '<div style="display:grid;grid-template-columns:1fr 120px 80px;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">' +
-        '<div style="font-size:0.9rem;color:var(--text)">' + d.desc + '</div>' +
-        '<div style="font-size:0.9rem;font-weight:600;color:var(--red);text-align:right">- ' + finFmt(d.valor) + '</div>' +
-        '<button onclick="finDelDespesa(' + i + ')" style="background:none;border:1px solid var(--border);color:var(--red);border-radius:6px;padding:3px 8px;font-size:0.78rem;cursor:pointer">🗑 Apagar</button>' +
-      '</div>';
-    });
-    html += '</div>';
-  }
-  html += '</div></div>';
-  return html;
+  var btn = document.getElementById('fin-upload-btn');
+  if (btn) btn.onclick = finImportar;
 }
 
 function finSelMes(k) {
@@ -6639,133 +6659,125 @@ function finSelMes(k) {
 }
 
 function finExcluirMes(k) {
-  if (!confirm('Excluir dados de ' + k + '?')) return;
+  if (!confirm('Excluir dados de '+k+'?')) return;
   delete state.financeiro.meses[k];
-  if (_finMesSel === k) _finMesSel = '';
+  if (_finMesSel===k) _finMesSel='';
   saveState();
   navigate('financeiro');
 }
 
 function finEditAliquota() {
-  var atual = state.financeiro.aliquota || 0;
-  var novo = prompt('Alíquota de imposto (% sobre faturamento):', atual);
-  if (novo === null) return;
+  var atual = state.financeiro.aliquota||0;
+  var novo = prompt('Alíquota de imposto (% sobre o faturamento bruto):', atual);
+  if (novo===null) return;
   var val = parseFloat(String(novo).replace(',','.'));
-  if (isNaN(val) || val < 0 || val > 100) { alert('Valor inválido.'); return; }
+  if (isNaN(val)||val<0||val>100) { alert('Valor inválido. Informe um número entre 0 e 100.'); return; }
   state.financeiro.aliquota = val;
   saveState();
   navigate('financeiro');
 }
 
 function finAddDespesa() {
-  var desc = (document.getElementById('fin-desp-desc')||{}).value || '';
-  var val  = parseFloat(((document.getElementById('fin-desp-val')||{}).value||'0').replace(',','.'));
-  if (!desc.trim()) { alert('Informe a descrição.'); return; }
-  if (!val || val <= 0) { alert('Informe um valor válido.'); return; }
-  if (!state.financeiro.despesas) state.financeiro.despesas = [];
-  state.financeiro.despesas.push({ desc: desc.trim(), valor: val, data: new Date().toLocaleDateString('pt-BR') });
+  var descEl = document.getElementById('fin-desp-desc');
+  var valEl  = document.getElementById('fin-desp-val');
+  var desc = descEl ? descEl.value.trim() : '';
+  var val  = valEl  ? parseFloat(valEl.value.replace(',','.')) : 0;
+  if (!desc) { alert('Informe a descrição.'); return; }
+  if (!val||val<=0) { alert('Informe um valor válido.'); return; }
+  if (!state.financeiro.despesas) state.financeiro.despesas=[];
+  state.financeiro.despesas.push({ desc:desc, valor:val, data:new Date().toLocaleDateString('pt-BR') });
   saveState();
   navigate('financeiro');
 }
 
 function finDelDespesa(i) {
-  if (!confirm('Remover despesa?')) return;
-  state.financeiro.despesas.splice(i, 1);
+  if (!confirm('Remover esta despesa?')) return;
+  state.financeiro.despesas.splice(i,1);
   saveState();
   navigate('financeiro');
 }
 
 async function finImportar() {
-  var mesInput = document.getElementById('fin-mes-input');
-  var mlFile = document.getElementById('fin-ml-file');
-  var spFile = document.getElementById('fin-sp-file');
-  var ttFile = document.getElementById('fin-tt-file');
+  var mesInp = document.getElementById('fin-mes-input');
+  var mlInp  = document.getElementById('fin-ml-file');
+  var spInp  = document.getElementById('fin-sp-file');
+  var ttInp  = document.getElementById('fin-tt-file');
   var status = document.getElementById('fin-upload-status');
+  var btn    = document.getElementById('fin-upload-btn');
 
-  var mes = mesInput ? mesInput.value : '';
-  if (!mes) { status.textContent = '⚠ Selecione o mês de referência.'; return; }
-  if (!mlFile.files.length && !spFile.files.length && !ttFile.files.length) {
-    status.textContent = '⚠ Selecione ao menos uma planilha.'; return;
+  var mes = mesInp ? mesInp.value : '';
+  if (!mes) { if(status) status.textContent='⚠ Selecione o mês.'; return; }
+  if ((!mlInp||!mlInp.files.length) && (!spInp||!spInp.files.length) && (!ttInp||!ttInp.files.length)) {
+    if(status) status.textContent='⚠ Selecione ao menos uma planilha.'; return;
   }
 
-  status.textContent = '⏳ Processando planilhas...';
-
-  // Load XLSX library dynamically if needed
-  if (typeof XLSX === 'undefined') {
-    status.textContent = '⏳ Carregando biblioteca...';
-    await new Promise(function(res, rej) {
-      var s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-      s.onload = res; s.onerror = rej;
-      document.head.appendChild(s);
-    });
-  }
-
-  if (!state.financeiro.meses) state.financeiro.meses = {};
-  if (!state.financeiro.meses[mes]) state.financeiro.meses[mes] = {};
-
-  async function readXlsx(file, sheet, headerRow) {
-    return new Promise(function(resolve) {
-      var reader = new FileReader();
-      reader.onload = function(e) {
-        var wb = XLSX.read(e.target.result, { type:'array' });
-        var ws = wb.Sheets[sheet || wb.SheetNames[0]];
-        var json = XLSX.utils.sheet_to_json(ws, { defval:'', raw:false });
-        // For ML: skip first 5 rows (header at row 6)
-        if (headerRow) {
-          var ws2 = wb.Sheets[sheet || wb.SheetNames[0]];
-          json = XLSX.utils.sheet_to_json(ws2, { range: headerRow, defval:'', raw:false });
-        }
-        resolve(json);
-      };
-      reader.readAsArrayBuffer(file);
-    });
-  }
+  if(btn) btn.disabled=true;
+  if(status) status.innerHTML='<span style="color:var(--blue)">⏳ Carregando biblioteca Excel...</span>';
 
   try {
-    if (mlFile.files.length) {
-      status.textContent = '⏳ Processando Mercado Livre...';
-      // ML has header at row 5 (0-indexed)
-      var mlData = await readXlsx(mlFile.files[0], 'Vendas BR', 5);
-      state.financeiro.meses[mes].ml = mlData;
-      status.textContent = '✓ ML importado (' + mlData.length + ' linhas)';
-    }
-    if (spFile.files.length) {
-      status.textContent = '⏳ Processando Shopee...';
-      var spData = await readXlsx(spFile.files[0], 'orders');
-      state.financeiro.meses[mes].sp = spData;
-      status.textContent = '✓ Shopee importado (' + spData.length + ' linhas)';
-    }
-    if (ttFile.files.length) {
-      status.textContent = '⏳ Processando TikTok...';
-      // TikTok: skip row 1 (description row), header at row 0
-      var ttRaw = await readXlsx(ttFile.files[0], 'OrderSKUList');
-      // Remove the descriptions row (first row after header which has descriptions)
-      var ttData = ttRaw.filter(function(r, i) {
-        // Row 0 will be description strings — filter rows where Order ID looks like a description
-        var oid = String(r['Order ID'] || '');
-        return oid.match(/^\d{15,}/);
+    if (typeof XLSX==='undefined') {
+      await new Promise(function(res,rej){
+        var s=document.createElement('script');
+        s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        s.onload=res; s.onerror=rej; document.head.appendChild(s);
       });
-      state.financeiro.meses[mes].tt = ttData;
-      status.textContent = '✓ TikTok importado (' + ttData.length + ' pedidos)';
     }
 
-    _finMesSel = mes;
-    saveState();
-    status.textContent = '✅ Importação concluída! Vá em Visão Geral para ver os resultados.';
-    setTimeout(function(){ finSetTab('visao'); }, 1500);
-  } catch(e) {
-    status.textContent = '❌ Erro: ' + e.message;
-    console.error(e);
-  }
-}
+    if (!state.financeiro.meses) state.financeiro.meses={};
+    if (!state.financeiro.meses[mes]) state.financeiro.meses[mes]={};
 
-function bindFinanceiro() {
-  // Set current month as default in the month input
-  var inp = document.getElementById('fin-mes-input');
-  if (inp && !inp.value) {
-    var now = new Date();
-    inp.value = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+    function readSheet(file, sheetName, skipRows) {
+      return new Promise(function(resolve,reject){
+        var reader=new FileReader();
+        reader.onerror=reject;
+        reader.onload=function(e){
+          try {
+            var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+            var wsName=sheetName||wb.SheetNames[0];
+            var ws=wb.Sheets[wsName];
+            if(!ws){ wsName=wb.SheetNames[0]; ws=wb.Sheets[wsName]; }
+            var json=XLSX.utils.sheet_to_json(ws,{range:skipRows||0,defval:'',raw:false});
+            resolve(json);
+          } catch(err){ reject(err); }
+        };
+        reader.readAsArrayBuffer(file);
+      });
+    }
+
+    var msgs=[];
+
+    if (mlInp && mlInp.files.length) {
+      if(status) status.innerHTML='<span style="color:var(--blue)">⏳ Processando Mercado Livre...</span>';
+      var mlData=await readSheet(mlInp.files[0],'Vendas BR',5);
+      state.financeiro.meses[mes].ml=mlData;
+      msgs.push('✅ ML: '+mlData.length+' linhas');
+    }
+    if (spInp && spInp.files.length) {
+      if(status) status.innerHTML='<span style="color:var(--blue)">⏳ Processando Shopee...</span>';
+      var spData=await readSheet(spInp.files[0],'orders',0);
+      state.financeiro.meses[mes].sp=spData;
+      msgs.push('✅ Shopee: '+spData.length+' linhas');
+    }
+    if (ttInp && ttInp.files.length) {
+      if(status) status.innerHTML='<span style="color:var(--blue)">⏳ Processando TikTok...</span>';
+      var ttRaw=await readSheet(ttInp.files[0],'OrderSKUList',0);
+      // Remove description row (first row with non-numeric Order ID)
+      var ttData=ttRaw.filter(function(r){
+        return /^\d{15,}/.test(String(r['Order ID']||''));
+      });
+      state.financeiro.meses[mes].tt=ttData;
+      msgs.push('✅ TikTok: '+ttData.length+' pedidos');
+    }
+
+    _finMesSel=mes;
+    saveState();
+    if(status) status.innerHTML='<span style="color:var(--green)">'+msgs.join(' · ')+' — Concluído!</span>';
+    if(btn) btn.disabled=false;
+    setTimeout(function(){ _finTab='visao'; navigate('financeiro'); },1200);
+  } catch(e) {
+    if(status) status.innerHTML='<span style="color:var(--red)">❌ Erro: '+e.message+'</span>';
+    if(btn) btn.disabled=false;
+    console.error('finImportar error:',e);
   }
 }
 </script>

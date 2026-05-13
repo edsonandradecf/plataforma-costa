@@ -6699,19 +6699,119 @@ function finDelDespesa(i) {
 }
 
 
+// ── Comprime planilha para só os campos necessários ──────────────────────
+function finComprimirML(rows) {
+  return (rows||[]).map(function(r){
+    return {
+      e: String(r['Estado']||''),
+      s: String(r['SKU']||''),
+      u: parseFloat(r['Unidades'])||0,
+      f: parseFloat(r['Receita por produtos (BRL)'])||0,
+      t: parseFloat(r['Tarifa de venda e impostos (BRL)'])||0,
+    };
+  });
+}
+function finComprimirSP(rows) {
+  return (rows||[]).map(function(r){
+    return {
+      st: String(r['Status do pedido']||''),
+      sk: String(r['Nº de referência do SKU principal']||''),
+      q:  parseInt(r['Quantidade'])||0,
+      v:  parseFloat(r['Valor Total'])||0,
+      c:  parseFloat(r['Taxa de comissão bruta'])||0,
+      s:  parseFloat(r['Taxa de serviço bruta'])||0,
+    };
+  });
+}
+function finComprimirTT(rows) {
+  var seen = {};
+  var out  = [];
+  (rows||[]).forEach(function(r){
+    var oid = String(r['Order ID']||'');
+    var sku = String(r['Seller SKU']||'');
+    var key = oid+'|'+sku;
+    if (seen[key]) return;
+    seen[key] = true;
+    out.push({
+      os: String(r['Order Status']||''),
+      sk: sku,
+      oid: oid,
+      q:  parseInt(r['Quantity'])||0,
+      v:  finParseBRL(r['SKU Subtotal After Discount']),
+    });
+  });
+  return out;
+}
+
+// ── Expansores: transforma formato comprimido de volta para o formato que finCalcMes usa
+function finExpandirML(rows) {
+  return (rows||[]).map(function(r){
+    return {
+      'Estado': r.e||'',
+      'SKU':    r.s||'',
+      'Unidades': r.u||0,
+      'Receita por produtos (BRL)': r.f||0,
+      'Tarifa de venda e impostos (BRL)': r.t||0,
+    };
+  });
+}
+function finExpandirSP(rows) {
+  return (rows||[]).map(function(r){
+    return {
+      'Status do pedido': r.st||'',
+      'Nº de referência do SKU principal': r.sk||'',
+      'Quantidade': r.q||0,
+      'Valor Total': r.v||0,
+      'Taxa de comissão bruta': r.c||0,
+      'Taxa de serviço bruta': r.s||0,
+    };
+  });
+}
+function finExpandirTT(rows) {
+  return (rows||[]).map(function(r){
+    return {
+      'Order Status':  r.os||'',
+      'Seller SKU':    r.sk||'',
+      'Order ID':      r.oid||'',
+      'Quantity':      r.q||0,
+      'SKU Subtotal After Discount': 'BRL ' + String(r.v||0).replace('.',','),
+    };
+  });
+}
+
 async function finSaveFirebase() {
   try {
-    var payload = {
-      meses:    state.financeiro.meses    || {},
+    var meses = state.financeiro.meses || {};
+
+    // 1. Salva metadados (despesas + alíquota) — pequeno, vai junto
+    var meta = {
       despesas: state.financeiro.despesas || [],
       aliquota: state.financeiro.aliquota || 0,
+      mesKeys:  Object.keys(meses),
     };
-    var resp = await fetch(FIREBASE_URL + '/financeiro.json', {
+    var r1 = await fetch(FIREBASE_URL + '/financeiro/meta.json', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(meta),
     });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    if (!r1.ok) throw new Error('HTTP ' + r1.status + ' (meta)');
+
+    // 2. Salva cada mês comprimido num nó próprio
+    for (var mesKey in meses) {
+      var mes = meses[mesKey];
+      var payload = {
+        ml: mes.ml ? finComprimirML(mes.ml) : null,
+        sp: mes.sp ? finComprimirSP(mes.sp) : null,
+        tt: mes.tt ? finComprimirTT(mes.tt) : null,
+      };
+      var safeKey = mesKey.replace('-','_'); // Firebase não aceita hífen em chave de path
+      var r2 = await fetch(FIREBASE_URL + '/financeiro/meses/' + safeKey + '.json', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!r2.ok) throw new Error('HTTP ' + r2.status + ' (mes ' + mesKey + ')');
+    }
     console.log('Financeiro salvo no Firebase OK');
   } catch(e) {
     console.error('finSaveFirebase error:', e);
@@ -6721,13 +6821,30 @@ async function finSaveFirebase() {
 
 async function finLoadFirebase() {
   try {
-    var resp = await fetch(FIREBASE_URL + '/financeiro.json');
-    if (!resp.ok) return;
-    var data = await resp.json();
-    if (!data) return;
-    state.financeiro.meses    = data.meses    || {};
-    state.financeiro.despesas = data.despesas || [];
-    state.financeiro.aliquota = data.aliquota || 0;
+    // 1. Carrega meta
+    var r1 = await fetch(FIREBASE_URL + '/financeiro/meta.json');
+    if (!r1.ok) return;
+    var meta = await r1.json();
+    if (!meta) return;
+    state.financeiro.despesas = meta.despesas || [];
+    state.financeiro.aliquota = meta.aliquota || 0;
+
+    // 2. Carrega cada mês
+    var mesKeys = meta.mesKeys || [];
+    state.financeiro.meses = {};
+    for (var i = 0; i < mesKeys.length; i++) {
+      var k = mesKeys[i];
+      var safeKey = k.replace('-','_');
+      var r2 = await fetch(FIREBASE_URL + '/financeiro/meses/' + safeKey + '.json');
+      if (!r2.ok) continue;
+      var mesData = await r2.json();
+      if (!mesData) continue;
+      state.financeiro.meses[k] = {
+        ml: mesData.ml ? finExpandirML(mesData.ml) : null,
+        sp: mesData.sp ? finExpandirSP(mesData.sp) : null,
+        tt: mesData.tt ? finExpandirTT(mesData.tt) : null,
+      };
+    }
     console.log('Financeiro carregado do Firebase OK, meses:', Object.keys(state.financeiro.meses));
   } catch(e) {
     console.error('finLoadFirebase error:', e);

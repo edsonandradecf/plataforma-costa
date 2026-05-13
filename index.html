@@ -420,12 +420,7 @@ function applyParsed(parsed, forceMerge) {
   state.agenda   = Array.isArray(parsed.agenda)   ? parsed.agenda   : [];
   state.logs     = Array.isArray(parsed.logs)     ? parsed.logs     : [];
   state.tabnutri = Array.isArray(parsed.tabnutri) ? parsed.tabnutri : [];
-  if (parsed.financeiro && typeof parsed.financeiro === 'object') {
-    state.financeiro = parsed.financeiro;
-    if (!state.financeiro.meses) state.financeiro.meses = {};
-    if (!state.financeiro.despesas) state.financeiro.despesas = [];
-    if (!state.financeiro.aliquota) state.financeiro.aliquota = 0;
-  }
+
   var est = parsed.estoque || {};
   state.estoque = {
     produtos:       Array.isArray(est.produtos)       ? est.produtos       : [],
@@ -578,7 +573,6 @@ function saveState() {
     agenda:      state.agenda,
     logs:        state.logs,
     tabnutri:    state.tabnutri,
-    financeiro:  state.financeiro,
     estoque:     state.estoque,
     ponto:       state.ponto,
     devolucoes:  state.devolucoes,
@@ -6643,6 +6637,7 @@ function renderFinanceiro() {
     '<div id="fin-despesas" style="display:'+(_finTab==='despesas'?'':'none')+'">'+despHtml+'</div>';
 }
 
+var _finLoaded = false;
 function bindFinanceiro() {
   var mesInp = document.getElementById('fin-mes-input');
   if (mesInp && !mesInp.value) {
@@ -6651,6 +6646,16 @@ function bindFinanceiro() {
   }
   var btn = document.getElementById('fin-upload-btn');
   if (btn) btn.onclick = finImportar;
+  // Load from Firebase on first open
+  if (!_finLoaded) {
+    _finLoaded = true;
+    finLoadFirebase().then(function() {
+      if (state.currentPage === 'financeiro') {
+        var c = document.getElementById('page-content');
+        if (c) { c.innerHTML = renderFinanceiro(); bindFinanceiro(); }
+      }
+    });
+  }
 }
 
 function finSelMes(k) {
@@ -6662,8 +6667,7 @@ function finExcluirMes(k) {
   if (!confirm('Excluir dados de '+k+'?')) return;
   delete state.financeiro.meses[k];
   if (_finMesSel===k) _finMesSel='';
-  saveState();
-  navigate('financeiro');
+  finSaveFirebase().then(function(){ navigate('financeiro'); });
 }
 
 function finEditAliquota() {
@@ -6673,8 +6677,7 @@ function finEditAliquota() {
   var val = parseFloat(String(novo).replace(',','.'));
   if (isNaN(val)||val<0||val>100) { alert('Valor inválido. Informe um número entre 0 e 100.'); return; }
   state.financeiro.aliquota = val;
-  saveState();
-  navigate('financeiro');
+  finSaveFirebase().then(function(){ navigate('financeiro'); });
 }
 
 function finAddDespesa() {
@@ -6686,17 +6689,50 @@ function finAddDespesa() {
   if (!val||val<=0) { alert('Informe um valor válido.'); return; }
   if (!state.financeiro.despesas) state.financeiro.despesas=[];
   state.financeiro.despesas.push({ desc:desc, valor:val, data:new Date().toLocaleDateString('pt-BR') });
-  saveState();
-  navigate('financeiro');
+  finSaveFirebase().then(function(){ navigate('financeiro'); });
 }
 
 function finDelDespesa(i) {
   if (!confirm('Remover esta despesa?')) return;
   state.financeiro.despesas.splice(i,1);
-  saveState();
-  navigate('financeiro');
+  finSaveFirebase().then(function(){ navigate('financeiro'); });
 }
 
+
+async function finSaveFirebase() {
+  try {
+    var payload = {
+      meses:    state.financeiro.meses    || {},
+      despesas: state.financeiro.despesas || [],
+      aliquota: state.financeiro.aliquota || 0,
+    };
+    var resp = await fetch(FIREBASE_URL + '/financeiro.json', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    console.log('Financeiro salvo no Firebase OK');
+  } catch(e) {
+    console.error('finSaveFirebase error:', e);
+    alert('Erro ao salvar no servidor: ' + e.message);
+  }
+}
+
+async function finLoadFirebase() {
+  try {
+    var resp = await fetch(FIREBASE_URL + '/financeiro.json');
+    if (!resp.ok) return;
+    var data = await resp.json();
+    if (!data) return;
+    state.financeiro.meses    = data.meses    || {};
+    state.financeiro.despesas = data.despesas || [];
+    state.financeiro.aliquota = data.aliquota || 0;
+    console.log('Financeiro carregado do Firebase OK, meses:', Object.keys(state.financeiro.meses));
+  } catch(e) {
+    console.error('finLoadFirebase error:', e);
+  }
+}
 async function finImportar() {
   var mesInp = document.getElementById('fin-mes-input');
   var mlInp  = document.getElementById('fin-ml-file');
@@ -6770,7 +6806,8 @@ async function finImportar() {
     }
 
     _finMesSel=mes;
-    saveState();
+    if(status) status.innerHTML='<span style="color:var(--blue)">⏳ Salvando no servidor...</span>';
+    await finSaveFirebase();
     if(status) status.innerHTML='<span style="color:var(--green)">'+msgs.join(' · ')+' — Concluído!</span>';
     if(btn) btn.disabled=false;
     setTimeout(function(){ _finTab='visao'; navigate('financeiro'); },1200);

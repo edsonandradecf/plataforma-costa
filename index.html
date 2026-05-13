@@ -775,7 +775,7 @@ function getPagesAdmin() {
   ];
 }
 function getPagesLimited() {
-  return getPagesAdmin().filter(p => p.id !== 'logs' && p.id !== 'vendas');
+  return getPagesAdmin().filter(p => p.id !== 'logs' && p.id !== 'vendas' && p.id !== 'financeiro');
 }
 
 function buildSidebar() {

@@ -5457,7 +5457,7 @@ function renderEstoqueCusto() {
         '<div class="card" style="padding:1.5rem;max-width:520px">' +
           '<div style="font-size:1rem;font-weight:700;margin-bottom:1.5rem">' + esc(prod.nome) + ' <span style="font-size:0.75rem;color:var(--text3);font-weight:400">SKU: '+prod.sku+'</span></div>' +
           (ultimoKg ? '<div style="background:rgba(26,138,74,0.08);border:0.5px solid rgba(26,138,74,0.2);border-radius:8px;padding:10px 14px;margin-bottom:1.25rem;font-size:0.83rem;color:var(--text2)">'+
-            '📈 Último preço/kg no histórico: <strong style="color:var(--green)">R$ '+parseFloat(ultimoKg).toFixed(4)+'/kg</strong> → custo ingrediente: <strong>R$ '+(ultimoKg*prod.peso/1000).toFixed(4)+'</strong> ('+prod.peso+'g)'+
+            '📈 Último preço/kg no histórico: <strong style="color:var(--green)">'+finFmt(parseFloat(ultimoKg))+'/kg</strong> → custo ingrediente: <strong>'+finFmt(ultimoKg*prod.peso/1000)+'</strong> ('+prod.peso+'g)'+
           '</div>' : '<div style="background:rgba(186,117,23,0.08);border:0.5px solid rgba(186,117,23,0.2);border-radius:8px;padding:10px 14px;margin-bottom:1.25rem;font-size:0.83rem;color:var(--text2)">'+
             '⚠️ Nenhum preço/kg encontrado no Histórico de Preços para este produto. Informe o custo manualmente.'+
           '</div>') +
@@ -6886,6 +6886,7 @@ function iconEmpty() { return `<svg viewBox="0 0 24 24" fill="none" stroke="curr
 
 var _finTab     = 'visao';
 var _finCardSel = null; // 'lucro'|'fat'|'taxas'|'custo'|'despesas'|'imposto'
+var _finCustoOrdem = 'vendas'; // 'vendas' | 'total' | 'sku'
 var _finMesSel = '';
 
 function finSetTab(t) {
@@ -7189,42 +7190,103 @@ function renderFinDetalheCard(calc, desp, aliq, MONTHS) {
 
   // ── CUSTO PRODUTOS ──────────────────────────────────────────
   if (card === 'custo') {
-    var semCusto = calc.custoProdDetalhe.filter(function(r){ return r.custo===null; });
-    var comCusto = calc.custoProdDetalhe.filter(function(r){ return r.custo!==null; });
+    var custos2 = state.financeiro.custoProdutos || {};
+    var skuVendas = {};
+    var mesData = _finMesSel ? (state.financeiro.meses||{})[_finMesSel] : null;
+    if (mesData) {
+      var ML_INV2 = ['Cancelada pelo comprador','Venda cancelada. Não envie.','Cancelada. Não despache','O seu comprador quer cancelar','Devolução em preparação','Devolução a caminho'];
+      if (mesData.ml) mesData.ml.forEach(function(r){
+        var estado = String(r['Estado']||'');
+        if (ML_INV2.some(function(x){ return estado.indexOf(x)!==-1; })) return;
+        if (estado.indexOf('Pacote de')!==-1) return;
+        var sku = String(r['SKU']||'').trim().toLowerCase(); if (!sku||sku==='nan') return;
+        if (!skuVendas[sku]) skuVendas[sku]={ml:0,sp:0,tt:0};
+        skuVendas[sku].ml += parseFloat(r['Unidades'])||0;
+      });
+      if (mesData.sp) mesData.sp.forEach(function(r){
+        if (String(r['Status do pedido']||'')==='Cancelado') return;
+        var sku = String(r['Nº de referência do SKU principal']||'').trim().toLowerCase(); if (!sku) return;
+        if (!skuVendas[sku]) skuVendas[sku]={ml:0,sp:0,tt:0};
+        skuVendas[sku].sp += parseInt(r['Quantidade'])||0;
+      });
+      if (mesData.tt) { var ttSeen2={};
+        mesData.tt.forEach(function(r){
+          var st=String(r['Order Status']||''); if(st==='Cancelado'||st==='Não pago') return;
+          var sku=String(r['Seller SKU']||'').trim().toLowerCase(); var oid=String(r['Order ID']||'');
+          var key=oid+'|'+sku; if(ttSeen2[key]) return; ttSeen2[key]=true;
+          if (!skuVendas[sku]) skuVendas[sku]={ml:0,sp:0,tt:0};
+          skuVendas[sku].tt += parseInt(r['Quantity'])||0;
+        });
+      }
+    }
+    var linhas = PRODUTOS_CUSTO.map(function(p){
+      var v = skuVendas[p.sku] || {ml:0,sp:0,tt:0};
+      var qtd = v.ml + v.sp + v.tt;
+      var c = custos2[p.sku];
+      var custo = (c && c.custoFinal !== undefined) ? c.custoFinal : null;
+      var total = (custo !== null) ? qtd * custo : null;
+      return { sku:p.sku, nome:p.nome, qtd:qtd, ml:v.ml, sp:v.sp, tt:v.tt, custo:custo, total:total };
+    });
+    var ord = _finCustoOrdem || 'vendas';
+    if (ord==='vendas') linhas.sort(function(a,b){ return b.qtd-a.qtd; });
+    else if (ord==='total') linhas.sort(function(a,b){ return (b.total||0)-(a.total||0); });
+    else linhas.sort(function(a,b){ return a.sku.localeCompare(b.sku); });
+    var totalGeral = linhas.reduce(function(s,r){ return s+(r.total||0); },0);
+    var semCusto2 = linhas.filter(function(r){ return r.custo===null; });
+    function btnOrd(id, label) {
+      var ativo = ord===id;
+      return '<button onclick="_finCustoOrdem=\''+id+'\';var c=document.getElementById(\'page-content\');if(c)c.innerHTML=renderFinanceiro();" style="padding:5px 12px;border:0.5px solid '+(ativo?'var(--green)':'var(--border2)')+';border-radius:7px;background:'+(ativo?'rgba(26,138,74,0.1)':'var(--card)')+';color:'+(ativo?'var(--green)':'var(--text2)')+';cursor:pointer;font-size:0.78rem;font-weight:'+(ativo?'700':'400')+'">'+label+'</button>';
+    }
     return voltar +
-      '<div style="font-size:1.1rem;font-weight:700;margin-bottom:0.5rem">📦 Detalhe do Custo de Produtos</div>'+
-      '<div style="font-size:0.83rem;color:var(--text3);margin-bottom:1.5rem">Custo unitário × unidades vendidas no período, por SKU</div>'+
-      '<div class="card" style="padding:1rem;margin-bottom:1.25rem">'+
-        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;text-align:center">'+
-          '<div><div style="font-size:0.7rem;color:var(--text3);text-transform:uppercase">Total calculado</div><div style="font-size:1.3rem;font-weight:800;color:#8b5cf6">'+finFmt(calc.custoProd)+'</div></div>'+
-          '<div><div style="font-size:0.7rem;color:var(--text3);text-transform:uppercase">SKUs com custo</div><div style="font-size:1.3rem;font-weight:800;color:var(--green)">'+comCusto.length+'</div></div>'+
-          '<div><div style="font-size:0.7rem;color:var(--text3);text-transform:uppercase">SKUs sem custo</div><div style="font-size:1.3rem;font-weight:800;color:var(--amber)">'+semCusto.length+'</div></div>'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:1rem">'+
+        '<div>'+
+          '<div style="font-size:1.1rem;font-weight:700">📦 Custo de Produtos</div>'+
+          '<div style="font-size:0.8rem;color:var(--text3);margin-top:2px">Mês: '+(_finMesSel||'—')+' · todos os SKUs do catálogo</div>'+
+        '</div>'+
+        '<div style="display:flex;gap:6px">'+btnOrd('vendas','↓ Mais vendidos')+btnOrd('total','↓ Maior custo')+btnOrd('sku','A→Z')+'</div>'+
+      '</div>'+
+      '<div class="card" style="padding:1rem;margin-bottom:1rem">'+
+        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;text-align:center">'+
+          '<div><div style="font-size:0.68rem;color:var(--text3);text-transform:uppercase">Total custo mês</div><div style="font-size:1.2rem;font-weight:800;color:#8b5cf6">'+finFmt(totalGeral)+'</div></div>'+
+          '<div><div style="font-size:0.68rem;color:var(--text3);text-transform:uppercase">SKUs vendidos</div><div style="font-size:1.2rem;font-weight:800;color:var(--green)">'+linhas.filter(function(r){return r.qtd>0;}).length+'</div></div>'+
+          '<div><div style="font-size:0.68rem;color:var(--text3);text-transform:uppercase">SKUs zerados</div><div style="font-size:1.2rem;font-weight:800;color:var(--text3)">'+linhas.filter(function(r){return r.qtd===0;}).length+'</div></div>'+
+          '<div><div style="font-size:0.68rem;color:var(--text3);text-transform:uppercase">Sem custo</div><div style="font-size:1.2rem;font-weight:800;color:var(--amber)">'+semCusto2.length+'</div></div>'+
         '</div>'+
       '</div>'+
       '<div class="card" style="padding:0;overflow:hidden">'+
-        '<table style="width:100%;border-collapse:collapse;font-size:0.83rem">'+
+        '<table style="width:100%;border-collapse:collapse;font-size:0.82rem">'+
           '<thead><tr style="background:var(--bg3);border-bottom:2px solid var(--border)">'+
-            '<th style="padding:8px 14px;text-align:left">SKU</th>'+
-            '<th style="padding:8px 14px;text-align:left">Produto</th>'+
-            '<th style="padding:8px 14px;text-align:right">Unid. vendidas</th>'+
-            '<th style="padding:8px 14px;text-align:right">Custo unit.</th>'+
-            '<th style="padding:8px 14px;text-align:right;color:#8b5cf6">Total</th>'+
+            '<th style="padding:8px 12px;text-align:left;font-size:0.7rem;color:var(--text3);text-transform:uppercase">Produto</th>'+
+            '<th style="padding:8px 12px;text-align:center;font-size:0.7rem;color:var(--text3);text-transform:uppercase">SKU</th>'+
+            '<th style="padding:8px 12px;text-align:right;font-size:0.7rem;color:#f97316;text-transform:uppercase">ML</th>'+
+            '<th style="padding:8px 12px;text-align:right;font-size:0.7rem;color:#EE4D2D;text-transform:uppercase">SP</th>'+
+            '<th style="padding:8px 12px;text-align:right;font-size:0.7rem;color:#6366f1;text-transform:uppercase">TT</th>'+
+            '<th style="padding:8px 12px;text-align:right;font-size:0.7rem;color:var(--text3);text-transform:uppercase">Total un.</th>'+
+            '<th style="padding:8px 12px;text-align:right;font-size:0.7rem;color:var(--text3);text-transform:uppercase">Custo unit.</th>'+
+            '<th style="padding:8px 12px;text-align:right;font-size:0.7rem;color:#8b5cf6;text-transform:uppercase">Total</th>'+
           '</tr></thead><tbody>'+
-          calc.custoProdDetalhe.map(function(r,i){
-            return '<tr style="border-bottom:0.5px solid var(--border)'+(i%2===1?';background:var(--bg3)':'')+'">' +
-              '<td style="padding:7px 14px;font-family:monospace;font-size:0.78rem;color:var(--text3)">'+r.sku+'</td>'+
-              '<td style="padding:7px 14px">'+r.nome+'</td>'+
-              '<td style="padding:7px 14px;text-align:right;font-weight:600">'+r.qtd+'</td>'+
-              '<td style="padding:7px 14px;text-align:right;color:var(--text2)">'+(r.custo!==null?'R$ '+r.custo.toFixed(4):'<span style="color:var(--amber)">⚠ não cadastrado</span>')+'</td>'+
-              '<td style="padding:7px 14px;text-align:right;font-weight:700;color:'+(r.total!==null?'#8b5cf6':'var(--amber)')+'">'+(r.total!==null?finFmt(r.total):'—')+'</td>'+
+          linhas.map(function(r,i){
+            var zerado = r.qtd===0;
+            return '<tr style="border-bottom:0.5px solid var(--border);opacity:'+(zerado?'0.55':'1')+';'+(i%2===1?'background:var(--bg3)':'')+'">' +
+              '<td style="padding:7px 12px;font-weight:'+(r.qtd>0?'600':'400')+'">'+esc(r.nome)+'</td>'+
+              '<td style="padding:7px 12px;text-align:center;font-family:monospace;font-size:0.75rem;color:var(--text3)">'+r.sku+'</td>'+
+              '<td style="padding:7px 12px;text-align:right;color:'+(r.ml>0?'#f97316':'var(--text3)')+'">'+r.ml+'</td>'+
+              '<td style="padding:7px 12px;text-align:right;color:'+(r.sp>0?'#EE4D2D':'var(--text3)')+'">'+r.sp+'</td>'+
+              '<td style="padding:7px 12px;text-align:right;color:'+(r.tt>0?'#6366f1':'var(--text3)')+'">'+r.tt+'</td>'+
+              '<td style="padding:7px 12px;text-align:right;font-weight:700">'+r.qtd+'</td>'+
+              '<td style="padding:7px 12px;text-align:right;color:var(--text2)">'+(r.custo!==null?finFmt(r.custo):'<span style="color:var(--amber);font-size:0.75rem">⚠ sem custo</span>')+'</td>'+
+              '<td style="padding:7px 12px;text-align:right;font-weight:700;color:'+(r.custo===null?'var(--amber)':'#8b5cf6')+'">'+(r.total!==null?finFmt(r.total):'—')+'</td>'+
             '</tr>';
           }).join('')+
+          '<tr style="background:var(--bg3);border-top:2px solid var(--border)">'+
+            '<td colspan="7" style="padding:9px 12px;font-weight:700">Total geral</td>'+
+            '<td style="padding:9px 12px;text-align:right;font-weight:800;font-size:1rem;color:#8b5cf6">'+finFmt(totalGeral)+'</td>'+
+          '</tr>'+
         '</tbody></table>'+
       '</div>'+
-      (semCusto.length?'<div class="card" style="padding:1rem;margin-top:1rem;background:rgba(186,117,23,0.06);border-color:rgba(186,117,23,0.2);font-size:0.83rem;color:var(--text2)">'+
-        '⚠️ <strong>'+semCusto.length+' SKU(s) sem custo cadastrado</strong> não estão sendo descontados do lucro: '+
-        semCusto.map(function(r){ return r.sku; }).join(', ')+
-        '. <button onclick="estoqueSetTab(\'custo\');navigate(\'estoque\')" style="background:none;border:none;color:var(--green);cursor:pointer;font-size:0.83rem;text-decoration:underline">Cadastrar agora →</button>'+
+      (semCusto2.length?'<div class="card" style="padding:0.875rem 1rem;margin-top:0.75rem;background:rgba(186,117,23,0.06);border-color:rgba(186,117,23,0.2);font-size:0.82rem;color:var(--text2)">'+
+        '⚠️ '+semCusto2.length+' SKU(s) sem custo cadastrado. '+
+        '<button onclick="estoqueSetTab(\'custo\');navigate(\'estoque\')" style="background:none;border:none;color:var(--green);cursor:pointer;font-size:0.82rem;text-decoration:underline">Cadastrar agora →</button>'+
       '</div>':'');
   }
 
@@ -7620,15 +7682,13 @@ function renderFinanceiro() {
       '<div>'+
         '<div class="desp-form-card">'+
           '<div class="desp-form-title">➕ Nova despesa</div>'+
-          '<div style="font-size:0.78rem;color:var(--text2);margin-bottom:10px;padding:7px 10px;background:var(--bg3);border-radius:7px">'+
-            '📅 Mês: <strong>'+mesAtualLabel+'</strong>'+
-            (_finMesSel?'':' <span style="color:var(--amber)">— selecione um mês acima</span>')+
-          '</div>'+
+          '<label style="font-size:0.75rem;color:var(--text2);display:block;margin-bottom:3px">📅 Mês de referência</label>'+
+          '<input class="desp-input" type="month" id="fin-desp-mes" value="'+(_finMesSel||'')+'">'+
           '<input class="desp-input" type="text" id="fin-desp-desc" placeholder="Descrição  (ex: Embalagens, Frete...)">'+
           '<input class="desp-input" type="number" id="fin-desp-val" placeholder="Valor em R$" min="0" step="0.01">'+
           '<input class="desp-input" type="text" id="fin-desp-data" placeholder="Data (opcional, ex: 13/05/2026)">'+
-          '<button class="desp-add-btn" onclick="finAddDespesa()"'+(!_finMesSel?' disabled style="opacity:0.5;cursor:not-allowed"':'')+'>'+
-            '<span style="font-size:1rem">+</span> Adicionar Despesa em '+mesAtualLabel+
+          '<button class="desp-add-btn" onclick="finAddDespesa()">'+
+            '<span style="font-size:1rem">+</span> Adicionar Despesa'+
           '</button>'+
         '</div>'+
         (despTotal>0?
@@ -7789,8 +7849,10 @@ function finAddDespesa() {
   var data = (dataEl && dataEl.value.trim()) ? dataEl.value.trim() : new Date().toLocaleDateString('pt-BR');
   if (!desc) { alert('Informe a descrição.'); return; }
   if (!val||val<=0) { alert('Informe um valor válido.'); return; }
+  var mesEl2 = document.getElementById('fin-desp-mes');
+  var mes = (mesEl2 && mesEl2.value) ? mesEl2.value : (_finMesSel || 'sem-mes');
+  if (!mes) { alert('Selecione o mês de referência.'); return; }
   if (!state.financeiro.despesas || Array.isArray(state.financeiro.despesas)) state.financeiro.despesas={};
-  var mes = _finMesSel || 'sem-mes';
   if (!state.financeiro.despesas[mes]) state.financeiro.despesas[mes] = [];
   state.financeiro.despesas[mes].push({ desc:desc, valor:val, data:data });
   finSaveFirebase().then(function(){ navigate('financeiro'); });

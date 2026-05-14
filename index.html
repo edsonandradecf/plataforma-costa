@@ -920,6 +920,8 @@ function startApp() {
   buildSidebar();
   renderPage();
   startRealtimeSync();
+  // Carrega histórico de preços do nó separado do Firebase
+  setTimeout(estoqueHistLoadFirebase, 2000);
   // Renova tokens automaticamente a cada 30 minutos
   iniciarRenovacaoAutomatica();
 }
@@ -5215,7 +5217,7 @@ function renderEstoqueHistorico() {
           '<th style="padding:10px 16px;text-align:center;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Compras</th>' +
           '<th style="padding:10px 16px;text-align:right;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Último preço</th>' +
           '<th style="padding:10px 16px;text-align:right;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Variação</th>' +
-          '<th style="padding:10px 16px"></th>' +
+          '<th style="padding:10px 16px;width:48px"></th>' +
         '</tr></thead><tbody>';
 
   nomes.forEach(function(nome, ni) {
@@ -5242,7 +5244,12 @@ function renderEstoqueHistorico() {
         (temHist ? 'R$ ' + (ultimo.totalKg||0).toFixed(2) + '<span style="font-size:0.7rem;font-weight:400;color:var(--text3)">/kg</span>' : '—') +
       '</td>' +
       '<td style="padding:12px 16px;text-align:right;font-weight:600;font-size:0.85rem;color:' + corVar + '">' + sinalVar + '</td>' +
-      '<td style="padding:12px 16px;text-align:right;color:var(--text3);font-size:0.8rem">→</td>' +
+      '<td style="padding:12px 16px;text-align:right" onclick="event.stopPropagation()">' +
+        '<button onclick="estoqueHistExcluirProduto(\'' + esc(nome) + '\')" ' +
+          'style="background:none;border:0.5px solid var(--border2);border-radius:6px;color:var(--text3);cursor:pointer;padding:4px 8px;font-size:0.75rem;transition:all 0.15s" ' +
+          'onmouseover="this.style.borderColor=\'var(--red)\';this.style.color=\'var(--red)\'" ' +
+          'onmouseout="this.style.borderColor=\'var(--border2)\';this.style.color=\'var(--text3)\'">🗑</button>' +
+      '</td>' +
     '</tr>';
   });
 
@@ -5278,6 +5285,8 @@ function estoqueHistSalvarManual() {
   });
 
   saveState();
+  // Salva também no nó separado do Firebase para persistência garantida
+  estoqueHistPushFirebase();
   if(status){ status.textContent='✓ Compra salva!'; setTimeout(function(){ status.textContent=''; },2000); }
   var c = document.getElementById('page-content');
   if(c) c.innerHTML = renderEstoque();
@@ -5287,8 +5296,44 @@ function estoqueHistExcluirManual(id) {
   if (!confirm('Remover este registro?')) return;
   state.estoque.historicoManual = (state.estoque.historicoManual||[]).filter(function(r){ return r.id !== id; });
   saveState();
+  estoqueHistPushFirebase();
   var c = document.getElementById('page-content');
   if(c) c.innerHTML = renderEstoque();
+}
+
+function estoqueHistExcluirProduto(nome) {
+  if (!confirm('Remover TODO o histórico de "' + nome + '"?\nIsso não afeta o estoque.')) return;
+  state.estoque.historicoManual = (state.estoque.historicoManual||[]).filter(function(r){ return r.produto !== nome; });
+  saveState();
+  estoqueHistPushFirebase();
+  var c = document.getElementById('page-content');
+  if(c) c.innerHTML = renderEstoque();
+}
+
+function estoqueHistPushFirebase() {
+  var data = state.estoque.historicoManual || [];
+  fetch(FIREBASE_URL + '/historicoManual.json', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }).catch(function(e){ console.warn('[HistoricoPush] erro:', e); });
+}
+
+function estoqueHistLoadFirebase() {
+  fetch(FIREBASE_URL + '/historicoManual.json')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if (!Array.isArray(data) || data.length === 0) return;
+      // Mescla sem duplicar
+      var existentes = state.estoque.historicoManual || [];
+      var ids = new Set(existentes.map(function(r){ return r.id; }));
+      var novos = data.filter(function(r){ return !ids.has(r.id); });
+      if (novos.length > 0) {
+        state.estoque.historicoManual = existentes.concat(novos);
+        console.log('[HistoricoLoad] Carregados ' + novos.length + ' registros do Firebase separado');
+      }
+    })
+    .catch(function(e){ console.warn('[HistoricoLoad] erro:', e); });
 }
 
 function setupEstoque() {}

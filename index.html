@@ -2,9 +2,21 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Plataforma Costa</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='white'/%3E%3Crect x='1' y='1' width='30' height='30' rx='5.5' fill='none' stroke='%238B6914' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Georgia,serif' font-weight='700' font-size='20' fill='%2322c55e' text-anchor='middle'%3EC%3C/text%3E%3C/svg%3E">
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#dfe8f0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1a1c1e" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Costa">
+<link rel="apple-touch-icon" href="icon-192.png">
+
+<link rel="icon" type="image/png" sizes="64x64" href="favicon-64.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
@@ -6616,33 +6628,105 @@ function renderFinanceiro() {
 
   /* ── DESPESAS ── */
   var despTotal = desp.reduce(function(s,d){return s+(d.valor||0);},0);
+  var despMax   = desp.length ? Math.max.apply(null, desp.map(function(d){return d.valor||0;})) : 1;
+
+  /* paleta de ícones por palavra-chave */
+  function despIcon(desc) {
+    var d = (desc||'').toLowerCase();
+    if (/frete|transport|envio|correio|logist/.test(d))  return '🚚';
+    if (/embal|caixa|sacol|papel|plast/.test(d))         return '📦';
+    if (/fornec|compra|matéria|insumo/.test(d))          return '🛒';
+    if (/aluguel|imóvel|armazém|galpão/.test(d))         return '🏭';
+    if (/market|anúncio|publicid|tráfego/.test(d))       return '📣';
+    if (/salário|funcionár|rh|colabor/.test(d))          return '👥';
+    if (/conta|luz|água|energia|internet/.test(d))       return '⚡';
+    if (/imposto|taxa|tribut|contab/.test(d))            return '🧾';
+    return '💳';
+  }
+
   var despHtml =
-    '<div style="max-width:640px">'+
-      '<div class="fin-upload-box" style="margin-bottom:1.25rem">'+
-        '<div class="card-header" style="margin-bottom:1rem"><span class="card-title">💸 Nova Despesa</span></div>'+
-        '<div style="display:grid;grid-template-columns:1fr 150px;gap:10px;margin-bottom:10px">'+
-          '<input type="text" id="fin-desp-desc" placeholder="Descrição (ex: Embalagens, Frete...)" style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:0.9rem;background:var(--input-bg);color:var(--text)">'+
-          '<input type="number" id="fin-desp-val" placeholder="Valor R$" min="0" step="0.01" style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:0.9rem;background:var(--input-bg);color:var(--text)">'+
+    '<style>'+
+      '.desp-wrap{display:grid;grid-template-columns:380px 1fr;gap:1.5rem;align-items:start}'+
+      '@media(max-width:860px){.desp-wrap{grid-template-columns:1fr}}'+
+      '.desp-form-card{background:var(--card);backdrop-filter:blur(20px);border:0.5px solid var(--border);border-radius:14px;padding:1.5rem;box-shadow:var(--shadow)}'+
+      '.desp-form-title{font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:1.25rem}'+
+      '.desp-input{width:100%;padding:10px 14px;border:0.5px solid var(--border2);border-radius:9px;background:var(--input-bg);backdrop-filter:blur(10px);color:var(--text);font-size:0.9rem;outline:none;transition:border 0.2s,box-shadow 0.2s;margin-bottom:10px;font-family:inherit}'+
+      '.desp-input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(55,138,221,0.12)}'+
+      '.desp-add-btn{width:100%;padding:11px;background:var(--green);color:#fff;border:none;border-radius:9px;font-size:0.88rem;font-weight:600;cursor:pointer;font-family:inherit;transition:opacity 0.15s;display:flex;align-items:center;justify-content:center;gap:6px}'+
+      '.desp-add-btn:hover{opacity:0.88}'+
+      '.desp-total-card{background:rgba(192,57,43,0.08);backdrop-filter:blur(20px);border:0.5px solid rgba(192,57,43,0.25);border-radius:12px;padding:1rem 1.25rem;margin-top:1rem;display:flex;align-items:center;justify-content:space-between}'+
+      '[data-theme="dark"] .desp-total-card{background:rgba(240,149,149,0.07);border-color:rgba(240,149,149,0.2)}'+
+      '.desp-total-label{font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--red);opacity:0.75}'+
+      '.desp-total-val{font-size:1.35rem;font-weight:700;color:var(--red)}'+
+      '.desp-list-col{}'+
+      '.desp-empty{text-align:center;padding:3rem 1rem;color:var(--text3)}'+
+      '.desp-empty-icon{font-size:2.5rem;margin-bottom:0.75rem}'+
+      '.desp-item{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--card);backdrop-filter:blur(20px);border:0.5px solid var(--border);border-radius:11px;margin-bottom:8px;transition:all 0.15s}'+
+      '.desp-item:hover{border-color:rgba(192,57,43,0.3);box-shadow:0 2px 10px rgba(192,57,43,0.08)}'+
+      '.desp-icon{width:36px;height:36px;border-radius:9px;background:rgba(192,57,43,0.08);border:0.5px solid rgba(192,57,43,0.15);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}'+
+      '[data-theme="dark"] .desp-icon{background:rgba(240,149,149,0.08);border-color:rgba(240,149,149,0.15)}'+
+      '.desp-info{flex:1;min-width:0}'+
+      '.desp-desc{font-size:0.88rem;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'+
+      '.desp-bar-wrap{height:3px;background:var(--border);border-radius:2px;margin-top:5px}'+
+      '.desp-bar-fill{height:3px;border-radius:2px;background:rgba(192,57,43,0.5);transition:width 0.4s ease}'+
+      '.desp-date{font-size:0.72rem;color:var(--text3);margin-top:2px}'+
+      '.desp-val{font-size:0.9rem;font-weight:700;color:var(--red);white-space:nowrap;margin-right:4px}'+
+      '.desp-del{background:none;border:0.5px solid var(--border2);border-radius:7px;color:var(--text3);cursor:pointer;padding:5px 8px;font-size:0.78rem;transition:all 0.15s;flex-shrink:0}'+
+      '.desp-del:hover{border-color:var(--red);color:var(--red);background:rgba(192,57,43,0.06)}'+
+      '.desp-count-badge{display:inline-flex;align-items:center;justify-content:center;background:var(--bg3);border:0.5px solid var(--border2);border-radius:99px;font-size:0.72rem;font-weight:700;color:var(--text3);padding:1px 8px;margin-left:8px}'+
+    '</style>'+
+    '<div class="desp-wrap">'+
+
+      /* ── coluna esquerda: form ── */
+      '<div>'+
+        '<div class="desp-form-card">'+
+          '<div class="desp-form-title">➕ Nova despesa</div>'+
+          '<input class="desp-input" type="text" id="fin-desp-desc" placeholder="Descrição  (ex: Embalagens, Frete...)">'+
+          '<input class="desp-input" type="number" id="fin-desp-val" placeholder="Valor em R$" min="0" step="0.01">'+
+          '<input class="desp-input" type="text" id="fin-desp-data" placeholder="Data (opcional, ex: 13/05/2026)">'+
+          '<button class="desp-add-btn" onclick="finAddDespesa()">'+
+            '<span style="font-size:1rem">+</span> Adicionar Despesa'+
+          '</button>'+
         '</div>'+
-        '<button class="btn btn-green" onclick="finAddDespesa()" style="padding:0.65rem 1.5rem">+ Adicionar Despesa</button>'+
+        (despTotal>0?
+          '<div class="desp-total-card">'+
+            '<div>'+
+              '<div class="desp-total-label">Total do mês</div>'+
+              '<div style="font-size:0.72rem;color:var(--text3);margin-top:1px">'+desp.length+' lançamento'+(desp.length!==1?'s':'')+'</div>'+
+            '</div>'+
+            '<div class="desp-total-val">− '+finFmt(despTotal)+'</div>'+
+          '</div>':'')+
       '</div>'+
-      '<div class="fin-upload-box">'+
-        '<div class="card-header" style="margin-bottom:0.75rem">'+
-          '<span class="card-title">Lista de Despesas</span>'+
-          '<span style="font-size:0.88rem;font-weight:700;color:var(--red)">Total: '+finFmt(despTotal)+'</span>'+
+
+      /* ── coluna direita: lista ── */
+      '<div class="desp-list-col">'+
+        '<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:0.875rem">'+
+          'Lançamentos <span class="desp-count-badge">'+desp.length+'</span>'+
         '</div>'+
         (desp.length===0?
-          '<div style="text-align:center;padding:2rem;color:var(--text3);font-size:0.9rem">Nenhuma despesa cadastrada</div>':
-          '<div class="fin-rank-row" style="font-size:0.72rem;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:0.4px;border-bottom:2px solid var(--border)">'+
-            '<span style="grid-column:1">Descrição</span><span style="grid-column:2;text-align:right">Valor</span><span></span>'+
-          '</div>'+
-          desp.map(function(d,i){
-            return '<div class="fin-desp-row">'+
-              '<span style="font-size:0.9rem;color:var(--text)">'+d.desc+'</span>'+
-              '<span style="font-size:0.9rem;font-weight:700;color:var(--red);text-align:right">- '+finFmt(d.valor)+'</span>'+
-              '<button onclick="finDelDespesa('+i+')" style="background:none;border:1px solid var(--border);color:var(--red);border-radius:6px;padding:4px 10px;font-size:0.78rem;cursor:pointer;font-family:inherit">🗑 Apagar</button>'+
-            '</div>';
-          }).join(''))+
+          '<div class="desp-empty">'+
+            '<div class="desp-empty-icon">💸</div>'+
+            '<div style="font-size:0.9rem;color:var(--text2);font-weight:500">Nenhuma despesa ainda</div>'+
+            '<div style="font-size:0.8rem;margin-top:4px">Adicione pelo formulário ao lado</div>'+
+          '</div>':
+          /* ordena do maior para o menor */
+          desp.slice().map(function(d,i){return {d:d,i:i};})
+            .sort(function(a,b){return (b.d.valor||0)-(a.d.valor||0);})
+            .map(function(item){
+              var d=item.d, i=item.i;
+              var pct = despMax>0 ? Math.round(((d.valor||0)/despMax)*100) : 0;
+              return '<div class="desp-item">'+
+                '<div class="desp-icon">'+despIcon(d.desc)+'</div>'+
+                '<div class="desp-info">'+
+                  '<div class="desp-desc" title="'+d.desc+'">'+d.desc+'</div>'+
+                  '<div class="desp-bar-wrap"><div class="desp-bar-fill" style="width:'+pct+'%"></div></div>'+
+                  (d.data?'<div class="desp-date">'+d.data+'</div>':'')+
+                '</div>'+
+                '<div class="desp-val">− '+finFmt(d.valor)+'</div>'+
+                '<button class="desp-del" onclick="finDelDespesa('+i+')" title="Remover">🗑</button>'+
+              '</div>';
+            }).join('')
+        )+
       '</div>'+
     '</div>';
 
@@ -6720,12 +6804,14 @@ function finEditAliquota() {
 function finAddDespesa() {
   var descEl = document.getElementById('fin-desp-desc');
   var valEl  = document.getElementById('fin-desp-val');
+  var dataEl = document.getElementById('fin-desp-data');
   var desc = descEl ? descEl.value.trim() : '';
   var val  = valEl  ? parseFloat(valEl.value.replace(',','.')) : 0;
+  var data = (dataEl && dataEl.value.trim()) ? dataEl.value.trim() : new Date().toLocaleDateString('pt-BR');
   if (!desc) { alert('Informe a descrição.'); return; }
   if (!val||val<=0) { alert('Informe um valor válido.'); return; }
   if (!state.financeiro.despesas) state.financeiro.despesas=[];
-  state.financeiro.despesas.push({ desc:desc, valor:val, data:new Date().toLocaleDateString('pt-BR') });
+  state.financeiro.despesas.push({ desc:desc, valor:val, data:data });
   finSaveFirebase().then(function(){ navigate('financeiro'); });
 }
 
@@ -6970,6 +7056,15 @@ async function finImportar() {
     if(btn) btn.disabled=false;
     console.error('finImportar error:',e);
   }
+}
+</script>
+<script>
+if ('serviceWorker' in navigator && location.hostname === 'edsonandradecf.github.io') {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('sw.js')
+      .then(function(reg) { console.log('[PWA] Service worker registrado:', reg.scope); })
+      .catch(function(err) { console.warn('[PWA] Falha ao registrar service worker:', err); });
+  });
 }
 </script>
 </body>

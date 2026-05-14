@@ -399,7 +399,7 @@ let state = {
   agenda: [],
   logs: [],
   tabnutri: [],
-  financeiro: { meses: {}, despesas: [], aliquota: 0, custoProdutos: {} },
+  financeiro: { meses: {}, despesas: {}, aliquota: 0, custoProdutos: {} },
   estoque: { produtos: [], movimentacoes: [], historicoManual: [] },
   ponto: { colaboradores: [], registros: [] },
   devolucoes: [],
@@ -7001,7 +7001,8 @@ function finCalcMes() {
   res.fat   = res.fat_ml + res.fat_sp + res.fat_tt;
   res.taxas = res.taxas_ml + res.taxas_sp;
 
-  var desp = state.financeiro.despesas || [];
+  var despObj = state.financeiro.despesas || {};
+  var desp = Array.isArray(despObj) ? despObj : (despObj[_finMesSel] || []);
   res.despesas = desp.reduce(function(s,d){ return s+(d.valor||0);},0);
 
   var aliq = parseFloat(state.financeiro.aliquota)||0;
@@ -7229,8 +7230,12 @@ function renderFinDetalheCard(calc, desp, aliq, MONTHS) {
 
   // ── DESPESAS ────────────────────────────────────────────────
   if (card === 'despesas') {
+    var p = (_finMesSel||'').split('-');
+    var MONTHS3 = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    var mesLbl = _finMesSel ? ((MONTHS3[parseInt(p[1])-1]||p[1])+'/'+p[0]) : 'todos';
     return voltar +
-      '<div style="font-size:1.1rem;font-weight:700;margin-bottom:1.5rem">💸 Detalhe das Despesas</div>'+
+      '<div style="font-size:1.1rem;font-weight:700;margin-bottom:0.25rem">💸 Despesas — '+mesLbl+'</div>'+
+      '<div style="font-size:0.82rem;color:var(--text3);margin-bottom:1.5rem">Apenas do mês selecionado. Troque o mês pela seleção acima.</div>'+
       (desp.length===0?
         '<div class="card" style="padding:2rem;text-align:center;color:var(--text3)">Nenhuma despesa cadastrada para este mês.</div>'
       :
@@ -7298,7 +7303,8 @@ function renderFinanceiro() {
 
   var MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   var calc   = finCalcMes();
-  var desp   = state.financeiro.despesas || [];
+  var despObj = state.financeiro.despesas || {};
+  var desp   = Array.isArray(despObj) ? despObj : (despObj[_finMesSel] || []);
   var aliq   = parseFloat(state.financeiro.aliquota)||0;
 
   // Se um card estiver selecionado, renderiza página de detalhe
@@ -7545,6 +7551,24 @@ function renderFinanceiro() {
   var despTotal = desp.reduce(function(s,d){return s+(d.valor||0);},0);
   var despMax   = desp.length ? Math.max.apply(null, desp.map(function(d){return d.valor||0;})) : 1;
 
+  // Resumo de todos os meses com despesas (para histórico)
+  var despObj2 = state.financeiro.despesas || {};
+  var todosMeses = Array.isArray(despObj2) ? [] : Object.keys(despObj2).sort().reverse();
+  var despHistorico = todosMeses.map(function(m){
+    var arr = despObj2[m] || [];
+    var total = arr.reduce(function(s,d){ return s+(d.valor||0); },0);
+    var p = m.split('-');
+    var MONTHS2 = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    var lbl = m === 'sem-mes' ? 'Sem mês definido' : (MONTHS2[parseInt(p[1])-1]||p[1])+'/'+p[0];
+    return { key:m, label:lbl, total:total, qtd:arr.length };
+  });
+  var mesAtualLabel = (function(){
+    if (!_finMesSel) return 'Sem mês selecionado';
+    var p = _finMesSel.split('-');
+    var MONTHS2 = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+    return (MONTHS2[parseInt(p[1])-1]||p[1])+'/'+p[0];
+  })();
+
   /* paleta de ícones por palavra-chave */
   function despIcon(desc) {
     var d = (desc||'').toLowerCase();
@@ -7596,11 +7620,15 @@ function renderFinanceiro() {
       '<div>'+
         '<div class="desp-form-card">'+
           '<div class="desp-form-title">➕ Nova despesa</div>'+
+          '<div style="font-size:0.78rem;color:var(--text2);margin-bottom:10px;padding:7px 10px;background:var(--bg3);border-radius:7px">'+
+            '📅 Mês: <strong>'+mesAtualLabel+'</strong>'+
+            (_finMesSel?'':' <span style="color:var(--amber)">— selecione um mês acima</span>')+
+          '</div>'+
           '<input class="desp-input" type="text" id="fin-desp-desc" placeholder="Descrição  (ex: Embalagens, Frete...)">'+
           '<input class="desp-input" type="number" id="fin-desp-val" placeholder="Valor em R$" min="0" step="0.01">'+
           '<input class="desp-input" type="text" id="fin-desp-data" placeholder="Data (opcional, ex: 13/05/2026)">'+
-          '<button class="desp-add-btn" onclick="finAddDespesa()">'+
-            '<span style="font-size:1rem">+</span> Adicionar Despesa'+
+          '<button class="desp-add-btn" onclick="finAddDespesa()"'+(!_finMesSel?' disabled style="opacity:0.5;cursor:not-allowed"':'')+'>'+
+            '<span style="font-size:1rem">+</span> Adicionar Despesa em '+mesAtualLabel+
           '</button>'+
         '</div>'+
         (despTotal>0?
@@ -7643,7 +7671,38 @@ function renderFinanceiro() {
             }).join('')
         )+
       '</div>'+
-    '</div>';
+    '</div>'+
+    /* ── HISTÓRICO DE DESPESAS POR MÊS ── */
+    (despHistorico.length > 1 ?
+      '<div style="margin-top:2rem">'+
+        '<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:0.875rem">'+
+          'Histórico por mês'+
+        '</div>'+
+        '<div class="card" style="padding:0;overflow:hidden">'+
+          '<table style="width:100%;border-collapse:collapse;font-size:0.85rem">'+
+            '<thead><tr style="background:var(--bg3);border-bottom:2px solid var(--border)">'+
+              '<th style="padding:9px 16px;text-align:left;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Mês</th>'+
+              '<th style="padding:9px 16px;text-align:center;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Lançamentos</th>'+
+              '<th style="padding:9px 16px;text-align:right;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Total</th>'+
+              '<th style="padding:9px 16px;width:40px"></th>'+
+            '</tr></thead><tbody>'+
+            despHistorico.map(function(m, mi){
+              var isAtivo = m.key === _finMesSel;
+              return '<tr style="border-bottom:0.5px solid var(--border);'+(mi%2===1?'background:var(--bg3)':'')+'">'+
+                '<td style="padding:9px 16px;font-weight:'+(isAtivo?'700':'400')+';color:'+(isAtivo?'var(--green)':'var(--text)')+'">'+
+                  m.label+(isAtivo?' ← atual':'')+
+                '</td>'+
+                '<td style="padding:9px 16px;text-align:center;color:var(--text3)">'+m.qtd+'</td>'+
+                '<td style="padding:9px 16px;text-align:right;font-weight:700;color:var(--red)">− '+finFmt(m.total)+'</td>'+
+                '<td style="padding:9px 16px;text-align:right">'+
+                  '<button onclick="finVerDesp(\\"'+m.key+'\\")">Ver</button>'+
+                '</td>'+
+              '</tr>';
+            }).join('')+
+          '</tbody></table>'+
+        '</div>'+
+      '</div>'
+    : '');
 
   /* ── EMPTY STATE ── */
   if (mesKeys.length===0 && _finTab==='visao') {
@@ -7706,6 +7765,11 @@ function finExcluirMes(k) {
   finSaveFirebase().then(function(){ navigate('financeiro'); });
 }
 
+function finVerDesp(mes) {
+  finSelMes(mes);
+  finSetTab('despesas');
+}
+
 function finEditAliquota() {
   var atual = state.financeiro.aliquota||0;
   var novo = prompt('Alíquota de imposto (% sobre o faturamento bruto):', atual);
@@ -7725,14 +7789,20 @@ function finAddDespesa() {
   var data = (dataEl && dataEl.value.trim()) ? dataEl.value.trim() : new Date().toLocaleDateString('pt-BR');
   if (!desc) { alert('Informe a descrição.'); return; }
   if (!val||val<=0) { alert('Informe um valor válido.'); return; }
-  if (!state.financeiro.despesas) state.financeiro.despesas=[];
-  state.financeiro.despesas.push({ desc:desc, valor:val, data:data });
+  if (!state.financeiro.despesas || Array.isArray(state.financeiro.despesas)) state.financeiro.despesas={};
+  var mes = _finMesSel || 'sem-mes';
+  if (!state.financeiro.despesas[mes]) state.financeiro.despesas[mes] = [];
+  state.financeiro.despesas[mes].push({ desc:desc, valor:val, data:data });
   finSaveFirebase().then(function(){ navigate('financeiro'); });
 }
 
 function finDelDespesa(i) {
   if (!confirm('Remover esta despesa?')) return;
-  state.financeiro.despesas.splice(i,1);
+  var despObj = state.financeiro.despesas || {};
+  var mes = _finMesSel || 'sem-mes';
+  var arr = Array.isArray(despObj) ? despObj : (despObj[mes] || []);
+  arr.splice(i, 1);
+  if (!Array.isArray(despObj)) state.financeiro.despesas[mes] = arr;
   finSaveFirebase().then(function(){ navigate('financeiro'); });
 }
 
@@ -7823,7 +7893,7 @@ async function finSaveFirebase() {
 
     // 1. Salva metadados (despesas + alíquota) — pequeno, vai junto
     var meta = {
-      despesas:      state.financeiro.despesas || [],
+      despesas:      state.financeiro.despesas || {},
       aliquota:      state.financeiro.aliquota || 0,
       mesKeys:       Object.keys(meses),
       custoProdutos: state.financeiro.custoProdutos || {},
@@ -7865,7 +7935,16 @@ async function finLoadFirebase() {
     if (!r1.ok) return;
     var meta = await r1.json();
     if (!meta) return;
-    state.financeiro.despesas     = meta.despesas || [];
+    // Compatibilidade: se vier array (formato antigo), migra para objeto
+    var rawDesp = meta.despesas;
+    if (Array.isArray(rawDesp)) {
+      // migra: coloca tudo no mês atual ou sem mês
+      var migrado = {};
+      if (rawDesp.length) migrado['sem-mes'] = rawDesp;
+      state.financeiro.despesas = migrado;
+    } else {
+      state.financeiro.despesas = rawDesp || {};
+    }
     state.financeiro.aliquota     = meta.aliquota || 0;
     state.financeiro.custoProdutos = meta.custoProdutos || {};
 

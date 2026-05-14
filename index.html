@@ -4812,6 +4812,48 @@ var _estoqueHistProduto = null;
 var _estoqueHistOrdemAlfa = false;
 var _estoqueCustoProdSel = null; // SKU selecionado na aba custo
 
+// ─────────────────────────────────────────────────────────────
+// MAPEAMENTO SKU → palavras-chave no histórico de preços
+// Para adicionar um novo produto:
+//   1. Adicione o objeto em PRODUTOS_CUSTO (nome, sku, peso)
+//   2. Adicione o SKU aqui com as palavras que aparecem no nome
+//      do produto no histórico de compras (matéria-prima)
+// ─────────────────────────────────────────────────────────────
+var SKU_HIST_KEYWORDS = {
+  // SKU (sem número)  → palavras que identificam a matéria-prima no histórico
+  'chia':       ['chia'],
+  'aveia':      ['aveia'],
+  'oleo':       ['oleo', 'óleo', 'coco'],          // óleo de coco
+  'psy':        ['psyll', 'psyllium'],
+  'nozes':      ['nozes', 'noz'],
+  'linhaca':    ['linha', 'linhaca', 'linhaça'],
+  'beterraba':  ['beter', 'beterraba'],
+  'abobora':    ['abob', 'abóbora', 'abobora'],
+  'frutas':     ['fruta', 'tropical', 'mix de fruta'],
+  'chips':      ['vegetal', 'chips vegeta'],        // chips vegetais
+  'sal':        ['flor de sal', 'sal'],
+  'caju':       ['caju', 'castanha'],
+  'uva':        ['uva', 'passa'],
+  'coco':       ['coco chips', 'chips de coco'],    // chips de coco (≠ óleo)
+  'arroz':      ['arroz'],
+  'cacau':      ['cacau'],
+};
+
+// Associa um SKU a um nome de produto do histórico
+// Retorna true se o nome contém alguma das palavras-chave do SKU base
+function skuMatchHist(sku, nomeLow) {
+  // Extrai a "raiz" do SKU (remove números do final: chia100→chia, oleo3→oleo)
+  var base = sku.replace(/[0-9]+$/, '');
+  var keywords = SKU_HIST_KEYWORDS[base];
+  if (!keywords) return false;
+  // Casos especiais: coco e oleo compartilham "coco" — diferenciar
+  if (base === 'coco' && nomeLow.indexOf('oleo') !== -1) return false;
+  if (base === 'oleo' && nomeLow.indexOf('chips') !== -1) return false;
+  if (base === 'sal'  && nomeLow.indexOf('flor') === -1 && nomeLow.indexOf('sal') !== -1 &&
+      (nomeLow.indexOf('abob') !== -1 || nomeLow.indexOf('semi') !== -1)) return false;
+  return keywords.some(function(kw){ return nomeLow.indexOf(kw) !== -1; });
+}
+
 // Catálogo fixo de produtos com SKU para custo
 var PRODUTOS_CUSTO = [
   {nome:'Óleo de coco - 3 Litros - Full',    sku:'oleo3',       peso:3000},
@@ -5398,23 +5440,7 @@ function renderEstoqueCusto() {
       hist.forEach(function(r){
         if (!r.totalKg) return;
         var nomeLow = (r.produto||'').toLowerCase();
-        var match = false;
-        if (sel.startsWith('chia'))       match = nomeLow.indexOf('chia') !== -1;
-        else if (sel.startsWith('aveia')) match = nomeLow.indexOf('aveia') !== -1;
-        else if (sel.startsWith('oleo'))  match = nomeLow.indexOf('coco') !== -1 || nomeLow.indexOf('leo') !== -1;
-        else if (sel.startsWith('psy'))   match = nomeLow.indexOf('psyll') !== -1;
-        else if (sel.startsWith('nozes')) match = nomeLow.indexOf('nozes') !== -1;
-        else if (sel.startsWith('linhaca')) match = nomeLow.indexOf('linha') !== -1;
-        else if (sel.startsWith('beterraba')) match = nomeLow.indexOf('beter') !== -1;
-        else if (sel.startsWith('abobora')) match = nomeLow.indexOf('abob') !== -1;
-        else if (sel.startsWith('frutas')) match = nomeLow.indexOf('fruta') !== -1 || nomeLow.indexOf('tropical') !== -1;
-        else if (sel.startsWith('chips')) match = nomeLow.indexOf('vegetal') !== -1 || nomeLow.indexOf('vegeta') !== -1;
-        else if (sel.startsWith('sal'))   match = nomeLow.indexOf('sal') !== -1;
-        else if (sel.startsWith('caju'))  match = nomeLow.indexOf('caju') !== -1;
-        else if (sel.startsWith('uva'))   match = nomeLow.indexOf('uva') !== -1;
-        else if (sel.startsWith('coco'))  match = nomeLow.indexOf('coco') !== -1;
-        else if (sel.startsWith('arroz')) match = nomeLow.indexOf('arroz') !== -1;
-        else if (sel.startsWith('cacau')) match = nomeLow.indexOf('cacau') !== -1;
+        var match = skuMatchHist(sel, nomeLow);
         if (match) {
           if (!maisRecente || (r.dataISO||'') > (maisRecente.dataISO||'')) maisRecente = r;
         }
@@ -5523,23 +5549,7 @@ function estoqueSalvarCusto(sku) {
     hist.forEach(function(r){
       if (!r.totalKg) return;
       var nomeLow = (r.produto||'').toLowerCase();
-      var match = false;
-      if (sku.startsWith('chia'))       match = nomeLow.indexOf('chia')!== -1;
-      else if (sku.startsWith('aveia')) match = nomeLow.indexOf('aveia')!== -1;
-      else if (sku.startsWith('oleo'))  match = nomeLow.indexOf('coco')!== -1||nomeLow.indexOf('leo')!== -1;
-      else if (sku.startsWith('psy'))   match = nomeLow.indexOf('psyll')!== -1;
-      else if (sku.startsWith('nozes')) match = nomeLow.indexOf('nozes')!== -1;
-      else if (sku.startsWith('linhaca')) match = nomeLow.indexOf('linha')!== -1;
-      else if (sku.startsWith('beterraba')) match = nomeLow.indexOf('beter')!== -1;
-      else if (sku.startsWith('abobora')) match = nomeLow.indexOf('abob')!== -1;
-      else if (sku.startsWith('frutas')) match = nomeLow.indexOf('fruta')!== -1||nomeLow.indexOf('tropical')!== -1;
-      else if (sku.startsWith('chips')) match = nomeLow.indexOf('vegetal')!== -1||nomeLow.indexOf('vegeta')!== -1;
-      else if (sku.startsWith('sal'))   match = nomeLow.indexOf('sal')!== -1;
-      else if (sku.startsWith('caju'))  match = nomeLow.indexOf('caju')!== -1;
-      else if (sku.startsWith('uva'))   match = nomeLow.indexOf('uva')!== -1;
-      else if (sku.startsWith('coco'))  match = nomeLow.indexOf('coco')!== -1;
-      else if (sku.startsWith('arroz')) match = nomeLow.indexOf('arroz')!== -1;
-      else if (sku.startsWith('cacau')) match = nomeLow.indexOf('cacau')!== -1;
+      var match = skuMatchHist(sku, nomeLow);
       if (match && (!maisRecente||(r.dataISO||'')>(maisRecente.dataISO||''))) maisRecente = r;
     });
     if (maisRecente && prod) {

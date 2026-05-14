@@ -552,6 +552,16 @@ function startRealtimeSync() {
         // Não aplicar sem usuário logado ou se EU fui quem salvou (evita flicker)
         if (!state.currentUser || _isSaving) return;
 
+        // Preserva historicoManual local se o Firebase ainda não tem (push pendente)
+        var localManual = state.estoque && state.estoque.historicoManual;
+        if (localManual && localManual.length > 0) {
+          var remoteManual = incoming.estoque && incoming.estoque.historicoManual;
+          if (!remoteManual || remoteManual.length < localManual.length) {
+            if (!incoming.estoque) incoming.estoque = {};
+            incoming.estoque.historicoManual = localManual;
+          }
+        }
+
         // SSE data is authoritative -- use forceMerge=true
         _firebaseReady = true;
         applyParsed(incoming, true);

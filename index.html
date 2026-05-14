@@ -399,7 +399,7 @@ let state = {
   agenda: [],
   logs: [],
   tabnutri: [],
-  financeiro: { meses: {}, despesas: [], aliquota: 0 },
+  financeiro: { meses: {}, despesas: [], aliquota: 0, custoProdutos: {} },
   estoque: { produtos: [], movimentacoes: [], historicoManual: [] },
   ponto: { colaboradores: [], registros: [] },
   devolucoes: [],
@@ -4808,8 +4808,46 @@ var _estoqueTab = 'estoque';
 var _estoqueOrdem = 'nome';
 var _estoqueBusca = '';
 var _estoqueOrdemAberto = false;
-var _estoqueHistProduto = null;   // produto selecionado no histórico
-var _estoqueHistOrdemAlfa = false; // ordenação alfabética no histórico
+var _estoqueHistProduto = null;
+var _estoqueHistOrdemAlfa = false;
+var _estoqueCustoProdSel = null; // SKU selecionado na aba custo
+
+// Catálogo fixo de produtos com SKU para custo
+var PRODUTOS_CUSTO = [
+  {nome:'Óleo de coco - 3 Litros - Full',    sku:'oleo3',       peso:3000},
+  {nome:'Óleo de coco - 1000 mL',            sku:'oleo1',       peso:1000},
+  {nome:'Óleo de coco - 500 mL',             sku:'oleo500',     peso:500},
+  {nome:'Aveia - Flocos Finos (500g)',        sku:'aveia500',    peso:500},
+  {nome:'Aveia - Flocos Finos (1Kg)',         sku:'aveia1',      peso:1000},
+  {nome:'Chips de Vegetais (50g)',            sku:'chips50',     peso:50},
+  {nome:'Chips de Vegetais (500g)',           sku:'chips500',    peso:500},
+  {nome:'Semente de Chia (100g)',             sku:'chia100',     peso:100},
+  {nome:'Semente de Chia (1Kg)',             sku:'chia1',       peso:1000},
+  {nome:'Castanha de Caju - Banda (100g)',    sku:'caju100',     peso:100},
+  {nome:'Castanha de Caju - Banda (1Kg)',     sku:'caju1',       peso:1000},
+  {nome:'Uva Passa Preta (100g)',             sku:'uva100',      peso:100},
+  {nome:'Uva Passa Preta (1kg)',              sku:'uva1',        peso:1000},
+  {nome:'Flor de Sal (100g)',                 sku:'sal100',      peso:100},
+  {nome:'Flor de Sal (1kg)',                  sku:'sal1',        peso:1000},
+  {nome:'Frutas Tropicais (50g)',             sku:'frutas50',    peso:50},
+  {nome:'Frutas Tropicais (500g)',            sku:'frutas500',   peso:500},
+  {nome:'Psyllium (100g)',                    sku:'psy100',      peso:100},
+  {nome:'Psyllium (1kg)',                     sku:'psy1',        peso:1000},
+  {nome:'Nozes Quartz (100g)',                sku:'nozes100',    peso:100},
+  {nome:'Nozes Quartz (1Kg)',                 sku:'nozes1',      peso:1000},
+  {nome:'Linhaça Dourada (100g)',             sku:'linhaca100',  peso:100},
+  {nome:'Linhaça Dourada (1Kg)',              sku:'linhaca1',    peso:1000},
+  {nome:'Beterraba em pó (100g)',             sku:'beterraba100',peso:100},
+  {nome:'Beterraba em pó (1Kg)',              sku:'beterraba1',  peso:1000},
+  {nome:'Semente de abóbora (100g)',          sku:'abobora100',  peso:100},
+  {nome:'Semente de abóbora (1Kg)',           sku:'abobora1',    peso:1000},
+  {nome:'Flocos de Arroz Natural (200g)',     sku:'arroz200',    peso:200},
+  {nome:'Flocos de Arroz Natural (400g)',     sku:'arroz400',    peso:400},
+  {nome:'Flocos de Arroz Cacau (200g)',       sku:'cacau200',    peso:200},
+  {nome:'Flocos de Arroz Cacau (500g)',       sku:'cacau500',    peso:500},
+  {nome:'Chips de Coco (400g)',               sku:'coco400',     peso:400},
+  {nome:'Chips de Coco (100g)',               sku:'coco100',     peso:100},
+];
 
 function isAdmin() {
   return state.currentUser && state.currentUser.role === 'admin';
@@ -4817,9 +4855,10 @@ function isAdmin() {
 
 function renderEstoque() {
   var tab = _estoqueTab;
-  var isEst = tab === 'estoque';
-  var isMov = tab === 'movimentacao';
+  var isEst  = tab === 'estoque';
+  var isMov  = tab === 'movimentacao';
   var isHist = tab === 'historico';
+  var isCust = tab === 'custo';
 
   function tabBtn(id, label, active) {
     return '<button onclick="estoqueSetTab(\'' + id + '\')" style="padding:0.65rem 1.25rem;background:none;border:none;border-bottom:' + (active ? '3px solid var(--green);color:var(--green);font-weight:600' : 'none;color:var(--text2)') + ';cursor:pointer;font-size:0.92rem;margin-bottom:-2px;transition:all 0.15s">' + label + '</button>';
@@ -4827,14 +4866,16 @@ function renderEstoque() {
 
   var tabBar =
     '<div style="display:flex;border-bottom:2px solid var(--border);margin-bottom:1.5rem">' +
-      tabBtn('estoque',      '📦 Estoque',         isEst)  +
-      tabBtn('movimentacao', '↕ Entrada / Saída',  isMov)  +
+      tabBtn('estoque',      '📦 Estoque',              isEst)  +
+      tabBtn('movimentacao', '↕ Entrada / Saída',       isMov)  +
       (isAdmin() ? tabBtn('historico', '📈 Histórico de Preços', isHist) : '') +
+      (isAdmin() ? tabBtn('custo',     '🧮 Custo dos Produtos',  isCust) : '') +
     '</div>';
 
   if (isEst)   return tabBar + renderEstoqueCards();
   if (isMov)   return tabBar + renderEstoqueMovimentacao();
-  if (isHist)  return tabBar + (isAdmin() ? renderEstoqueHistorico() : '<div class="empty-state">'+iconEmpty()+'<p>Acesso restrito a administradores.</p></div>');
+  if (isHist)  return tabBar + (isAdmin() ? renderEstoqueHistorico() : '<div class="empty-state">'+iconEmpty()+'<p>Acesso restrito.</p></div>');
+  if (isCust)  return tabBar + (isAdmin() ? renderEstoqueCusto() : '<div class="empty-state">'+iconEmpty()+'<p>Acesso restrito.</p></div>');
   return tabBar + renderEstoqueCards();
 }
 
@@ -5335,6 +5376,190 @@ function estoqueHistLoadFirebase() {
     })
     .catch(function(e){ console.warn('[HistoricoLoad] erro:', e); });
 }
+
+function renderEstoqueCusto() {
+  var custos = state.financeiro.custoProdutos || {};
+  var sel = _estoqueCustoProdSel;
+
+  // ── DETALHE: formulário de edição ───────────────────────────
+  if (sel) {
+    var prod = PRODUTOS_CUSTO.find(function(p){ return p.sku === sel; });
+    if (!prod) { _estoqueCustoProdSel = null; }
+    else {
+      var c = custos[sel] || {};
+      // Busca último preço do kg deste produto no histórico
+      var ultimoKg = '';
+      var hist = (state.estoque.historicoManual || []).concat(
+        (state.estoque.movimentacoes||[]).filter(function(m){ return m.tipo==='entrada'&&m.totalKg>0; })
+      );
+      // tenta associar por nome do produto no histórico — heurística por palavras-chave do SKU
+      var skuWords = sel.replace(/[0-9]/g,'').split(/(?=[A-Z])/).join(' ').toLowerCase();
+      var maisRecente = null;
+      hist.forEach(function(r){
+        if (!r.totalKg) return;
+        var nomeLow = (r.produto||'').toLowerCase();
+        var match = false;
+        if (sel.startsWith('chia'))       match = nomeLow.indexOf('chia') !== -1;
+        else if (sel.startsWith('aveia')) match = nomeLow.indexOf('aveia') !== -1;
+        else if (sel.startsWith('oleo'))  match = nomeLow.indexOf('coco') !== -1 || nomeLow.indexOf('leo') !== -1;
+        else if (sel.startsWith('psy'))   match = nomeLow.indexOf('psyll') !== -1;
+        else if (sel.startsWith('nozes')) match = nomeLow.indexOf('nozes') !== -1;
+        else if (sel.startsWith('linhaca')) match = nomeLow.indexOf('linha') !== -1;
+        else if (sel.startsWith('beterraba')) match = nomeLow.indexOf('beter') !== -1;
+        else if (sel.startsWith('abobora')) match = nomeLow.indexOf('abob') !== -1;
+        else if (sel.startsWith('frutas')) match = nomeLow.indexOf('fruta') !== -1 || nomeLow.indexOf('tropical') !== -1;
+        else if (sel.startsWith('chips')) match = nomeLow.indexOf('vegetal') !== -1 || nomeLow.indexOf('vegeta') !== -1;
+        else if (sel.startsWith('sal'))   match = nomeLow.indexOf('sal') !== -1;
+        else if (sel.startsWith('caju'))  match = nomeLow.indexOf('caju') !== -1;
+        else if (sel.startsWith('uva'))   match = nomeLow.indexOf('uva') !== -1;
+        else if (sel.startsWith('coco'))  match = nomeLow.indexOf('coco') !== -1;
+        else if (sel.startsWith('arroz')) match = nomeLow.indexOf('arroz') !== -1;
+        else if (sel.startsWith('cacau')) match = nomeLow.indexOf('cacau') !== -1;
+        if (match) {
+          if (!maisRecente || (r.dataISO||'') > (maisRecente.dataISO||'')) maisRecente = r;
+        }
+      });
+      if (maisRecente) ultimoKg = maisRecente.totalKg;
+
+      // Custo calculado automaticamente se preço/kg disponível
+      var custoProduto = c.custoManual !== undefined ? c.custoManual :
+        (ultimoKg ? ((ultimoKg * prod.peso / 1000) + (parseFloat(c.embalagem)||0) + (parseFloat(c.caixa)||0)) : '');
+
+      return '' +
+        '<button onclick="_estoqueCustoProdSel=null;var el=document.getElementById(\'page-content\');if(el)el.innerHTML=renderEstoque();" ' +
+          'style="display:inline-flex;align-items:center;gap:6px;margin-bottom:1.25rem;background:none;border:0.5px solid var(--border2);border-radius:8px;padding:6px 14px;color:var(--text2);cursor:pointer;font-size:0.85rem">← Voltar</button>' +
+        '<div class="card" style="padding:1.5rem;max-width:520px">' +
+          '<div style="font-size:1rem;font-weight:700;margin-bottom:1.5rem">' + esc(prod.nome) + ' <span style="font-size:0.75rem;color:var(--text3);font-weight:400">SKU: '+prod.sku+'</span></div>' +
+          (ultimoKg ? '<div style="background:rgba(26,138,74,0.08);border:0.5px solid rgba(26,138,74,0.2);border-radius:8px;padding:10px 14px;margin-bottom:1.25rem;font-size:0.83rem;color:var(--text2)">'+
+            '📈 Último preço/kg no histórico: <strong style="color:var(--green)">R$ '+parseFloat(ultimoKg).toFixed(4)+'/kg</strong> → custo ingrediente: <strong>R$ '+(ultimoKg*prod.peso/1000).toFixed(4)+'</strong> ('+prod.peso+'g)'+
+          '</div>' : '<div style="background:rgba(186,117,23,0.08);border:0.5px solid rgba(186,117,23,0.2);border-radius:8px;padding:10px 14px;margin-bottom:1.25rem;font-size:0.83rem;color:var(--text2)">'+
+            '⚠️ Nenhum preço/kg encontrado no Histórico de Preços para este produto. Informe o custo manualmente.'+
+          '</div>') +
+          '<div style="display:flex;flex-direction:column;gap:12px">' +
+            '<div><label style="font-size:0.75rem;color:var(--text2);display:block;margin-bottom:4px">Embalagem (R$)</label>' +
+              '<input type="number" id="cp-emb" min="0" step="0.01" value="'+(c.embalagem||'')+'" placeholder="0,00" '+
+              'style="width:100%;padding:9px 12px;border:0.5px solid var(--border2);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem">'+
+            '</div>' +
+            '<div><label style="font-size:0.75rem;color:var(--text2);display:block;margin-bottom:4px">Caixa / Rateio (R$)</label>' +
+              '<input type="number" id="cp-caixa" min="0" step="0.01" value="'+(c.caixa||'')+'" placeholder="0,00" '+
+              'style="width:100%;padding:9px 12px;border:0.5px solid var(--border2);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem">'+
+            '</div>' +
+            '<div><label style="font-size:0.75rem;color:var(--text2);display:block;margin-bottom:4px">Custo do produto (R$) <span style="color:var(--text3);font-weight:400">— deixe em branco para calcular automaticamente</span></label>' +
+              '<input type="number" id="cp-custo" min="0" step="0.0001" value="'+(c.custoManual !== undefined ? c.custoManual : '')+'" placeholder="Calculado automaticamente" '+
+              'style="width:100%;padding:9px 12px;border:0.5px solid var(--border2);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem">'+
+            '</div>' +
+          '</div>' +
+          '<div id="cp-status" style="font-size:0.82rem;margin-top:10px;min-height:1.2em"></div>' +
+          '<button onclick="estoqueSalvarCusto(\''+sel+'\')" ' +
+            'style="margin-top:1rem;width:100%;padding:10px;background:var(--green);color:#fff;border:none;border-radius:9px;font-size:0.9rem;font-weight:600;cursor:pointer">Salvar</button>' +
+        '</div>';
+    }
+  }
+
+  // ── LISTA de produtos ────────────────────────────────────────
+  var custoProdTotal = 0;
+  var comCusto = 0;
+  PRODUTOS_CUSTO.forEach(function(p){
+    var c = custos[p.sku];
+    if (c && c.custoFinal !== undefined) { custoProdTotal += c.custoFinal; comCusto++; }
+  });
+
+  var html =
+    '<div style="margin-bottom:1rem;font-size:0.82rem;color:var(--text3)">' +
+      comCusto + ' de ' + PRODUTOS_CUSTO.length + ' produtos com custo cadastrado' +
+    '</div>' +
+    '<div class="card" style="padding:0;overflow:hidden">' +
+      '<table style="width:100%;border-collapse:collapse;font-size:0.87rem">' +
+        '<thead><tr style="background:var(--bg3);border-bottom:2px solid var(--border)">' +
+          '<th style="padding:10px 16px;text-align:left;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Produto</th>' +
+          '<th style="padding:10px 16px;text-align:center;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">SKU</th>' +
+          '<th style="padding:10px 16px;text-align:right;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Embalagem</th>' +
+          '<th style="padding:10px 16px;text-align:right;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Caixa</th>' +
+          '<th style="padding:10px 16px;text-align:right;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);color:var(--green)">Custo Unit.</th>' +
+          '<th style="padding:10px 16px;width:40px"></th>' +
+        '</tr></thead><tbody>';
+
+  PRODUTOS_CUSTO.forEach(function(p) {
+    var c = custos[p.sku] || {};
+    var temCusto = c.custoFinal !== undefined;
+    html += '<tr style="border-bottom:0.5px solid var(--border);cursor:pointer;transition:background 0.12s" '+
+      'onclick="_estoqueCustoProdSel=\''+p.sku+'\';var el=document.getElementById(\'page-content\');if(el)el.innerHTML=renderEstoque();" '+
+      'onmouseover="this.style.background=\'var(--bg3)\'" onmouseout="this.style.background=\'\'">'+
+      '<td style="padding:11px 16px;font-weight:500">'+esc(p.nome)+'</td>'+
+      '<td style="padding:11px 16px;text-align:center;font-size:0.78rem;color:var(--text3);font-family:monospace">'+p.sku+'</td>'+
+      '<td style="padding:11px 16px;text-align:right;color:var(--text2)">'+(c.embalagem !== undefined ? 'R$ '+parseFloat(c.embalagem).toFixed(2) : '—')+'</td>'+
+      '<td style="padding:11px 16px;text-align:right;color:var(--text2)">'+(c.caixa !== undefined ? 'R$ '+parseFloat(c.caixa).toFixed(2) : '—')+'</td>'+
+      '<td style="padding:11px 16px;text-align:right;font-weight:700;color:'+(temCusto?'var(--green)':'var(--text3)')+'">'+(temCusto ? 'R$ '+c.custoFinal.toFixed(4) : '—')+'</td>'+
+      '<td style="padding:11px 16px;text-align:right;color:var(--text3);font-size:0.8rem">→</td>'+
+    '</tr>';
+  });
+
+  html += '</tbody></table></div>';
+  return html;
+}
+
+function estoqueSalvarCusto(sku) {
+  var embEl   = document.getElementById('cp-emb');
+  var caixaEl = document.getElementById('cp-caixa');
+  var custoEl = document.getElementById('cp-custo');
+  var status  = document.getElementById('cp-status');
+
+  var emb   = parseFloat((embEl  ?embEl.value:'').replace(',','.'))||0;
+  var caixa = parseFloat((caixaEl?caixaEl.value:'').replace(',','.'))||0;
+  var custoManualStr = (custoEl?custoEl.value:'').trim();
+  var custoManual = custoManualStr !== '' ? parseFloat(custoManualStr.replace(',','.'))||0 : undefined;
+
+  if (!state.financeiro.custoProdutos) state.financeiro.custoProdutos = {};
+
+  // Calcula custo final: manual ou automático
+  var prod = PRODUTOS_CUSTO.find(function(p){ return p.sku === sku; });
+  var custoFinal = custoManual;
+  if (custoFinal === undefined) {
+    // tenta pegar do histórico
+    var hist = (state.estoque.historicoManual||[]).concat(
+      (state.estoque.movimentacoes||[]).filter(function(m){ return m.tipo==='entrada'&&m.totalKg>0; })
+    );
+    var maisRecente = null;
+    hist.forEach(function(r){
+      if (!r.totalKg) return;
+      var nomeLow = (r.produto||'').toLowerCase();
+      var match = false;
+      if (sku.startsWith('chia'))       match = nomeLow.indexOf('chia')!== -1;
+      else if (sku.startsWith('aveia')) match = nomeLow.indexOf('aveia')!== -1;
+      else if (sku.startsWith('oleo'))  match = nomeLow.indexOf('coco')!== -1||nomeLow.indexOf('leo')!== -1;
+      else if (sku.startsWith('psy'))   match = nomeLow.indexOf('psyll')!== -1;
+      else if (sku.startsWith('nozes')) match = nomeLow.indexOf('nozes')!== -1;
+      else if (sku.startsWith('linhaca')) match = nomeLow.indexOf('linha')!== -1;
+      else if (sku.startsWith('beterraba')) match = nomeLow.indexOf('beter')!== -1;
+      else if (sku.startsWith('abobora')) match = nomeLow.indexOf('abob')!== -1;
+      else if (sku.startsWith('frutas')) match = nomeLow.indexOf('fruta')!== -1||nomeLow.indexOf('tropical')!== -1;
+      else if (sku.startsWith('chips')) match = nomeLow.indexOf('vegetal')!== -1||nomeLow.indexOf('vegeta')!== -1;
+      else if (sku.startsWith('sal'))   match = nomeLow.indexOf('sal')!== -1;
+      else if (sku.startsWith('caju'))  match = nomeLow.indexOf('caju')!== -1;
+      else if (sku.startsWith('uva'))   match = nomeLow.indexOf('uva')!== -1;
+      else if (sku.startsWith('coco'))  match = nomeLow.indexOf('coco')!== -1;
+      else if (sku.startsWith('arroz')) match = nomeLow.indexOf('arroz')!== -1;
+      else if (sku.startsWith('cacau')) match = nomeLow.indexOf('cacau')!== -1;
+      if (match && (!maisRecente||(r.dataISO||'')>(maisRecente.dataISO||''))) maisRecente = r;
+    });
+    if (maisRecente && prod) {
+      custoFinal = maisRecente.totalKg * prod.peso / 1000 + emb + caixa;
+    }
+  }
+
+  state.financeiro.custoProdutos[sku] = {
+    embalagem: emb,
+    caixa: caixa,
+    custoManual: custoManual,
+    custoFinal: custoFinal !== undefined ? round4(custoFinal) : undefined,
+  };
+
+  finSaveFirebase().then(function(){
+    if(status){ status.textContent='✓ Salvo!'; status.style.color='var(--green)'; setTimeout(function(){ status.textContent=''; },2000); }
+  });
+}
+
+function round4(v){ return Math.round(v*10000)/10000; }
 
 function setupEstoque() {}
 
@@ -6770,7 +6995,20 @@ function finCalcMes() {
 
   var aliq = parseFloat(state.financeiro.aliquota)||0;
   res.imposto = res.fat * (aliq/100);
-  res.lucro   = res.fat - res.taxas - res.despesas - res.imposto;
+
+  // Custo dos produtos — associa por SKU
+  var custos = state.financeiro.custoProdutos || {};
+  res.custoProd = 0;
+  Object.keys(skuMl).concat(Object.keys(skuSp)).concat(Object.keys(skuTt)).forEach(function(sku){
+    var k = sku.toLowerCase().trim();
+    var c = custos[k];
+    if (!c || c.custoFinal === undefined) return;
+    var qtd = (skuMl[sku]||0) + (skuSp[sku]||0) + (skuTt[sku]||0);
+    res.custoProd += qtd * c.custoFinal;
+  });
+  res.custoProd = Math.round(res.custoProd * 100) / 100;
+
+  res.lucro = res.fat - res.taxas - res.despesas - res.imposto - res.custoProd;
 
   // SKU merge
   var all = {};
@@ -6842,39 +7080,44 @@ function renderFinanceiro() {
   /* ── VISÃO GERAL ── */
   var lucroColor = calc.lucro>=0?'var(--green)':'var(--red)';
   var visaoHtml =
-    /* ROW 1 */
+    /* ROW 1 — 6 KPI cards 3+3 + gráfico */
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem">'+
-      /* Left: 5 KPI cards */
       '<div style="display:flex;flex-direction:column;gap:0.7rem">'+
-        /* Lucro */
-        '<div class="fin-kpi" style="border-left:4px solid '+(calc.lucro>=0?'var(--green)':'var(--red)')+'">'+
-          '<div class="fin-kpi-label">📈 Lucro Líquido</div>'+
-          '<div class="fin-kpi-val" style="color:'+lucroColor+'">'+(calc.lucro<0?'- ':'')+finFmt(calc.lucro)+'</div>'+
-          '<div class="fin-kpi-sub">= Faturamento - Despesas - Taxas - Imposto</div>'+
+        /* Linha topo: Lucro | Faturamento | Taxas */
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.7rem">'+
+          '<div class="fin-kpi" style="border-left:4px solid '+(calc.lucro>=0?'var(--green)':'var(--red)')+'">'+
+            '<div class="fin-kpi-label">📈 Lucro Líquido</div>'+
+            '<div class="fin-kpi-val" style="color:'+lucroColor+'">'+(calc.lucro<0?'− ':'')+finFmt(Math.abs(calc.lucro))+'</div>'+
+            '<div class="fin-kpi-sub">Fat − Taxas − Desp − Imp − Custo</div>'+
+          '</div>'+
+          '<div class="fin-kpi" style="border-left:4px solid var(--green)">'+
+            '<div class="fin-kpi-label">💰 Faturamento</div>'+
+            '<div class="fin-kpi-val">'+finFmt(calc.fat)+'</div>'+
+            '<div class="fin-kpi-sub">ML + Shopee + TikTok</div>'+
+          '</div>'+
+          '<div class="fin-kpi" style="border-left:4px solid var(--amber)">'+
+            '<div class="fin-kpi-label">🏦 Taxas de Venda</div>'+
+            '<div class="fin-kpi-val" style="color:var(--amber)">− '+finFmt(calc.taxas)+'</div>'+
+            '<div class="fin-kpi-sub">ML '+finFmt(calc.taxas_ml)+' · SP '+finFmt(calc.taxas_sp)+'</div>'+
+          '</div>'+
         '</div>'+
-        /* Faturamento */
-        '<div class="fin-kpi" style="border-left:4px solid var(--blue)">'+
-          '<div class="fin-kpi-label">💰 Faturamento Total</div>'+
-          '<div class="fin-kpi-val">'+finFmt(calc.fat)+'</div>'+
-          '<div class="fin-kpi-sub">ML + Shopee + TikTok</div>'+
-        '</div>'+
-        /* Taxas */
-        '<div class="fin-kpi" style="border-left:4px solid var(--amber)">'+
-          '<div class="fin-kpi-label">🏦 Taxas de Venda</div>'+
-          '<div class="fin-kpi-val" style="color:var(--amber)">- '+finFmt(calc.taxas)+'</div>'+
-          '<div class="fin-kpi-sub">ML '+finFmt(calc.taxas_ml)+' · Shopee '+finFmt(calc.taxas_sp)+'</div>'+
-        '</div>'+
-        /* Despesas */
-        '<div class="fin-kpi" style="border-left:4px solid var(--red)">'+
-          '<div class="fin-kpi-label">💸 Despesas</div>'+
-          '<div class="fin-kpi-val" style="color:var(--red)">- '+finFmt(calc.despesas)+'</div>'+
-          '<div class="fin-kpi-sub">'+(desp.length)+' lançamento(s)</div>'+
-        '</div>'+
-        /* Imposto clicável */
-        '<div class="fin-kpi" style="border-left:4px solid #8b5cf6;cursor:pointer" onclick="finEditAliquota()" title="Clique para editar alíquota">'+
-          '<div class="fin-kpi-label">🧾 Imposto <span style="font-size:0.68rem;color:var(--text3);margin-left:auto">✏️ '+aliq+'% — clique para editar</span></div>'+
-          '<div class="fin-kpi-val" style="color:#8b5cf6">- '+finFmt(calc.imposto)+'</div>'+
-          '<div class="fin-kpi-sub">'+aliq+'% sobre o faturamento</div>'+
+        /* Linha baixo: Custo | Despesas | Imposto */
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.7rem">'+
+          '<div class="fin-kpi" style="border-left:4px solid #8b5cf6;cursor:pointer" onclick="estoqueSetTab(\'custo\');navigate(\'estoque\')" title="Editar em Estoque -> Custo dos Produtos">'+
+            '<div class="fin-kpi-label">📦 Custo Produtos <span style="font-size:0.65rem;color:var(--text3)">↗</span></div>'+
+            '<div class="fin-kpi-val" style="color:#8b5cf6">− '+finFmt(calc.custoProd)+'</div>'+
+            '<div class="fin-kpi-sub">'+(calc.custoProd===0?'Configure em Estoque':'SKU × unidades vendidas')+'</div>'+
+          '</div>'+
+          '<div class="fin-kpi" style="border-left:4px solid var(--red)">'+
+            '<div class="fin-kpi-label">💸 Despesas</div>'+
+            '<div class="fin-kpi-val" style="color:var(--red)">− '+finFmt(calc.despesas)+'</div>'+
+            '<div class="fin-kpi-sub">'+(desp.length)+' lançamento(s)</div>'+
+          '</div>'+
+          '<div class="fin-kpi" style="border-left:4px solid #0ea5e9;cursor:pointer" onclick="finEditAliquota()">'+
+            '<div class="fin-kpi-label">🧾 Imposto <span style="font-size:0.65rem;color:var(--text3)">✏️ '+aliq+'%</span></div>'+
+            '<div class="fin-kpi-val" style="color:#0ea5e9">− '+finFmt(calc.imposto)+'</div>'+
+            '<div class="fin-kpi-sub">'+aliq+'% sobre faturamento</div>'+
+          '</div>'+
         '</div>'+
       '</div>'+
       /* Right: pizza */
@@ -7256,9 +7499,10 @@ async function finSaveFirebase() {
 
     // 1. Salva metadados (despesas + alíquota) — pequeno, vai junto
     var meta = {
-      despesas: state.financeiro.despesas || [],
-      aliquota: state.financeiro.aliquota || 0,
-      mesKeys:  Object.keys(meses),
+      despesas:      state.financeiro.despesas || [],
+      aliquota:      state.financeiro.aliquota || 0,
+      mesKeys:       Object.keys(meses),
+      custoProdutos: state.financeiro.custoProdutos || {},
     };
     var r1 = await fetch(FIREBASE_URL + '/financeiro/meta.json', {
       method: 'PUT',
@@ -7297,8 +7541,9 @@ async function finLoadFirebase() {
     if (!r1.ok) return;
     var meta = await r1.json();
     if (!meta) return;
-    state.financeiro.despesas = meta.despesas || [];
-    state.financeiro.aliquota = meta.aliquota || 0;
+    state.financeiro.despesas     = meta.despesas || [];
+    state.financeiro.aliquota     = meta.aliquota || 0;
+    state.financeiro.custoProdutos = meta.custoProdutos || {};
 
     // 2. Carrega cada mês
     var mesKeys = meta.mesKeys || [];

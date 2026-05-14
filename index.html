@@ -1378,7 +1378,7 @@ function renderEtiquetas() {
         </div>
         <div style="display:flex;gap:8px">
           <button class="btn btn-green" style="flex:1;padding:0.65rem" onclick="previewEtiqueta()">👁 Visualizar</button>
-          <button class="btn btn-green" style="flex:1;padding:0.65rem" onclick="gerarEtiqueta()">v Baixar PDF</button>
+          <button class="btn btn-green" style="flex:1;padding:0.65rem" onclick="gerarEtiqueta()">⬇ Baixar PDF</button>
         </div>
         <div id="lbl-status" style="color:var(--text2);font-size:0.85rem;text-align:center;min-height:1.2em;"></div>
       </div>
@@ -1411,7 +1411,7 @@ function renderEtiquetas() {
           '</div>' +
           '<div style="display:flex;gap:8px;margin-top:4px">' +
             '<button class="btn btn-green" style="flex:1;padding:0.65rem" onclick="etqPreview()">👁 Prévia</button>' +
-            '<button class="btn btn-green" style="flex:1;padding:0.65rem" onclick="etqGerarPDF()">v Gerar PDF</button>' +
+            '<button class="btn btn-green" style="flex:1;padding:0.65rem" onclick="etqGerarPDF()">⬇ Gerar PDF</button>' +
           '</div>' +
           '<div id="etq-status" style="color:var(--text2);font-size:0.85rem;text-align:center;min-height:1.2em;margin-top:6px"></div>' +
         '</div>' +
@@ -1890,7 +1890,7 @@ function renderTabNutri() {
           '</div>' +
           '<div style="display:flex;gap:6px">' +
             '<button class="btn btn-sm" style="flex:1" onclick="tnLoad(' + i + ')">✏️ Editar</button>' +
-            '<button class="btn btn-sm btn-green" style="flex:1" onclick="tnPrint(' + i + ')">v PDF</button>' +
+            '<button class="btn btn-sm btn-green" style="flex:1" onclick="tnPrint(' + i + ')">⬇ PDF</button>' +
             '<button class="btn btn-sm btn-red" onclick="tnDelete(' + i + ')">x</button>' +
           '</div>' +
         '</div>';
@@ -2012,7 +2012,7 @@ function renderTabNutri() {
 
       '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
         '<button class="btn btn-green" style="flex:1;padding:0.7rem" onclick="tnSave()">💾 Salvar Tabela</button>' +
-        '<button class="btn btn-green" style="flex:1;padding:0.7rem" onclick="tnGeneratePDF()">v Baixar PDF</button>' +
+        '<button class="btn btn-green" style="flex:1;padding:0.7rem" onclick="tnGeneratePDF()">⬇ Baixar PDF</button>' +
       '</div>' +
       '<div id="tn-status" style="color:var(--text2);font-size:0.82rem;text-align:center;margin-top:8px;min-height:1.2em"></div>' +
     '</div>' +
@@ -2209,7 +2209,7 @@ function tnAskQtdPDF() {
         'style="width:100%;padding:0.7rem 1rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:1.1rem;text-align:center;margin-bottom:1rem">' +
       '<div style="display:flex;gap:8px">' +
         '<button class="btn" style="flex:1" onclick="closeModal()">Cancelar</button>' +
-        '<button class="btn btn-green" style="flex:1" onclick="tnConfirmarQtdPDF()">v Gerar PDF</button>' +
+        '<button class="btn btn-green" style="flex:1" onclick="tnConfirmarQtdPDF()">⬇ Gerar PDF</button>' +
       '</div>' +
     '</div>';
   modal.style.display = 'flex';
@@ -4632,7 +4632,7 @@ function pontoAbrirModalManual(idx) {
 
       '<div style="display:flex;gap:8px">' +
         '<button class="btn" style="flex:1" onclick="closeModal()">Cancelar</button>' +
-        '<button class="btn btn-green" style="flex:1" onclick="pontoSalvarManual(' + idx + ')">v Salvar</button>' +
+        '<button class="btn btn-green" style="flex:1" onclick="pontoSalvarManual(' + idx + ')">✓ Salvar</button>' +
       '</div>' +
       '<div id="pm-status" style="font-size:0.82rem;color:var(--red);text-align:center;margin-top:8px;min-height:1.2em"></div>' +
     '</div>';
@@ -5066,7 +5066,7 @@ function renderEstoqueMovimentacao() {
         '</div>' +
       '</div>' +
       '<div style="margin-top:10px;display:flex;gap:8px;align-items:center">' +
-        '<button class="btn btn-green" onclick="estoqueRegistrarMov()">v Registrar</button>' +
+        '<button class="btn btn-green" onclick="estoqueRegistrarMov()">✓ Registrar</button>' +
         '<span id="est-mov-status" style="font-size:0.85rem;color:var(--text2)"></span>' +
       '</div>' +
     '</div>';
@@ -6884,7 +6884,8 @@ function iconEmpty() { return `<svg viewBox="0 0 24 24" fill="none" stroke="curr
 
 /* ════════════ FINANCEIRO ════════════════════════════════════════ */
 
-var _finTab    = 'visao';
+var _finTab     = 'visao';
+var _finCardSel = null; // 'lucro'|'fat'|'taxas'|'custo'|'despesas'|'imposto'
 var _finMesSel = '';
 
 function finSetTab(t) {
@@ -7006,17 +7007,52 @@ function finCalcMes() {
   var aliq = parseFloat(state.financeiro.aliquota)||0;
   res.imposto = res.fat * (aliq/100);
 
-  // Custo dos produtos — associa por SKU
+  // Custo dos produtos — merge correto sem duplicar SKUs entre plataformas
   var custos = state.financeiro.custoProdutos || {};
   res.custoProd = 0;
-  Object.keys(skuMl).concat(Object.keys(skuSp)).concat(Object.keys(skuTt)).forEach(function(sku){
-    var k = sku.toLowerCase().trim();
+  res.custoProdDetalhe = []; // para a página de detalhe
+  var skuAllKeys = {};
+  Object.keys(skuMl).forEach(function(s){ skuAllKeys[s.toLowerCase().trim()] = true; });
+  Object.keys(skuSp).forEach(function(s){ skuAllKeys[s.toLowerCase().trim()] = true; });
+  Object.keys(skuTt).forEach(function(s){ skuAllKeys[s.toLowerCase().trim()] = true; });
+  Object.keys(skuAllKeys).forEach(function(k){
     var c = custos[k];
-    if (!c || c.custoFinal === undefined) return;
-    var qtd = (skuMl[sku]||0) + (skuSp[sku]||0) + (skuTt[sku]||0);
-    res.custoProd += qtd * c.custoFinal;
+    var qtdMl  = skuMl[k]  || 0;
+    var qtdSp  = skuSp[k]  || 0;
+    var qtdTt  = skuTt[k]  || 0;
+    var qtd = qtdMl + qtdSp + qtdTt;
+    if (!qtd) return;
+    if (!c || c.custoFinal === undefined) {
+      res.custoProdDetalhe.push({ sku:k, nome:SKU_NAMES[k]||k, qtd:qtd, custo:null, total:null });
+      return;
+    }
+    var total = qtd * c.custoFinal;
+    res.custoProd += total;
+    res.custoProdDetalhe.push({ sku:k, nome:SKU_NAMES[k]||k, qtd:qtd, custo:c.custoFinal, total:total });
   });
   res.custoProd = Math.round(res.custoProd * 100) / 100;
+  res.custoProdDetalhe.sort(function(a,b){ return (b.total||0)-(a.total||0); });
+
+  // Detalhe ML para página de drill-down
+  res.mlDetalhe = { linhas:0, filtradas:0, semSku:0 };
+  if (mes.ml) {
+    mes.ml.forEach(function(r){
+      res.mlDetalhe.linhas++;
+      var estado = String(r['Estado']||'');
+      if (ML_INVALID.some(function(x){ return estado.indexOf(x)!==-1; })) { res.mlDetalhe.filtradas++; return; }
+      if (estado.indexOf('Pacote de')!==-1) { res.mlDetalhe.filtradas++; return; }
+      var sku = String(r['SKU']||'').trim();
+      if (!sku || sku==='nan') { res.mlDetalhe.semSku++; }
+    });
+  }
+  // Detalhe Shopee
+  res.spDetalhe = { linhas:0, cancelados:0 };
+  if (mes.sp) {
+    mes.sp.forEach(function(r){
+      res.spDetalhe.linhas++;
+      if (String(r['Status do pedido']||'')==='Cancelado') res.spDetalhe.cancelados++;
+    });
+  }
 
   res.lucro = res.fat - res.taxas - res.despesas - res.imposto - res.custoProd;
 
@@ -7036,6 +7072,225 @@ function finCalcMes() {
   return res;
 }
 
+function finAbrirDetalhe(card) {
+  _finCardSel = card;
+  var c = document.getElementById('page-content');
+  if (c) c.innerHTML = renderFinanceiro();
+}
+
+function finFecharDetalhe() {
+  _finCardSel = null;
+  var c = document.getElementById('page-content');
+  if (c) c.innerHTML = renderFinanceiro();
+  bindFinanceiro();
+}
+
+function renderFinDetalheCard(calc, desp, aliq, MONTHS) {
+  var card = _finCardSel;
+  var voltar = '<button onclick="finFecharDetalhe()" style="display:inline-flex;align-items:center;gap:6px;margin-bottom:1.5rem;background:none;border:0.5px solid var(--border2);border-radius:8px;padding:7px 16px;color:var(--text2);cursor:pointer;font-size:0.88rem">← Voltar</button>';
+
+  // ── FATURAMENTO ─────────────────────────────────────────────
+  if (card === 'fat') {
+    var mes = _finMesSel ? (state.financeiro.meses||{})[_finMesSel] : null;
+    var mlRows = [], spRows = [];
+    if (mes && mes.ml) {
+      var ML_INVALID_LOCAL = ['Cancelada pelo comprador','Venda cancelada. Não envie.','Cancelada. Não despache','O seu comprador quer cancelar','Devolução em preparação','Devolução a caminho'];
+      mes.ml.forEach(function(r){
+        var estado = String(r['Estado']||'');
+        var invalido = ML_INVALID_LOCAL.some(function(x){ return estado.indexOf(x)!==-1; }) || estado.indexOf('Pacote de')!==-1;
+        var sku = String(r['SKU']||'').trim();
+        var rec = parseFloat(r['Receita por produtos (BRL)'])||0;
+        mlRows.push({ estado:estado, sku:sku, rec:rec, invalido:invalido, semSku:(!sku||sku==='nan') });
+      });
+    }
+    if (mes && mes.sp) {
+      mes.sp.forEach(function(r){
+        var status = String(r['Status do pedido']||'');
+        var sku = String(r['Nº de referência do SKU principal']||'').trim();
+        var vt = parseFloat(r['Valor Total'])||0;
+        spRows.push({ status:status, sku:sku, vt:vt, cancelado:status==='Cancelado' });
+      });
+    }
+    var mlTotal = mlRows.filter(function(r){ return !r.invalido && r.sku && r.sku!=='nan'; }).reduce(function(s,r){ return s+r.rec; },0);
+    var mlFiltradas = mlRows.filter(function(r){ return r.invalido; }).length;
+    var mlSemSku = mlRows.filter(function(r){ return !r.invalido && (!r.sku||r.sku==='nan'); }).length;
+    var spTotal = spRows.filter(function(r){ return !r.cancelado; }).reduce(function(s,r){ return s+r.vt; },0);
+    var spCancelados = spRows.filter(function(r){ return r.cancelado; }).length;
+
+    return voltar +
+      '<div style="font-size:1.1rem;font-weight:700;margin-bottom:1.5rem">💰 Detalhe do Faturamento</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem">'+
+        // ML
+        '<div class="card" style="padding:1.25rem">'+
+          '<div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#f97316;margin-bottom:1rem">🟠 Mercado Livre</div>'+
+          '<div style="font-size:1.8rem;font-weight:800;color:var(--text)">'+finFmt(calc.fat_ml)+'</div>'+
+          '<div style="margin-top:1rem;display:flex;flex-direction:column;gap:6px">'+
+            '<div style="display:flex;justify-content:space-between;font-size:0.83rem;padding:6px 0;border-bottom:0.5px solid var(--border)"><span style="color:var(--text2)">Total de linhas na planilha</span><span style="font-weight:600">'+mlRows.length+'</span></div>'+
+            '<div style="display:flex;justify-content:space-between;font-size:0.83rem;padding:6px 0;border-bottom:0.5px solid var(--border)"><span style="color:var(--red)">Filtradas (cancelamentos/devoluções)</span><span style="font-weight:600;color:var(--red)">− '+mlFiltradas+'</span></div>'+
+            (mlSemSku ? '<div style="display:flex;justify-content:space-between;font-size:0.83rem;padding:6px 0;border-bottom:0.5px solid var(--border)"><span style="color:var(--amber)">Sem SKU (não somadas)</span><span style="font-weight:600;color:var(--amber)">'+mlSemSku+'</span></div>' : '')+
+            '<div style="display:flex;justify-content:space-between;font-size:0.83rem;padding:8px 0"><span style="color:var(--green);font-weight:600">✓ Linhas válidas somadas</span><span style="font-weight:700;color:var(--green)">'+(mlRows.length - mlFiltradas - mlSemSku)+'</span></div>'+
+          '</div>'+
+          '<div style="margin-top:0.75rem;padding:10px;background:rgba(249,115,22,0.06);border-radius:8px;font-size:0.78rem;color:var(--text3)">'+
+            'Usa coluna "Receita por produtos (BRL)" da planilha ML. Vendas brutas do ML incluem cancelamentos futuros que a planilha já desconta no estado.'+
+          '</div>'+
+        '</div>'+
+        // Shopee
+        '<div class="card" style="padding:1.25rem">'+
+          '<div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#EE4D2D;margin-bottom:1rem">🔴 Shopee</div>'+
+          '<div style="font-size:1.8rem;font-weight:800;color:var(--text)">'+finFmt(calc.fat_sp)+'</div>'+
+          '<div style="margin-top:1rem;display:flex;flex-direction:column;gap:6px">'+
+            '<div style="display:flex;justify-content:space-between;font-size:0.83rem;padding:6px 0;border-bottom:0.5px solid var(--border)"><span style="color:var(--text2)">Total de pedidos na planilha</span><span style="font-weight:600">'+spRows.length+'</span></div>'+
+            '<div style="display:flex;justify-content:space-between;font-size:0.83rem;padding:6px 0;border-bottom:0.5px solid var(--border)"><span style="color:var(--red)">Cancelados (excluídos)</span><span style="font-weight:600;color:var(--red)">− '+spCancelados+'</span></div>'+
+            '<div style="display:flex;justify-content:space-between;font-size:0.83rem;padding:8px 0"><span style="color:var(--green);font-weight:600">✓ Pedidos válidos somados</span><span style="font-weight:700;color:var(--green)">'+(spRows.length - spCancelados)+'</span></div>'+
+          '</div>'+
+          '<div style="margin-top:0.75rem;padding:10px;background:rgba(238,77,45,0.06);border-radius:8px;font-size:0.78rem;color:var(--text3)">'+
+            'Usa coluna "Valor Total" da planilha Shopee. Esse valor já é o valor pago pelo comprador, após descontos da Shopee aplicados pelo consumidor (cupons de comprador).'+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="card" style="padding:1rem;font-size:0.83rem;color:var(--text2)">'+
+        '<strong>ℹ️ Por que difere do painel do ML/Shopee?</strong><br>'+
+        'O ML reporta "Vendas brutas" no painel (inclui cancelamentos ainda em aberto). A plataforma usa a planilha exportada que já filtra pelo status final de cada venda. '+
+        'A Shopee no painel soma descontos do Shopee Ads e da plataforma separadamente — a planilha usa o valor pago efetivamente pelo comprador.'+
+      '</div>';
+  }
+
+  // ── TAXAS ───────────────────────────────────────────────────
+  if (card === 'taxas') {
+    return voltar +
+      '<div style="font-size:1.1rem;font-weight:700;margin-bottom:1.5rem">🏦 Detalhe das Taxas de Venda</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">'+
+        '<div class="card" style="padding:1.25rem">'+
+          '<div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#f97316;margin-bottom:1rem">🟠 Taxas Mercado Livre</div>'+
+          '<div style="font-size:1.8rem;font-weight:800;color:var(--amber)">'+finFmt(calc.taxas_ml)+'</div>'+
+          '<div style="margin-top:0.75rem;padding:10px;background:rgba(249,115,22,0.06);border-radius:8px;font-size:0.78rem;color:var(--text3)">'+
+            'Coluna "Tarifa de venda e impostos (BRL)" da planilha ML. Valor negativo convertido para positivo (Math.abs).'+
+          '</div>'+
+          (calc.fat_ml>0?'<div style="margin-top:10px;font-size:0.85rem;color:var(--text2)">% sobre faturamento ML: <strong>'+((calc.taxas_ml/calc.fat_ml)*100).toFixed(1)+'%</strong></div>':'')+
+        '</div>'+
+        '<div class="card" style="padding:1.25rem">'+
+          '<div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#EE4D2D;margin-bottom:1rem">🔴 Taxas Shopee</div>'+
+          '<div style="font-size:1.8rem;font-weight:800;color:var(--amber)">'+finFmt(calc.taxas_sp)+'</div>'+
+          '<div style="margin-top:0.75rem;padding:10px;background:rgba(238,77,45,0.06);border-radius:8px;font-size:0.78rem;color:var(--text3)">'+
+            'Soma de "Taxa de comissão bruta" + "Taxa de serviço bruta" da planilha Shopee.'+
+          '</div>'+
+          (calc.fat_sp>0?'<div style="margin-top:10px;font-size:0.85rem;color:var(--text2)">% sobre faturamento Shopee: <strong>'+((calc.taxas_sp/calc.fat_sp)*100).toFixed(1)+'%</strong></div>':'')+
+        '</div>'+
+      '</div>'+
+      '<div class="card" style="padding:1rem;margin-top:1rem;font-size:0.88rem">'+
+        '<div style="display:flex;justify-content:space-between;align-items:center">'+
+          '<span style="color:var(--text2)">Total de taxas</span>'+
+          '<span style="font-size:1.2rem;font-weight:800;color:var(--amber)">'+finFmt(calc.taxas)+'</span>'+
+        '</div>'+
+        (calc.fat>0?'<div style="font-size:0.8rem;color:var(--text3);margin-top:4px">'+((calc.taxas/calc.fat)*100).toFixed(1)+'% do faturamento total</div>':'')+
+      '</div>';
+  }
+
+  // ── CUSTO PRODUTOS ──────────────────────────────────────────
+  if (card === 'custo') {
+    var semCusto = calc.custoProdDetalhe.filter(function(r){ return r.custo===null; });
+    var comCusto = calc.custoProdDetalhe.filter(function(r){ return r.custo!==null; });
+    return voltar +
+      '<div style="font-size:1.1rem;font-weight:700;margin-bottom:0.5rem">📦 Detalhe do Custo de Produtos</div>'+
+      '<div style="font-size:0.83rem;color:var(--text3);margin-bottom:1.5rem">Custo unitário × unidades vendidas no período, por SKU</div>'+
+      '<div class="card" style="padding:1rem;margin-bottom:1.25rem">'+
+        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;text-align:center">'+
+          '<div><div style="font-size:0.7rem;color:var(--text3);text-transform:uppercase">Total calculado</div><div style="font-size:1.3rem;font-weight:800;color:#8b5cf6">'+finFmt(calc.custoProd)+'</div></div>'+
+          '<div><div style="font-size:0.7rem;color:var(--text3);text-transform:uppercase">SKUs com custo</div><div style="font-size:1.3rem;font-weight:800;color:var(--green)">'+comCusto.length+'</div></div>'+
+          '<div><div style="font-size:0.7rem;color:var(--text3);text-transform:uppercase">SKUs sem custo</div><div style="font-size:1.3rem;font-weight:800;color:var(--amber)">'+semCusto.length+'</div></div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="card" style="padding:0;overflow:hidden">'+
+        '<table style="width:100%;border-collapse:collapse;font-size:0.83rem">'+
+          '<thead><tr style="background:var(--bg3);border-bottom:2px solid var(--border)">'+
+            '<th style="padding:8px 14px;text-align:left">SKU</th>'+
+            '<th style="padding:8px 14px;text-align:left">Produto</th>'+
+            '<th style="padding:8px 14px;text-align:right">Unid. vendidas</th>'+
+            '<th style="padding:8px 14px;text-align:right">Custo unit.</th>'+
+            '<th style="padding:8px 14px;text-align:right;color:#8b5cf6">Total</th>'+
+          '</tr></thead><tbody>'+
+          calc.custoProdDetalhe.map(function(r,i){
+            return '<tr style="border-bottom:0.5px solid var(--border)'+(i%2===1?';background:var(--bg3)':'')+'">' +
+              '<td style="padding:7px 14px;font-family:monospace;font-size:0.78rem;color:var(--text3)">'+r.sku+'</td>'+
+              '<td style="padding:7px 14px">'+r.nome+'</td>'+
+              '<td style="padding:7px 14px;text-align:right;font-weight:600">'+r.qtd+'</td>'+
+              '<td style="padding:7px 14px;text-align:right;color:var(--text2)">'+(r.custo!==null?'R$ '+r.custo.toFixed(4):'<span style="color:var(--amber)">⚠ não cadastrado</span>')+'</td>'+
+              '<td style="padding:7px 14px;text-align:right;font-weight:700;color:'+(r.total!==null?'#8b5cf6':'var(--amber)')+'">'+(r.total!==null?finFmt(r.total):'—')+'</td>'+
+            '</tr>';
+          }).join('')+
+        '</tbody></table>'+
+      '</div>'+
+      (semCusto.length?'<div class="card" style="padding:1rem;margin-top:1rem;background:rgba(186,117,23,0.06);border-color:rgba(186,117,23,0.2);font-size:0.83rem;color:var(--text2)">'+
+        '⚠️ <strong>'+semCusto.length+' SKU(s) sem custo cadastrado</strong> não estão sendo descontados do lucro: '+
+        semCusto.map(function(r){ return r.sku; }).join(', ')+
+        '. <button onclick="estoqueSetTab(\'custo\');navigate(\'estoque\')" style="background:none;border:none;color:var(--green);cursor:pointer;font-size:0.83rem;text-decoration:underline">Cadastrar agora →</button>'+
+      '</div>':'');
+  }
+
+  // ── DESPESAS ────────────────────────────────────────────────
+  if (card === 'despesas') {
+    return voltar +
+      '<div style="font-size:1.1rem;font-weight:700;margin-bottom:1.5rem">💸 Detalhe das Despesas</div>'+
+      (desp.length===0?
+        '<div class="card" style="padding:2rem;text-align:center;color:var(--text3)">Nenhuma despesa cadastrada para este mês.</div>'
+      :
+        '<div class="card" style="padding:0;overflow:hidden">'+
+          '<table style="width:100%;border-collapse:collapse;font-size:0.85rem">'+
+            '<thead><tr style="background:var(--bg3);border-bottom:2px solid var(--border)">'+
+              '<th style="padding:10px 16px;text-align:left">Descrição</th>'+
+              '<th style="padding:10px 16px;text-align:center">Data</th>'+
+              '<th style="padding:10px 16px;text-align:right;color:var(--red)">Valor</th>'+
+            '</tr></thead><tbody>'+
+            desp.map(function(d,i){
+              return '<tr style="border-bottom:0.5px solid var(--border)'+(i%2===1?';background:var(--bg3)':'')+'">' +
+                '<td style="padding:9px 16px">'+esc(d.desc)+'</td>'+
+                '<td style="padding:9px 16px;text-align:center;color:var(--text3)">'+esc(d.data||'—')+'</td>'+
+                '<td style="padding:9px 16px;text-align:right;font-weight:700;color:var(--red)">'+finFmt(d.valor)+'</td>'+
+              '</tr>';
+            }).join('')+
+            '<tr style="background:var(--bg3);border-top:2px solid var(--border)">'+
+              '<td colspan="2" style="padding:10px 16px;font-weight:700">Total</td>'+
+              '<td style="padding:10px 16px;text-align:right;font-weight:800;font-size:1rem;color:var(--red)">'+finFmt(calc.despesas)+'</td>'+
+            '</tr>'+
+          '</tbody></table>'+
+        '</div>'
+      );
+  }
+
+  // ── LUCRO ───────────────────────────────────────────────────
+  if (card === 'lucro') {
+    var lucroColor = calc.lucro>=0?'var(--green)':'var(--red)';
+    var itens = [
+      { label:'💰 Faturamento Total',    val: calc.fat,       cor:'var(--green)', sinal:'+' },
+      { label:'🏦 Taxas de Venda',       val: calc.taxas,     cor:'var(--amber)', sinal:'−' },
+      { label:'📦 Custo de Produtos',    val: calc.custoProd, cor:'#8b5cf6',      sinal:'−' },
+      { label:'💸 Despesas',             val: calc.despesas,  cor:'var(--red)',   sinal:'−' },
+      { label:'🧾 Imposto ('+aliq+'%)', val: calc.imposto,   cor:'#0ea5e9',      sinal:'−' },
+    ];
+    return voltar +
+      '<div style="font-size:1.1rem;font-weight:700;margin-bottom:1.5rem">📈 Composição do Lucro Líquido</div>'+
+      '<div class="card" style="padding:1.5rem;max-width:560px">'+
+        itens.map(function(item, i){
+          var pct = calc.fat>0 ? (item.val/calc.fat*100).toFixed(1) : '0';
+          return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:0.5px solid var(--border)">'+
+            '<div>'+
+              '<div style="font-size:0.9rem;font-weight:500">'+item.label+'</div>'+
+              '<div style="font-size:0.75rem;color:var(--text3)">'+pct+'% do faturamento</div>'+
+            '</div>'+
+            '<div style="font-size:1rem;font-weight:700;color:'+item.cor+'">'+item.sinal+' '+finFmt(item.val)+'</div>'+
+          '</div>';
+        }).join('')+
+        '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0 0">'+
+          '<div style="font-size:1rem;font-weight:700">= Lucro Líquido</div>'+
+          '<div style="font-size:1.4rem;font-weight:800;color:'+lucroColor+'">'+(calc.lucro<0?'− ':'')+finFmt(Math.abs(calc.lucro))+'</div>'+
+        '</div>'+
+        (calc.fat>0?'<div style="font-size:0.78rem;color:var(--text3);margin-top:6px">Margem líquida: <strong style="color:'+lucroColor+'">'+(calc.lucro/calc.fat*100).toFixed(1)+'%</strong></div>':'')+
+      '</div>';
+  }
+
+  return voltar + '<div class="empty-state">'+iconEmpty()+'<p>Detalhe não disponível</p></div>';
+}
+
 function renderFinanceiro() {
   var meses  = state.financeiro.meses || {};
   var mesKeys = Object.keys(meses).sort().reverse();
@@ -7045,6 +7300,11 @@ function renderFinanceiro() {
   var calc   = finCalcMes();
   var desp   = state.financeiro.despesas || [];
   var aliq   = parseFloat(state.financeiro.aliquota)||0;
+
+  // Se um card estiver selecionado, renderiza página de detalhe
+  if (_finCardSel && _finTab === 'visao') {
+    return renderFinDetalheCard(calc, desp, aliq, MONTHS);
+  }
 
   /* ── PILL SELETOR DE MÊS ── */
   var mesPills = '';
@@ -7056,34 +7316,88 @@ function renderFinanceiro() {
 
   /* ── PIE CHART SVG ── */
   function pieSVG(fatMl, fatSp, fatTt) {
-    var total = fatMl+fatSp+fatTt || 1;
+    var total = fatMl + fatSp + fatTt || 1;
     var segs = [
-      {v:fatMl, c:'#f97316', l:'Mercado Livre'},
-      {v:fatSp, c:'#EE4D2D', l:'Shopee'},
-      {v:fatTt, c:'#6366f1', l:'TikTok'},
+      { v:fatMl, c:'#f97316', l:'Mercado Livre', icon:'🟠' },
+      { v:fatSp, c:'#EE4D2D', l:'Shopee',        icon:'🔴' },
+      { v:fatTt, c:'#6366f1', l:'TikTok',        icon:'⚫' },
     ];
-    var cx=85,cy=85,r=68, out='', angle=-Math.PI/2;
+
+    // Donut SVG
+    var cx=110, cy=110, rOuter=90, rInner=52, out='', angle=-Math.PI/2;
     segs.forEach(function(s){
       if(s.v<=0) return;
-      var a=s.v/total*2*Math.PI;
-      var x1=cx+r*Math.cos(angle), y1=cy+r*Math.sin(angle);
-      var x2=cx+r*Math.cos(angle+a), y2=cy+r*Math.sin(angle+a);
+      var a = s.v/total*2*Math.PI;
+      var x1o=cx+rOuter*Math.cos(angle),  y1o=cy+rOuter*Math.sin(angle);
+      var x2o=cx+rOuter*Math.cos(angle+a),y2o=cy+rOuter*Math.sin(angle+a);
+      var x1i=cx+rInner*Math.cos(angle+a),y1i=cy+rInner*Math.sin(angle+a);
+      var x2i=cx+rInner*Math.cos(angle),  y2i=cy+rInner*Math.sin(angle);
       var lg=a>Math.PI?1:0;
-      out+='<path d="M'+cx+' '+cy+' L'+x1.toFixed(1)+' '+y1.toFixed(1)+' A'+r+' '+r+' 0 '+lg+' 1 '+x2.toFixed(1)+' '+y2.toFixed(1)+' Z" fill="'+s.c+'" stroke="#fff" stroke-width="2.5"/>';
-      angle+=a;
+      // Label no meio do segmento
+      var midA = angle + a/2;
+      var lx = cx + (rInner+rOuter)/2*Math.cos(midA);
+      var ly = cy + (rInner+rOuter)/2*Math.sin(midA);
+      var pct = (s.v/total*100).toFixed(0);
+      out += '<path d="M'+x1o.toFixed(1)+' '+y1o.toFixed(1)+
+              ' A'+rOuter+' '+rOuter+' 0 '+lg+' 1 '+x2o.toFixed(1)+' '+y2o.toFixed(1)+
+              ' L'+x1i.toFixed(1)+' '+y1i.toFixed(1)+
+              ' A'+rInner+' '+rInner+' 0 '+lg+' 0 '+x2i.toFixed(1)+' '+y2i.toFixed(1)+
+              ' Z" fill="'+s.c+'" stroke="var(--card)" stroke-width="2.5"/>';
+      if (a > 0.35) {
+        out += '<text x="'+lx.toFixed(1)+'" y="'+ly.toFixed(1)+'" text-anchor="middle" dominant-baseline="middle" font-size="11" font-weight="700" fill="#fff">'+pct+'%</text>';
+      }
+      angle += a;
     });
-    var legend='';
-    segs.forEach(function(s){
-      var pct=total>0?(s.v/total*100).toFixed(1):'0.0';
-      legend+='<div style="display:flex;align-items:center;gap:7px;margin-bottom:6px">'+
-        '<div style="width:10px;height:10px;border-radius:2px;flex-shrink:0;background:'+s.c+'"></div>'+
-        '<span style="font-size:0.78rem;color:var(--text2);flex:1">'+s.l+'</span>'+
-        '<span style="font-size:0.78rem;font-weight:700;color:var(--text)">'+pct+'%</span></div>';
-    });
-    return '<div style="display:flex;flex-direction:column;align-items:center;gap:10px">'+
-      '<svg viewBox="0 0 170 170" style="width:150px;height:150px">'+out+'</svg>'+
-      '<div style="width:100%">'+legend+'</div>'+
-      '<div style="font-size:0.75rem;color:var(--text3);text-align:center">Total: '+finFmt(calc.fat)+'</div>'+
+    // Centro do donut
+    out += '<circle cx="'+cx+'" cy="'+cy+'" r="'+rInner+'" fill="var(--card)"/>'+
+           '<text x="'+cx+'" y="'+(cy-8)+'" text-anchor="middle" font-size="10" fill="var(--text3)" font-weight="500">TOTAL</text>'+
+           '<text x="'+cx+'" y="'+(cy+10)+'" text-anchor="middle" font-size="12" fill="var(--text)" font-weight="800">'+finFmt(total).replace('R$\u00a0','').replace('R$ ','')+'</text>';
+
+    // Barras horizontais de composição de lucro
+    var itensBar = [
+      { l:'Taxas',     v:calc.taxas,     c:'var(--amber)', pct: calc.fat>0?(calc.taxas/calc.fat*100):0 },
+      { l:'Custo',     v:calc.custoProd, c:'#8b5cf6',      pct: calc.fat>0?(calc.custoProd/calc.fat*100):0 },
+      { l:'Desp.',     v:calc.despesas,  c:'var(--red)',    pct: calc.fat>0?(calc.despesas/calc.fat*100):0 },
+      { l:'Imposto',   v:calc.imposto,   c:'#0ea5e9',      pct: calc.fat>0?(calc.imposto/calc.fat*100):0 },
+      { l:'Lucro',     v:Math.max(0,calc.lucro), c:'var(--green)', pct: calc.fat>0?(Math.max(0,calc.lucro)/calc.fat*100):0 },
+    ];
+
+    var barsHtml = '<div style="margin-top:1rem">'+
+      '<div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:8px">Composição do faturamento</div>'+
+      // Barra empilhada
+      '<div style="display:flex;height:12px;border-radius:6px;overflow:hidden;gap:1px;margin-bottom:10px">'+
+        itensBar.map(function(b){ return b.pct>0 ? '<div style="width:'+b.pct.toFixed(1)+'%;background:'+b.c+'" title="'+b.l+': '+b.pct.toFixed(1)+'%"></div>' : ''; }).join('')+
+      '</div>'+
+      itensBar.map(function(b){
+        return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">'+
+          '<div style="width:8px;height:8px;border-radius:2px;flex-shrink:0;background:'+b.c+'"></div>'+
+          '<span style="font-size:0.75rem;color:var(--text2);flex:1">'+b.l+'</span>'+
+          '<span style="font-size:0.75rem;color:var(--text3)">'+b.pct.toFixed(1)+'%</span>'+
+          '<span style="font-size:0.75rem;font-weight:700;color:var(--text)">'+finFmt(b.v)+'</span>'+
+        '</div>';
+      }).join('')+
+    '</div>';
+
+    // Legenda por plataforma
+    var legPlat = '<div style="display:flex;flex-direction:column;gap:5px;margin-bottom:0.75rem">'+
+      segs.map(function(s){
+        var pct = total>0?(s.v/total*100).toFixed(1):'0.0';
+        return '<div style="display:flex;align-items:center;gap:7px">'+
+          '<div style="width:10px;height:10px;border-radius:2px;background:'+s.c+';flex-shrink:0"></div>'+
+          '<span style="font-size:0.78rem;color:var(--text2);flex:1">'+s.l+'</span>'+
+          '<span style="font-size:0.78rem;color:var(--text3)">'+pct+'%</span>'+
+          '<span style="font-size:0.78rem;font-weight:700;color:var(--text)">'+finFmt(s.v)+'</span>'+
+        '</div>';
+      }).join('')+
+    '</div>';
+
+    return '<div style="display:grid;grid-template-columns:auto 1fr;gap:1.25rem;align-items:start">'+
+      '<svg viewBox="0 0 220 220" style="width:170px;height:170px;flex-shrink:0">'+out+'</svg>'+
+      '<div>'+
+        '<div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:8px">Por plataforma</div>'+
+        legPlat+
+        barsHtml+
+      '</div>'+
     '</div>';
   }
 
@@ -7095,13 +7409,13 @@ function renderFinanceiro() {
       '<div style="display:flex;flex-direction:column;gap:0.7rem">'+
         /* Linha topo: Lucro | Faturamento | Taxas */
         '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.7rem">'+
-          '<div class="fin-kpi" style="border-left:4px solid '+(calc.lucro>=0?'var(--green)':'var(--red)')+'">'+
-            '<div class="fin-kpi-label">📈 Lucro Líquido</div>'+
+          '<div class="fin-kpi" style="border-left:4px solid '+(calc.lucro>=0?'var(--green)':'var(--red)')+';cursor:pointer" onclick="finAbrirDetalhe(\'lucro\')">'+
+            '<div class="fin-kpi-label">📈 Lucro Líquido <span style="font-size:0.65rem;color:var(--text3)">↗ detalhe</span></div>'+
             '<div class="fin-kpi-val" style="color:'+lucroColor+'">'+(calc.lucro<0?'− ':'')+finFmt(Math.abs(calc.lucro))+'</div>'+
             '<div class="fin-kpi-sub">Fat − Taxas − Desp − Imp − Custo</div>'+
           '</div>'+
-          '<div class="fin-kpi" style="border-left:4px solid var(--green)">'+
-            '<div class="fin-kpi-label">💰 Faturamento</div>'+
+          '<div class="fin-kpi" style="border-left:4px solid var(--green);cursor:pointer" onclick="finAbrirDetalhe(\'fat\')">'+
+            '<div class="fin-kpi-label">💰 Faturamento <span style="font-size:0.65rem;color:var(--text3)">↗</span></div>'+
             '<div class="fin-kpi-val">'+finFmt(calc.fat)+'</div>'+
             '<div class="fin-kpi-sub">ML + Shopee + TikTok</div>'+
           '</div>'+

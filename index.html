@@ -6977,6 +6977,8 @@ function finCalcMes() {
       if (estado.indexOf('Pacote de')!==-1) return;
       var sku = String(r['SKU']||'').trim();
       if (!sku || sku==='nan') return;
+      // Ignora SKUs que não estão no catálogo da plataforma
+      if (!SKU_NAMES[sku.toLowerCase()]) return;
       var rec = parseFloat(String(r['Preço unitário de venda do anúncio (BRL)']||'').replace(',','.'))||0;
       var tar = parseFloat(String(r['Tarifa de venda e impostos (BRL)']||'').replace(',','.'))||0;
       var env = parseFloat(String(r['Tarifas de envio (BRL)']||'').replace(',','.'))||0;
@@ -6994,7 +6996,8 @@ function finCalcMes() {
       if (status==='Cancelado') return;
       var sku = String(r['Número de referência SKU']||'').trim();
       if (!sku) return;
-      var vt  = parseFloat(r['Valor Total'])||0;
+      // Ignora SKUs que não estão no catálogo da plataforma
+      if (!SKU_NAMES[sku.toLowerCase()]) return;
       var com = parseFloat(r['Taxa de comissão bruta'])||0;
       var srv = parseFloat(r['Taxa de serviço bruta'])||0;
       var qty = parseInt(r['Quantidade'])||0;
@@ -7013,6 +7016,8 @@ function finCalcMes() {
       var sku = String(r['Seller SKU']||'').trim();
       var oid = String(r['Order ID']||'');
       var qty = parseInt(r['Quantity'])||0;
+      // Ignora SKUs que não estão no catálogo da plataforma
+      if (!sku || !SKU_NAMES[sku.toLowerCase()]) return;
       // Valor de venda = SKU Subtotal Before Discount - SKU Platform Discount - SKU Seller Discount
       var before   = finParseBRL(r['SKU Subtotal Before Discount']);
       var platDisc = finParseBRL(r['SKU Platform Discount']);

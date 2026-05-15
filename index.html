@@ -6992,7 +6992,7 @@ function finCalcMes() {
     mes.sp.forEach(function(r) {
       var status = String(r['Status do pedido']||'');
       if (status==='Cancelado') return;
-      var sku = String(r['Nº de referência do SKU principal']||'').trim();
+      var sku = String(r['Número de referência SKU']||'').trim();
       if (!sku) return;
       var vt  = parseFloat(r['Valor Total'])||0;
       var com = parseFloat(r['Taxa de comissão bruta'])||0;
@@ -7143,7 +7143,7 @@ function renderFinDetalheCard(calc, desp, aliq, MONTHS) {
     if (mes && mes.sp) {
       mes.sp.forEach(function(r){
         var status = String(r['Status do pedido']||'');
-        var sku = String(r['Nº de referência do SKU principal']||'').trim();
+        var sku = String(r['Número de referência SKU']||'').trim();
         var vt = parseFloat(r['Valor Total'])||0;
         spRows.push({ status:status, sku:sku, vt:vt, cancelado:status==='Cancelado' });
       });
@@ -7240,7 +7240,7 @@ function renderFinDetalheCard(calc, desp, aliq, MONTHS) {
       });
       if (mesData.sp) mesData.sp.forEach(function(r){
         if (String(r['Status do pedido']||'')==='Cancelado') return;
-        var sku = String(r['Nº de referência do SKU principal']||'').trim().toLowerCase(); if (!sku) return;
+        var sku = String(r['Número de referência SKU']||'').trim().toLowerCase(); if (!sku) return;
         if (!skuVendas[sku]) skuVendas[sku]={ml:0,sp:0,tt:0};
         skuVendas[sku].sp += parseInt(r['Quantidade'])||0;
       });
@@ -8192,7 +8192,7 @@ function finComprimirSP(rows) {
   return (rows||[]).map(function(r){
     return {
       st: String(r['Status do pedido']||''),
-      sk: String(r['Nº de referência do SKU principal']||''),
+      sk: String(r['Número de referência SKU']||''),
       q:  parseInt(r['Quantidade'])||0,
       v:  parseFloat(r['Valor Total'])||0,
       c:  parseFloat(r['Taxa de comissão bruta'])||0,
@@ -8240,7 +8240,7 @@ function finExpandirSP(rows) {
   return (rows||[]).map(function(r){
     return {
       'Status do pedido': r.st||'',
-      'Nº de referência do SKU principal': r.sk||'',
+      'Número de referência SKU': r.sk||'',
       'Quantidade': r.q||0,
       'Valor Total': r.v||0,
       'Taxa de comissão bruta': r.c||0,

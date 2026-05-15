@@ -7735,32 +7735,24 @@ function renderFinanceiro() {
     /* ══════════════════════════════════════════════════
        LAYOUT: sidebar de meses (esquerda) + conteúdo (direita)
     ══════════════════════════════════════════════════ */
-    '<div style="display:grid;grid-template-columns:220px 1fr;gap:1.5rem;min-height:500px">'+
+    '<div style="display:flex;flex-direction:column;gap:1rem">'+
 
-      /* ── SIDEBAR DE MESES ── */
-      '<div>'+
-        '<div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:10px;padding:0 4px">Meses</div>'+
-        '<div class="desp-sidebar">'+
-          /* Botão Novo Mês */
-          '<button onclick="despAbrirNovoMes()" class="desp-mes-btn" style="border-style:dashed;border-color:var(--border2);color:var(--text3);font-size:0.82rem;justify-content:center;gap:6px">'+
-            '<span>+</span> Novo mês'+
-          '</button>'+
-          (todosMeses.length===0?
-            '<div style="padding:16px 4px;font-size:0.82rem;color:var(--text3);text-align:center">Nenhum lançamento ainda</div>'
-          :
-            despResumo.map(function(m){ return despRenderMesBtn(m, despMesSel); }).join('')
-          )+
-        '</div>'+
-        /* Total geral */
-        (despTotalGeral>0?
-          '<div style="margin-top:16px;padding:12px 14px;background:rgba(192,57,43,0.06);border:0.5px solid rgba(192,57,43,0.15);border-radius:10px">'+
-            '<div style="font-size:0.68rem;color:rgba(192,57,43,0.7);text-transform:uppercase;letter-spacing:0.5px;font-weight:700">Total geral</div>'+
-            '<div style="font-size:1.1rem;font-weight:800;color:var(--red);margin-top:2px">'+finFmt(despTotalGeral)+'</div>'+
-          '</div>'
-        :'')+
-      '</div>'+
+      /* Pills de mês acima de tudo */
+      (todosMeses.length>0?
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
+          '<span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Mês:</span>'+
+          todosMeses.map(function(k){
+            var isAtivo = k===despMesSel;
+            var lbl = getMesLabel(k);
+            return '<button id="despbtn-'+k+'" style="padding:5px 14px;border-radius:99px;font-size:0.82rem;font-weight:'+(isAtivo?'700':'400')+';cursor:pointer;border:0.5px solid '+(isAtivo?'var(--red)':'var(--border2)')+';background:'+(isAtivo?'rgba(192,57,43,0.09)':'var(--card)')+';color:'+(isAtivo?'var(--red)':'var(--text2)')+';font-family:inherit;transition:all 0.15s" onclick="despVerMes(\''+k+'\')">'+lbl+'</button>';
+          }).join('')+
+          '<button style="padding:5px 14px;border-radius:99px;font-size:0.82rem;cursor:pointer;border:1px dashed var(--border2);background:none;color:var(--text3);font-family:inherit" onclick="despAbrirNovoMes()">+ Novo</button>'+
+        '</div>'
+      :
+        '<button style="padding:6px 16px;border-radius:99px;font-size:0.82rem;cursor:pointer;border:1px dashed var(--border2);background:none;color:var(--text3);font-family:inherit" onclick="despAbrirNovoMes()">+ Criar primeiro mês</button>'
+      )+
 
-      /* ── CONTEÚDO DIREITA ── */
+      /* ── CONTEÚDO (sem sidebar) ── */
       '<div style="display:flex;flex-direction:column;gap:1rem">'+
 
         /* Formulário compacto no topo */
@@ -7834,8 +7826,8 @@ function renderFinanceiro() {
         :
           '<div class="card" style="padding:3rem;text-align:center;color:var(--text3)">'+
             '<div style="font-size:2rem;margin-bottom:10px">📅</div>'+
-            '<div style="font-size:0.95rem;font-weight:500;color:var(--text2)">Selecione um mês na barra lateral</div>'+
-            '<div style="font-size:0.82rem;margin-top:4px">ou crie um novo clicando em "+ Novo mês"</div>'+
+            '<div style="font-size:0.95rem;font-weight:500;color:var(--text2)">Selecione um mês acima</div>'+
+            '<div style="font-size:0.82rem;margin-top:4px">ou clique em "+ Novo" para criar</div>'+
           '</div>'
         )+
       '</div>'+

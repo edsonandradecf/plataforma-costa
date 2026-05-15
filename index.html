@@ -7791,7 +7791,11 @@ function renderFinanceiro() {
             '</div>'+
             '<div class="desp-field">'+
               '<label>Data</label>'+
-              '<input type="text" id="fin-desp-data" placeholder="dd/mm/aaaa">'+
+              '<div style="position:relative">'+
+                '<input type="text" id="fin-desp-data" placeholder="dd/mm/aaaa" maxlength="10" oninput="despMascaraData(this)" style="width:100%;padding:9px 36px 9px 12px;border:0.5px solid var(--border2);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.88rem;outline:none;font-family:inherit;transition:border 0.15s">'+
+                '<input type="date" id="fin-desp-data-pick" onchange="despPickData(this.value)" tabindex="-1" style="position:absolute;right:0;top:0;width:32px;height:100%;opacity:0;cursor:pointer;border:none">'+
+                '<span onclick="document.getElementById(\'fin-desp-data-pick\').showPicker()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:0.9rem;color:var(--text3);pointer-events:all">📅</span>'+
+              '</div>'+
             '</div>'+
             '<button onclick="finAddDespesa()" style="padding:9px 20px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:0.88rem;font-weight:700;cursor:pointer;white-space:nowrap;height:36px">+ Adicionar</button>'+
           '</div>'+
@@ -7873,7 +7877,7 @@ function renderFinanceiro() {
           +'<span style="color:var(--text3);font-size:0.7rem">▾</span>'
           +'</button>'
           +'<div id="fin-mes-drop-visao" style="display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:999;background:var(--card);border:0.5px solid var(--border);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.15);backdrop-filter:blur(20px);min-width:160px;overflow:hidden">'
-          +mesKeys.map(function(k){var act=k===_finMesSel;return '<button onclick="finSelMesVisao(\"'+k+'\")" style="display:block;width:100%;text-align:left;padding:10px 16px;background:'+(act?'rgba(26,138,74,0.1)':'transparent')+';border:none;color:'+(act?'var(--green)':'var(--text)')+';font-weight:'+(act?'700':'400')+';font-size:0.88rem;cursor:pointer;font-family:inherit;border-bottom:0.5px solid var(--border2)">'+(act?'✓ ':'')+mL(k)+'</button>';}).join('')
+          +mesKeys.map(function(k){var act=k===_finMesSel;return '<button data-mes="'+k+'" onclick="finSelMesVisao(this.getAttribute(\'data-mes\'))" style="display:block;width:100%;text-align:left;padding:10px 16px;background:'+(act?'rgba(26,138,74,0.1)':'transparent')+';border:none;color:'+(act?'var(--green)':'var(--text)')+';font-weight:'+(act?'700':'400')+';font-size:0.88rem;cursor:pointer;font-family:inherit;border-bottom:0.5px solid var(--border2)">'+(act?'\u2713 ':'')+mL(k)+'</button>';}).join('')
           +'</div></div>';
       })():'')+visaoHtml+
     '</div>'+
@@ -8034,6 +8038,23 @@ function finShowDropName(inputId, nameElId) {
 function finVerDesp(mes) {
   _despMesSel = mes;
   finSetTab('despesas');
+}
+
+function despMascaraData(inp) {
+  var v = inp.value.replace(/\D/g, '').slice(0, 8);
+  if (v.length >= 5)      v = v.slice(0,2)+'/'+v.slice(2,4)+'/'+v.slice(4);
+  else if (v.length >= 3) v = v.slice(0,2)+'/'+v.slice(2);
+  inp.value = v;
+}
+
+function despPickData(isoDate) {
+  // isoDate = "2026-05-13" → converte para "13/05/2026"
+  if (!isoDate) return;
+  var p = isoDate.split('-');
+  if (p.length === 3) {
+    var inp = document.getElementById('fin-desp-data');
+    if (inp) inp.value = p[2]+'/'+p[1]+'/'+p[0];
+  }
 }
 
 function finSelMesVisao(k) {

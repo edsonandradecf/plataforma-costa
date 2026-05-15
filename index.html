@@ -7737,20 +7737,31 @@ function renderFinanceiro() {
     ══════════════════════════════════════════════════ */
     '<div style="display:flex;flex-direction:column;gap:1rem">'+
 
-      /* Pills de mês acima de tudo */
-      (todosMeses.length>0?
-        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
-          '<span style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Mês:</span>'+
-          todosMeses.map(function(k){
-            var isAtivo = k===despMesSel;
-            var lbl = getMesLabel(k);
-            return '<button id="despbtn-'+k+'" style="padding:5px 14px;border-radius:99px;font-size:0.82rem;font-weight:'+(isAtivo?'700':'400')+';cursor:pointer;border:0.5px solid '+(isAtivo?'var(--red)':'var(--border2)')+';background:'+(isAtivo?'rgba(192,57,43,0.09)':'var(--card)')+';color:'+(isAtivo?'var(--red)':'var(--text2)')+';font-family:inherit;transition:all 0.15s" onclick="despVerMes(\''+k+'\')">'+lbl+'</button>';
-          }).join('')+
-          '<button style="padding:5px 14px;border-radius:99px;font-size:0.82rem;cursor:pointer;border:1px dashed var(--border2);background:none;color:var(--text3);font-family:inherit" onclick="despAbrirNovoMes()">+ Novo</button>'+
-        '</div>'
-      :
-        '<button style="padding:6px 16px;border-radius:99px;font-size:0.82rem;cursor:pointer;border:1px dashed var(--border2);background:none;color:var(--text3);font-family:inherit" onclick="despAbrirNovoMes()">+ Criar primeiro mês</button>'
-      )+
+      /* Dropdown de mês exclusivo da aba despesas */
+      (function(){
+        var despObj4 = state.financeiro.despesas || {};
+        var dKeys = Array.isArray(despObj4) ? [] : Object.keys(despObj4).sort().reverse();
+        mesKeys.forEach(function(k){ if(dKeys.indexOf(k)===-1) dKeys.push(k); });
+        dKeys.sort().reverse();
+        if (!dKeys.length) return '<button onclick="despAbrirNovoMes()" style="padding:6px 16px;margin-bottom:0.25rem;border-radius:10px;font-size:0.82rem;cursor:pointer;border:1px dashed var(--border2);background:none;color:var(--text3);font-family:inherit">+ Criar primeiro mês</button>';
+        function dLbl(k){ if(k==='sem-mes') return 'Sem mês'; var p=k.split('-'); return ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(p[1])-1]+'/'+p[0]; }
+        return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:0.25rem">'+
+          '<div style="position:relative" id="desp-mes-wrap-desp">'+
+            '<button onclick="despToggleMesDropDesp()" style="display:flex;align-items:center;gap:8px;padding:7px 16px 7px 12px;background:var(--card);border:0.5px solid var(--border);border-radius:10px;cursor:pointer;font-size:0.88rem;font-weight:600;color:var(--text);backdrop-filter:blur(16px);box-shadow:var(--shadow)">'+
+              '<span style="font-size:1rem">📅</span>'+
+              '<span>'+(despMesSel?dLbl(despMesSel):'Selecionar mês')+'</span>'+
+              '<span style="color:var(--text3);font-size:0.7rem">▾</span>'+
+            '</button>'+
+            '<div id="desp-mes-drop-desp" style="display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:999;background:var(--card);border:0.5px solid var(--border);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.15);backdrop-filter:blur(20px);min-width:160px;overflow:hidden">'+
+              dKeys.map(function(k){
+                var act=k===despMesSel;
+                return '<button onclick="despVerMes(\''+k+'\');despToggleMesDropDesp(true)" style="display:block;width:100%;text-align:left;padding:10px 16px;background:'+(act?'rgba(192,57,43,0.08)':'transparent')+';border:none;color:'+(act?'var(--red)':'var(--text)')+';font-weight:'+(act?'700':'400')+';font-size:0.88rem;cursor:pointer;font-family:inherit;border-bottom:0.5px solid var(--border2)">'+(act?'✓ ':'')+dLbl(k)+'</button>';
+              }).join('')+
+            '</div>'+
+          '</div>'+
+          '<button onclick="despAbrirNovoMes()" style="padding:7px 12px;border-radius:10px;font-size:0.82rem;cursor:pointer;border:0.5px solid var(--border2);background:none;color:var(--text3);font-family:inherit">+ Novo</button>'+
+        '</div>';
+      })()+
 
       /* ── CONTEÚDO (sem sidebar) ── */
       '<div style="display:flex;flex-direction:column;gap:1rem">'+
@@ -7852,38 +7863,23 @@ function renderFinanceiro() {
       '<button class="fin-tab'+(_finTab==='upload'?' active':'')+'" data-tab="upload" onclick="finSetTab(\'upload\')">📁 Importar Planilhas</button>'+
       '<button class="fin-tab'+(_finTab==='despesas'?' active':'')+'" data-tab="despesas" onclick="finSetTab(\'despesas\')">💸 Despesas</button>'+
     '</div>'+
-    (function(){
-      // Para visão geral: meses de planilhas; para despesas: todos os meses (planilhas + despesas)
-      var despObj3 = state.financeiro.despesas || {};
-      var despMesKeys = Array.isArray(despObj3) ? [] : Object.keys(despObj3).sort().reverse();
-      var showDrop = _finTab==='visao' ? mesKeys.length>0 : (mesKeys.length>0 || despMesKeys.length>0);
-      if (!showDrop) return '';
-      var isDespTab = _finTab==='despesas';
-      var activeMes = isDespTab ? _despMesSel : _finMesSel;
-      // Merge de meses únicos para a aba despesas
-      var dropKeys = isDespTab ? (function(){
-        var all = {}; mesKeys.forEach(function(k){all[k]=true;}); despMesKeys.forEach(function(k){all[k]=true;});
-        return Object.keys(all).sort().reverse();
-      })() : mesKeys;
-      function mesLbl(k) {
-        if (k==='sem-mes') return 'Sem mês definido';
-        var p=k.split('-'); return ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(p[1])-1]+'/'+p[0];
-      }
-      return '<div style="position:relative;display:inline-block;margin-bottom:1.25rem" id="fin-mes-wrap">'+
-        '<button onclick="finToggleMesDrop()" style="display:flex;align-items:center;gap:8px;padding:7px 16px 7px 12px;background:var(--card);border:0.5px solid var(--border);border-radius:10px;cursor:pointer;font-size:0.88rem;font-weight:600;color:var(--text);backdrop-filter:blur(16px);box-shadow:var(--shadow)">'+
+    /* ── DROPDOWN VISÃO GERAL (só aparece na aba visão geral) ── */
+    (_finTab==='visao' && mesKeys.length>0 ? (function(){
+      function mesLbl(k){ var p=k.split('-'); return ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(p[1])-1]+'/'+p[0]; }
+      return '<div style="position:relative;display:inline-block;margin-bottom:1.25rem" id="fin-mes-wrap-visao">'+
+        '<button onclick="finToggleMesDropVisao()" style="display:flex;align-items:center;gap:8px;padding:7px 16px 7px 12px;background:var(--card);border:0.5px solid var(--border);border-radius:10px;cursor:pointer;font-size:0.88rem;font-weight:600;color:var(--text);backdrop-filter:blur(16px);box-shadow:var(--shadow)">'+
           '<span style="font-size:1rem">📅</span>'+
-          '<span>'+(activeMes?mesLbl(activeMes):'Selecionar mês')+'</span>'+
+          '<span>'+(_finMesSel?mesLbl(_finMesSel):'Selecionar mês')+'</span>'+
           '<span style="color:var(--text3);font-size:0.7rem">▾</span>'+
         '</button>'+
-        '<div id="fin-mes-drop" style="display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:999;background:var(--card);border:0.5px solid var(--border);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.15);backdrop-filter:blur(20px);min-width:160px;overflow:hidden">'+
-          dropKeys.map(function(k){
-            var act = k===activeMes;
-            var fn = isDespTab ? 'finVerDesp' : 'finSelMes';
-            return '<button onclick="'+fn+'(\''+k+'\');finToggleMesDrop(true)" style="display:block;width:100%;text-align:left;padding:10px 16px;background:'+(act?'rgba(26,138,74,0.1)':'transparent')+';border:none;color:'+(act?'var(--green)':'var(--text)')+';font-weight:'+(act?'700':'400')+';font-size:0.88rem;cursor:pointer;font-family:inherit;border-bottom:0.5px solid var(--border2)">'+(act?'✓ ':'')+mesLbl(k)+'</button>';
+        '<div id="fin-mes-drop-visao" style="display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:999;background:var(--card);border:0.5px solid var(--border);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.15);backdrop-filter:blur(20px);min-width:160px;overflow:hidden">'+
+          mesKeys.map(function(k){
+            var act=k===_finMesSel;
+            return '<button onclick="finSelMes(\''+k+'\');finToggleMesDropVisao(true)" style="display:block;width:100%;text-align:left;padding:10px 16px;background:'+(act?'rgba(26,138,74,0.1)':'transparent')+';border:none;color:'+(act?'var(--green)':'var(--text)')+';font-weight:'+(act?'700':'400')+';font-size:0.88rem;cursor:pointer;font-family:inherit;border-bottom:0.5px solid var(--border2)">'+(act?'✓ ':'')+mesLbl(k)+'</button>';
           }).join('')+
         '</div>'+
       '</div>';
-    })()+
+    })() : '')+
     '<div id="fin-visao"  style="display:'+(_finTab==='visao'?'':'none')+'">'+visaoHtml+'</div>'+
     '<div id="fin-upload" style="display:'+(_finTab==='upload'?'':'none')+'">'+uploadHtml+'</div>'+
     '<div id="fin-despesas" style="display:'+(_finTab==='despesas'?'':'none')+'">'+despHtml+'</div>';
@@ -8045,8 +8041,8 @@ function finVerDesp(mes) {
   finSetTab('despesas');
 }
 
-function finToggleMesDrop(forceClose) {
-  var drop = document.getElementById('fin-mes-drop');
+function finToggleMesDropVisao(forceClose) {
+  var drop = document.getElementById('fin-mes-drop-visao');
   if (!drop) return;
   var isOpen = drop.style.display !== 'none';
   if (forceClose || isOpen) {
@@ -8055,7 +8051,28 @@ function finToggleMesDrop(forceClose) {
     drop.style.display = 'block';
     setTimeout(function(){
       document.addEventListener('click', function fechar(e){
-        if (!document.getElementById('fin-mes-wrap') || !document.getElementById('fin-mes-wrap').contains(e.target)) {
+        var wrap = document.getElementById('fin-mes-wrap-visao');
+        if (!wrap || !wrap.contains(e.target)) {
+          drop.style.display = 'none';
+          document.removeEventListener('click', fechar);
+        }
+      });
+    }, 10);
+  }
+}
+
+function despToggleMesDropDesp(forceClose) {
+  var drop = document.getElementById('desp-mes-drop-desp');
+  if (!drop) return;
+  var isOpen = drop.style.display !== 'none';
+  if (forceClose || isOpen) {
+    drop.style.display = 'none';
+  } else {
+    drop.style.display = 'block';
+    setTimeout(function(){
+      document.addEventListener('click', function fechar(e){
+        var wrap = document.getElementById('desp-mes-wrap-desp');
+        if (!wrap || !wrap.contains(e.target)) {
           drop.style.display = 'none';
           document.removeEventListener('click', fechar);
         }

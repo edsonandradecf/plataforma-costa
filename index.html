@@ -6977,7 +6977,7 @@ function finCalcMes() {
       if (estado.indexOf('Pacote de')!==-1) return;
       var sku = String(r['SKU']||'').trim();
       if (!sku || sku==='nan') return;
-      var rec = parseFloat(String(r['Receita por produtos (BRL)']||'').replace(',','.'))||0;
+      var rec = parseFloat(String(r['Preço unitário de venda do anúncio (BRL)']||'').replace(',','.'))||0;
       var tar = parseFloat(String(r['Tarifa de venda e impostos (BRL)']||'').replace(',','.'))||0;
       var env = parseFloat(String(r['Tarifas de envio (BRL)']||'').replace(',','.'))||0;
       var uni = parseFloat(String(r['Unidades']||'').replace(',','.'))||0;
@@ -7136,7 +7136,7 @@ function renderFinDetalheCard(calc, desp, aliq, MONTHS) {
         var estado = String(r['Estado']||'');
         var invalido = ML_INVALID_LOCAL.some(function(x){ return estado.indexOf(x)!==-1; }) || estado.indexOf('Pacote de')!==-1;
         var sku = String(r['SKU']||'').trim();
-        var rec = parseFloat(r['Receita por produtos (BRL)'])||0;
+        var rec = parseFloat(r['Preço unitário de venda do anúncio (BRL)'])||0;
         mlRows.push({ estado:estado, sku:sku, rec:rec, invalido:invalido, semSku:(!sku||sku==='nan') });
       });
     }
@@ -7178,7 +7178,7 @@ function renderFinDetalheCard(calc, desp, aliq, MONTHS) {
             '<div style="display:flex;justify-content:space-between;font-size:0.82rem;padding:7px 0"><span style="color:var(--green);font-weight:600">✓ Válidas somadas</span><span style="font-weight:700;color:var(--green)">'+(mlRows.length-mlFiltradas-mlSemSku)+'</span></div>'+
           '</div>'+
           '<div style="margin-top:0.75rem;padding:8px 10px;background:rgba(234,179,8,0.06);border-radius:8px;font-size:0.75rem;color:var(--text3)">'+
-            'Coluna "Receita por produtos (BRL)"'+
+            'Coluna "Preço unitário de venda do anúncio (BRL)"'+
           '</div>'+
         '</div>'+
 
@@ -8233,7 +8233,7 @@ function finComprimirML(rows) {
       e: String(r['Estado']||''),
       s: String(r['SKU']||''),
       u: parseFloat(r['Unidades'])||0,
-      f: parseFloat(r['Receita por produtos (BRL)'])||0,
+      f: parseFloat(r['Preço unitário de venda do anúncio (BRL)'])||0,
       t: parseFloat(r['Tarifa de venda e impostos (BRL)'])||0,
       v: parseFloat(r['Tarifas de envio (BRL)'])||0,
     };
@@ -8281,7 +8281,7 @@ function finExpandirML(rows) {
       'Estado': r.e||'',
       'SKU':    r.s||'',
       'Unidades': r.u||0,
-      'Receita por produtos (BRL)': r.f||0,
+      'Preço unitário de venda do anúncio (BRL)': r.f||0,
       'Tarifa de venda e impostos (BRL)': r.t||0,
       'Tarifas de envio (BRL)': r.v||0,
     };

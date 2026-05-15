@@ -7677,172 +7677,169 @@ function renderFinanceiro() {
     :'');
 
   /* ── DESPESAS ── */
-  var despObj2 = state.financeiro.despesas || {};
+  var despObj2   = state.financeiro.despesas || {};
   var todosMeses = Array.isArray(despObj2) ? [] : Object.keys(despObj2).sort().reverse();
-  var MONTHS2 = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  var MONTHS_D   = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
   function getMesLabel(k) {
-    if (k === 'sem-mes') return 'Sem mês definido';
+    if (!k || k === 'sem-mes') return 'Sem mês';
     var p = k.split('-');
-    return (MONTHS2[parseInt(p[1])-1]||p[1])+'/'+p[0];
+    return (MONTHS_D[parseInt(p[1])-1]||p[1])+'/'+p[0];
   }
-
   function despIcon(desc) {
     var d = (desc||'').toLowerCase();
-    if (/frete|transport|envio|correio|logist/.test(d))  return '🚚';
-    if (/embal|caixa|sacol|papel|plast/.test(d))         return '📦';
-    if (/fornec|compra|matéria|insumo/.test(d))          return '🛒';
-    if (/aluguel|imóvel|armazém|galpão/.test(d))         return '🏭';
-    if (/market|anúncio|publicid|tráfego/.test(d))       return '📣';
-    if (/salário|funcionár|rh|colabor/.test(d))          return '👥';
-    if (/conta|luz|água|energia|internet/.test(d))       return '⚡';
-    if (/imposto|taxa|tribut|contab/.test(d))            return '🧾';
+    if (/frete|transport|envio|correio|logist/.test(d))   return '🚚';
+    if (/embal|caixa|sacol|papel|plast/.test(d))          return '📦';
+    if (/fornec|compra|matéria|insumo/.test(d))           return '🛒';
+    if (/aluguel|imóvel|armazém|galpão/.test(d))          return '🏭';
+    if (/market|anúncio|publicid|tráfego/.test(d))        return '📣';
+    if (/salário|funcionár|rh|colabor/.test(d))           return '👥';
+    if (/conta|luz|água|energia|internet/.test(d))        return '⚡';
+    if (/imposto|taxa|tribut|contab/.test(d))             return '🧾';
     return '💳';
   }
 
-  // Resumo rápido por mês (para os cards de sumário)
+  // Mês selecionado nas despesas
+  var despMesSel  = _despMesSel || (todosMeses[0] || '');
+  var despMesArr  = despMesSel ? (despObj2[despMesSel] || []) : [];
+  var despMesTot  = despMesArr.reduce(function(s,d){ return s+(d.valor||0); }, 0);
+  var despMax     = despMesArr.length ? Math.max.apply(null, despMesArr.map(function(d){ return d.valor||0; })) : 1;
+
+  // Totais histórico
   var despResumo = todosMeses.map(function(m) {
     var arr = despObj2[m] || [];
-    var total = arr.reduce(function(s,d){ return s+(d.valor||0); }, 0);
-    return { key:m, label:getMesLabel(m), total:total, qtd:arr.length, arr:arr };
+    return { key:m, label:getMesLabel(m), total:arr.reduce(function(s,d){return s+(d.valor||0);},0), qtd:arr.length };
   });
-
-  // Total geral
   var despTotalGeral = despResumo.reduce(function(s,m){ return s+m.total; }, 0);
-
-  // Mês selecionado para visualizar lançamentos
-  var despMesSel = _despMesSel || (todosMeses[0]||'');
-  var despMesData = despMesSel ? (despObj2[despMesSel]||[]) : [];
-  var despMesTotal = despMesData.reduce(function(s,d){ return s+(d.valor||0); }, 0);
-  var despMax = despMesData.length ? Math.max.apply(null, despMesData.map(function(d){ return d.valor||0; })) : 1;
 
   var despHtml =
     '<style>'+
-      '.desp-mes-card{background:var(--card);backdrop-filter:blur(16px);border:0.5px solid var(--border);border-radius:12px;padding:14px 16px;cursor:pointer;transition:all 0.15s;flex:1;min-width:0}'+
-      '.desp-mes-card:hover{border-color:var(--green);box-shadow:0 2px 12px rgba(26,138,74,0.1)}'+
-      '.desp-mes-card.ativo{border-color:var(--green);background:rgba(26,138,74,0.06)}'+
-      '.desp-item2{display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--bg3);border-radius:10px;border:0.5px solid var(--border);margin-bottom:7px;transition:all 0.15s}'+
-      '.desp-item2:hover{border-color:rgba(192,57,43,0.3)}'+
-      '.desp-icon2{width:34px;height:34px;border-radius:8px;background:rgba(192,57,43,0.07);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0}'+
-      '.desp-bar2{height:3px;background:var(--border);border-radius:2px;margin-top:4px}'+
-      '.desp-bar2-fill{height:3px;border-radius:2px;background:rgba(192,57,43,0.45)}'+
-      '.desp-del2{background:none;border:0.5px solid var(--border2);border-radius:6px;color:var(--text3);cursor:pointer;padding:4px 8px;font-size:0.78rem;transition:all 0.15s}'+
-      '.desp-del2:hover{border-color:var(--red);color:var(--red)}'+
+      /* Sidebar de meses */
+      '.desp-sidebar{display:flex;flex-direction:column;gap:4px}'+
+      '.desp-mes-btn{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:9px;cursor:pointer;transition:background 0.13s;border:0.5px solid transparent;text-align:left;width:100%;font-family:inherit;font-size:0.85rem;background:transparent}'+
+      '.desp-mes-btn:hover{background:var(--bg3)}'+
+      '.desp-mes-btn.ativo{background:rgba(192,57,43,0.07);border-color:rgba(192,57,43,0.2);color:var(--red)}'+
+      /* Items */
+      '.desp-row{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:0.5px solid var(--border);transition:background 0.12s}'+
+      '.desp-row:hover{background:var(--bg3)}'+
+      '.desp-row:last-child{border-bottom:none}'+
+      '.desp-ico{width:36px;height:36px;border-radius:9px;background:rgba(192,57,43,0.07);display:flex;align-items:center;justify-content:center;font-size:1.05rem;flex-shrink:0}'+
+      '.desp-prog{height:3px;background:var(--border);border-radius:2px;margin-top:4px}'+
+      '.desp-prog-fill{height:3px;background:rgba(192,57,43,0.45);border-radius:2px}'+
+      /* Form */
+      '.desp-field label{display:block;font-size:0.72rem;color:var(--text3);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}'+
+      '.desp-field input{width:100%;padding:9px 12px;border:0.5px solid var(--border2);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.88rem;outline:none;font-family:inherit;transition:border 0.15s}'+
+      '.desp-field input:focus{border-color:var(--red);box-shadow:0 0 0 3px rgba(192,57,43,0.08)}'+
     '</style>'+
 
-    // ── FORMULÁRIO DE NOVA DESPESA ──────────────────────────────
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.75rem">'+
-      '<div class="card" style="padding:1.25rem">'+
-        '<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:1rem">➕ Nova despesa</div>'+
-        '<div style="font-size:0.72rem;color:var(--text2);margin-bottom:4px">Mês de referência</div>'+
-        '<div style="position:relative;margin-bottom:10px" id="desp-mes-wrap">'+
-          '<button onclick="despToggleMesDrop()" style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:var(--bg3);border:0.5px solid var(--border2);border-radius:9px;cursor:pointer;font-size:0.88rem;color:var(--text);font-family:inherit">'+
-            '<span>'+(_despMesSel?(function(){var p=_despMesSel.split('-');return ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(p[1])-1]+'/'+p[0];})():'Selecionar mês...')+'</span>'+
-            '<span style="color:var(--text3)">▾</span>'+
-          '</button>'+
-          '<input type="hidden" id="fin-desp-mes" value="'+(_despMesSel||'')+'">'+
-          '<div id="desp-mes-drop" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:99;background:var(--card);border:0.5px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.15);backdrop-filter:blur(20px);overflow:hidden;max-height:220px;overflow-y:auto">'+
-          (function(){
-            var d3=state.financeiro.despesas||{}; var am=Array.isArray(d3)?[]:Object.keys(d3).sort().reverse();
-            mesKeys.forEach(function(k){if(am.indexOf(k)===-1)am.push(k);}); am.sort().reverse();
-            if(!am.length) return '<div style="padding:10px 14px;font-size:0.8rem;color:var(--text3)">Nenhum mês ainda — será criado ao adicionar</div>';
-            return am.map(function(k){
-              var p2=k.split('-');var lbl2=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(p2[1])-1]+'/'+p2[0];
-              var act2=k===_despMesSel;
-              return '<button onclick="despSetMes(\\"'+k+'\\")" style="display:block;width:100%;text-align:left;padding:9px 14px;background:'+(act2?'rgba(26,138,74,0.1)':'transparent')+';border:none;border-bottom:0.5px solid var(--border2);color:'+(act2?'var(--green)':'var(--text)')+';font-size:0.85rem;cursor:pointer;font-family:inherit;font-weight:'+(act2?'700':'400')+'">'+(act2?'✓ ':'') + lbl2+'</button>';
-            }).join('');
-          })()+
-          '</div>'+
-        '</div>'+
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'+
-          '<div>'+
-            '<label style="font-size:0.72rem;color:var(--text2);display:block;margin-bottom:3px">Descrição</label>'+
-            '<input class="desp-input" type="text" id="fin-desp-desc" placeholder="Embalagens, Frete..." style="margin-bottom:0">'+
-          '</div>'+
-          '<div>'+
-            '<label style="font-size:0.72rem;color:var(--text2);display:block;margin-bottom:3px">Data (opcional)</label>'+
-            '<input class="desp-input" type="text" id="fin-desp-data" placeholder="13/05/2026" style="margin-bottom:0">'+
-          '</div>'+
-        '</div>'+
-          '<label style="font-size:0.72rem;color:var(--text2);display:block;margin-bottom:3px">Valor (R$)</label>'+
-          '<input class="desp-input" type="number" id="fin-desp-val" placeholder="0,00" min="0" step="0.01" style="margin-bottom:0">'+
-        '</div>'+
-        '<button onclick="finAddDespesa()" style="width:100%;padding:10px;background:var(--green);color:#fff;border:none;border-radius:9px;font-size:0.88rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">'+
-          '<span>+</span> Adicionar Despesa'+
-        '</button>'+
-        '<div id="desp-add-status" style="font-size:0.8rem;color:var(--text3);margin-top:6px;min-height:1.2em;text-align:center"></div>'+
-      '</div>'+
+    /* ══════════════════════════════════════════════════
+       LAYOUT: sidebar de meses (esquerda) + conteúdo (direita)
+    ══════════════════════════════════════════════════ */
+    '<div style="display:grid;grid-template-columns:220px 1fr;gap:1.5rem;min-height:500px">'+
 
-      // ── RESUMO GERAL ──
-      '<div style="display:flex;flex-direction:column;gap:10px">'+
-        '<div class="card" style="padding:1.25rem;flex:1">'+
-          '<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:1rem">📊 Resumo geral</div>'+
-          (despTotalGeral>0?
-            '<div style="font-size:2rem;font-weight:800;color:var(--red)">'+finFmt(despTotalGeral)+'</div>'+
-            '<div style="font-size:0.78rem;color:var(--text3);margin-top:4px">'+despResumo.reduce(function(s,m){return s+m.qtd;},0)+' lançamentos em '+despResumo.length+' mês(es)</div>'
+      /* ── SIDEBAR DE MESES ── */
+      '<div>'+
+        '<div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:10px;padding:0 4px">Meses</div>'+
+        '<div class="desp-sidebar">'+
+          /* Botão Novo Mês */
+          '<button onclick="despAbrirNovoMes()" class="desp-mes-btn" style="border-style:dashed;border-color:var(--border2);color:var(--text3);font-size:0.82rem;justify-content:center;gap:6px">'+
+            '<span>+</span> Novo mês'+
+          '</button>'+
+          (todosMeses.length===0?
+            '<div style="padding:16px 4px;font-size:0.82rem;color:var(--text3);text-align:center">Nenhum lançamento ainda</div>'
           :
-            '<div style="color:var(--text3);font-size:0.88rem">Nenhuma despesa cadastrada ainda.</div>'
+            despResumo.map(function(m){ return despRenderMesBtn(m, despMesSel); }).join('')
           )+
         '</div>'+
+        /* Total geral */
         (despTotalGeral>0?
-          '<div class="card" style="padding:1rem">'+
-            '<div style="font-size:0.72rem;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">Por mês</div>'+
-            despResumo.map(function(m){
-              var pct = despTotalGeral>0?Math.round(m.total/despTotalGeral*100):0;
-              var isAtivo = m.key === despMesSel;
-              return '<div onclick="finVerDesp(\"'+m.key+'\")" style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;cursor:pointer;background:'+(isAtivo?'rgba(26,138,74,0.08)':'transparent')+'">'+
-                '<div style="font-size:0.82rem;font-weight:'+(isAtivo?'700':'400')+';color:'+(isAtivo?'var(--green)':'var(--text)')+';min-width:70px">'+m.label+'</div>'+
-                '<div style="flex:1;height:5px;background:var(--border);border-radius:3px"><div style="width:'+pct+'%;height:5px;background:var(--red);border-radius:3px;opacity:0.7"></div></div>'+
-                '<div style="font-size:0.8rem;font-weight:700;color:var(--red);white-space:nowrap">'+finFmt(m.total)+'</div>'+
-                '<div style="font-size:0.75rem;color:var(--text3)">'+m.qtd+'×</div>'+
-              '</div>';
-            }).join('')+
+          '<div style="margin-top:16px;padding:12px 14px;background:rgba(192,57,43,0.06);border:0.5px solid rgba(192,57,43,0.15);border-radius:10px">'+
+            '<div style="font-size:0.68rem;color:rgba(192,57,43,0.7);text-transform:uppercase;letter-spacing:0.5px;font-weight:700">Total geral</div>'+
+            '<div style="font-size:1.1rem;font-weight:800;color:var(--red);margin-top:2px">'+finFmt(despTotalGeral)+'</div>'+
           '</div>'
         :'')+
       '</div>'+
-    '</div>'+
 
-    // ── LANÇAMENTOS DO MÊS SELECIONADO ──────────────────────────
-    '<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:0.875rem">'+
-      (despMesSel?'Lançamentos — '+getMesLabel(despMesSel):'Selecione um mês para ver os lançamentos')+
-      (despMesData.length?' <span style="background:var(--bg3);border:0.5px solid var(--border2);border-radius:99px;padding:1px 8px;font-size:0.7rem;font-weight:700;color:var(--text3)">'+despMesData.length+'</span>':'')+
-    '</div>'+
+      /* ── CONTEÚDO DIREITA ── */
+      '<div style="display:flex;flex-direction:column;gap:1rem">'+
 
-    (despMesSel && despMesData.length===0?
-      '<div style="text-align:center;padding:2.5rem;color:var(--text3);background:var(--bg3);border-radius:12px;border:0.5px solid var(--border)">'+
-        '<div style="font-size:2rem;margin-bottom:8px">💸</div>'+
-        '<div style="font-size:0.9rem">Nenhuma despesa em '+getMesLabel(despMesSel)+'</div>'+
-        '<div style="font-size:0.8rem;margin-top:4px">Use o formulário acima para adicionar</div>'+
-      '</div>'
-    : despMesSel?
-      '<div style="display:flex;flex-direction:column;gap:0">'+
-        '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px;background:var(--bg3);border:0.5px solid var(--border);border-radius:10px 10px 0 0;margin-bottom:0">'+
-          '<span style="font-size:0.8rem;font-weight:600;color:var(--text2)">Total</span>'+
-          '<span style="font-size:1rem;font-weight:800;color:var(--red)">− '+finFmt(despMesTotal)+'</span>'+
+        /* Formulário compacto no topo */
+        '<div class="card" style="padding:1.25rem">'+
+          '<div id="desp-novo-mes-wrap" style="display:none;margin-bottom:1rem;padding:10px 14px;background:var(--bg3);border-radius:8px;border:0.5px solid var(--border2)">'+
+            '<div style="font-size:0.72rem;color:var(--text3);margin-bottom:6px;font-weight:600;text-transform:uppercase">Criar novo mês</div>'+
+            '<div style="display:flex;gap:8px;align-items:center">'+
+              '<input type="month" id="fin-desp-novo-mes" style="flex:1;padding:7px 10px;border:0.5px solid var(--border2);border-radius:7px;background:var(--input-bg);color:var(--text);font-size:0.85rem;outline:none">'+
+              '<button onclick="despConfirmarNovoMes()" style="padding:7px 14px;background:var(--green);color:#fff;border:none;border-radius:7px;font-size:0.82rem;font-weight:600;cursor:pointer">Criar</button>'+
+              '<button onclick="despFecharNovoMes()" style="padding:7px 12px;background:none;border:0.5px solid var(--border2);border-radius:7px;font-size:0.82rem;color:var(--text3);cursor:pointer">✕</button>'+
+            '</div>'+
+          '</div>'+
+          '<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:12px">'+
+            '➕ Nova despesa'+(despMesSel?' — '+getMesLabel(despMesSel):'')+
+          '</div>'+
+          '<input type="hidden" id="fin-desp-mes" value="'+(despMesSel||'')+'">'+
+          '<div style="display:grid;grid-template-columns:1fr 1fr 120px auto;gap:10px;align-items:end">'+
+            '<div class="desp-field">'+
+              '<label>Descrição</label>'+
+              '<input type="text" id="fin-desp-desc" placeholder="Ex: Embalagens, Frete...">'+
+            '</div>'+
+            '<div class="desp-field">'+
+              '<label>Valor (R$)</label>'+
+              '<input type="number" id="fin-desp-val" placeholder="0,00" min="0" step="0.01">'+
+            '</div>'+
+            '<div class="desp-field">'+
+              '<label>Data</label>'+
+              '<input type="text" id="fin-desp-data" placeholder="dd/mm/aaaa">'+
+            '</div>'+
+            '<button onclick="finAddDespesa()" style="padding:9px 20px;background:var(--green);color:#fff;border:none;border-radius:8px;font-size:0.88rem;font-weight:700;cursor:pointer;white-space:nowrap;height:36px">+ Adicionar</button>'+
+          '</div>'+
+          '<div id="desp-add-status" style="font-size:0.8rem;margin-top:8px;min-height:1rem"></div>'+
         '</div>'+
-        despMesData.slice().map(function(d,i){return {d:d,i:i};})
-          .sort(function(a,b){return (b.d.valor||0)-(a.d.valor||0);})
-          .map(function(item, idx, arr){
-            var d=item.d, i=item.i;
-            var pct = despMax>0?Math.round(((d.valor||0)/despMax)*100):0;
-            var isLast = idx===arr.length-1;
-            return '<div class="desp-item2" style="border-radius:'+(isLast?'0 0 10px 10px':'0')+';border-top:none">'+
-              '<div class="desp-icon2">'+despIcon(d.desc)+'</div>'+
-              '<div style="flex:1;min-width:0">'+
-                '<div style="font-size:0.87rem;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(d.desc)+'</div>'+
-                '<div class="desp-bar2"><div class="desp-bar2-fill" style="width:'+pct+'%"></div></div>'+
-                (d.data?'<div style="font-size:0.7rem;color:var(--text3);margin-top:3px">'+esc(d.data)+'</div>':'')+
+
+        /* Lista de lançamentos do mês */
+        (despMesSel?
+          '<div class="card" style="padding:0;overflow:hidden">'+
+            /* Header do card */
+            '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:2px solid var(--border)">'+
+              '<div>'+
+                '<div style="font-weight:700;font-size:0.95rem">'+getMesLabel(despMesSel)+'</div>'+
+                '<div style="font-size:0.75rem;color:var(--text3);margin-top:1px">'+despMesArr.length+' lançamento'+(despMesArr.length!==1?'s':'')+'</div>'+
               '</div>'+
-              '<div style="font-size:0.9rem;font-weight:700;color:var(--red);white-space:nowrap;margin:0 8px">− '+finFmt(d.valor)+'</div>'+
-              '<button class="desp-del2" onclick="finDelDespesa('+i+')" title="Remover">🗑</button>'+
-            '</div>';
-          }).join('')+
-      '</div>'
-    :
-      '<div style="text-align:center;padding:2rem;color:var(--text3);font-size:0.88rem">'+
-        'Nenhum dado ainda. Adicione uma despesa pelo formulário acima.'+
-      '</div>'
-    );
+              '<div style="font-size:1.25rem;font-weight:800;color:var(--red)">− '+finFmt(despMesTot)+'</div>'+
+            '</div>'+
+            /* Itens */
+            (despMesArr.length===0?
+              '<div style="padding:3rem;text-align:center;color:var(--text3)">'+
+                '<div style="font-size:1.8rem;margin-bottom:8px">💸</div>'+
+                '<div style="font-size:0.9rem">Nenhuma despesa em '+getMesLabel(despMesSel)+'</div>'+
+              '</div>'
+            :
+              despMesArr.slice().map(function(d,i){return {d:d,i:i};})
+                .sort(function(a,b){return (b.d.valor||0)-(a.d.valor||0);})
+                .map(function(item){
+                  var d=item.d, i=item.i;
+                  var pct=despMax>0?Math.round(((d.valor||0)/despMax)*100):0;
+                  return '<div class="desp-row">'+
+                    '<div class="desp-ico">'+despIcon(d.desc)+'</div>'+
+                    '<div style="flex:1;min-width:0">'+
+                      '<div style="font-size:0.9rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(d.desc)+'</div>'+
+                      '<div class="desp-prog"><div class="desp-prog-fill" style="width:'+pct+'%"></div></div>'+
+                      (d.data?'<div style="font-size:0.72rem;color:var(--text3);margin-top:3px">'+esc(d.data)+'</div>':'')+
+                    '</div>'+
+                    '<div style="font-size:0.95rem;font-weight:700;color:var(--red);white-space:nowrap;margin:0 12px">− '+finFmt(d.valor)+'</div>'+
+                    '<button onclick="finDelDespesa('+i+')" style="width:30px;height:30px;background:none;border:0.5px solid var(--border2);border-radius:7px;color:var(--text3);cursor:pointer;font-size:0.85rem;display:flex;align-items:center;justify-content:center;transition:all 0.15s" onmouseover="this.style.borderColor=\'var(--red)\';this.style.color=\'var(--red)\'" onmouseout="this.style.borderColor=\'var(--border2)\';this.style.color=\'var(--text3)\'">🗑</button>'+
+                  '</div>';
+                }).join('')
+            )+
+          '</div>'
+        :
+          '<div class="card" style="padding:3rem;text-align:center;color:var(--text3)">'+
+            '<div style="font-size:2rem;margin-bottom:10px">📅</div>'+
+            '<div style="font-size:0.95rem;font-weight:500;color:var(--text2)">Selecione um mês na barra lateral</div>'+
+            '<div style="font-size:0.82rem;margin-top:4px">ou crie um novo clicando em "+ Novo mês"</div>'+
+          '</div>'
+        )+
+      '</div>'+
+    '</div>';
 
     /* ── EMPTY STATE ── */
   if (mesKeys.length===0 && _finTab==='visao') {
@@ -7931,6 +7928,54 @@ function finExcluirMes(k) {
   delete state.financeiro.meses[k];
   if (_finMesSel===k) _finMesSel='';
   finSaveFirebase().then(function(){ navigate('financeiro'); });
+}
+
+function despRenderMesBtn(m, despMesSel) {
+  var isAtivo = m.key === despMesSel;
+  var el = document.createElement('button');
+  el.className = 'desp-mes-btn' + (isAtivo ? ' ativo' : '');
+  el.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:9px;cursor:pointer;border:0.5px solid '+(isAtivo?'rgba(192,57,43,0.2)':'transparent')+';background:'+(isAtivo?'rgba(192,57,43,0.07)':'transparent')+';width:100%;font-family:inherit;font-size:0.85rem;text-align:left';
+  var key = m.key;
+  el.onclick = function(){ despVerMes(key); };
+  el.innerHTML =
+    '<div>'+
+      '<div style="font-weight:'+(isAtivo?'700':'500')+'">'+m.label+'</div>'+
+      '<div style="font-size:0.72rem;color:'+(isAtivo?'rgba(192,57,43,0.7)':'var(--text3)')+'">'+m.qtd+' lançamento'+(m.qtd!==1?'s':'')+'</div>'+
+    '</div>'+
+    '<div style="font-weight:700;font-size:0.82rem;color:'+(isAtivo?'var(--red)':'var(--text2)')+'">'+finFmt(m.total)+'</div>';
+  return el.outerHTML;
+}
+
+function despVerMes(mes) {
+  _despMesSel = mes;
+  var c = document.getElementById('page-content');
+  if (c) { c.innerHTML = renderFinanceiro(); bindFinanceiro(); }
+}
+
+function despFecharNovoMes() {
+  var w = document.getElementById('desp-novo-mes-wrap');
+  if (w) w.style.display = 'none';
+}
+
+function despAbrirNovoMes() {
+  var w = document.getElementById('desp-novo-mes-wrap');
+  if (w) w.style.display = w.style.display === 'none' ? 'block' : 'none';
+  var inp = document.getElementById('fin-desp-novo-mes');
+  if (inp && !inp.value) {
+    var now = new Date();
+    inp.value = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  }
+}
+
+function despConfirmarNovoMes() {
+  var inp = document.getElementById('fin-desp-novo-mes');
+  if (!inp || !inp.value) { alert('Selecione um mês.'); return; }
+  var mes = inp.value;
+  if (!state.financeiro.despesas || Array.isArray(state.financeiro.despesas)) state.financeiro.despesas = {};
+  if (!state.financeiro.despesas[mes]) state.financeiro.despesas[mes] = [];
+  _despMesSel = mes;
+  var c = document.getElementById('page-content');
+  if (c) { c.innerHTML = renderFinanceiro(); bindFinanceiro(); }
 }
 
 function despSetMes(mes) {

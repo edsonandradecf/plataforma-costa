@@ -7863,25 +7863,20 @@ function renderFinanceiro() {
       '<button class="fin-tab'+(_finTab==='upload'?' active':'')+'" data-tab="upload" onclick="finSetTab(\'upload\')">📁 Importar Planilhas</button>'+
       '<button class="fin-tab'+(_finTab==='despesas'?' active':'')+'" data-tab="despesas" onclick="finSetTab(\'despesas\')">💸 Despesas</button>'+
     '</div>'+
-    /* ── DROPDOWN VISÃO GERAL (só aparece na aba visão geral) ── */
-    (_finTab==='visao' && mesKeys.length>0 ? (function(){
-      function mesLbl(k){ var p=k.split('-'); return ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(p[1])-1]+'/'+p[0]; }
-      return '<div style="position:relative;display:inline-block;margin-bottom:1.25rem" id="fin-mes-wrap-visao">'+
-        '<button onclick="finToggleMesDropVisao()" style="display:flex;align-items:center;gap:8px;padding:7px 16px 7px 12px;background:var(--card);border:0.5px solid var(--border);border-radius:10px;cursor:pointer;font-size:0.88rem;font-weight:600;color:var(--text);backdrop-filter:blur(16px);box-shadow:var(--shadow)">'+
-          '<span style="font-size:1rem">📅</span>'+
-          '<span>'+(_finMesSel?mesLbl(_finMesSel):'Selecionar mês')+'</span>'+
-          '<span style="color:var(--text3);font-size:0.7rem">▾</span>'+
-        '</button>'+
-        '<div id="fin-mes-drop-visao" style="display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:999;background:var(--card);border:0.5px solid var(--border);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.15);backdrop-filter:blur(20px);min-width:160px;overflow:hidden">'+
-          mesKeys.map(function(k){
-            var act=k===_finMesSel;
-            return '<button onclick="finSelMes(\''+k+'\');finToggleMesDropVisao(true)" style="display:block;width:100%;text-align:left;padding:10px 16px;background:'+(act?'rgba(26,138,74,0.1)':'transparent')+';border:none;color:'+(act?'var(--green)':'var(--text)')+';font-weight:'+(act?'700':'400')+';font-size:0.88rem;cursor:pointer;font-family:inherit;border-bottom:0.5px solid var(--border2)">'+(act?'✓ ':'')+mesLbl(k)+'</button>';
-          }).join('')+
-        '</div>'+
-      '</div>';
-    })() : '')+
-    '<div id="fin-visao"  style="display:'+(_finTab==='visao'?'':'none')+'">'+visaoHtml+'</div>'+
-    '<div id="fin-upload" style="display:'+(_finTab==='upload'?'':'none')+'">'+uploadHtml+'</div>'+
+    '<div id="fin-visao"  style="display:'+(_finTab==='visao'?'':'none')+'">'+
+      (mesKeys.length>0?(function(){
+        function mL(k){var p=k.split('-');return ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(p[1])-1]+'/'+p[0];}
+        return '<div style="position:relative;display:inline-block;margin-bottom:1.25rem" id="fin-mes-wrap-visao">'
+          +'<button onclick="finToggleMesDropVisao()" style="display:flex;align-items:center;gap:8px;padding:7px 16px 7px 12px;background:var(--card);border:0.5px solid var(--border);border-radius:10px;cursor:pointer;font-size:0.88rem;font-weight:600;color:var(--text);backdrop-filter:blur(16px);box-shadow:var(--shadow)">'
+          +'<span style="font-size:1rem">📅</span>'
+          +'<span>'+(_finMesSel?mL(_finMesSel):'Selecionar mês')+'</span>'
+          +'<span style="color:var(--text3);font-size:0.7rem">▾</span>'
+          +'</button>'
+          +'<div id="fin-mes-drop-visao" style="display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:999;background:var(--card);border:0.5px solid var(--border);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.15);backdrop-filter:blur(20px);min-width:160px;overflow:hidden">'
+          +mesKeys.map(function(k){var act=k===_finMesSel;return '<button onclick="finSelMesVisao(\"'+k+'\")" style="display:block;width:100%;text-align:left;padding:10px 16px;background:'+(act?'rgba(26,138,74,0.1)':'transparent')+';border:none;color:'+(act?'var(--green)':'var(--text)')+';font-weight:'+(act?'700':'400')+';font-size:0.88rem;cursor:pointer;font-family:inherit;border-bottom:0.5px solid var(--border2)">'+(act?'✓ ':'')+mL(k)+'</button>';}).join('')
+          +'</div></div>';
+      })():'')+visaoHtml+
+    '</div>'+
     '<div id="fin-despesas" style="display:'+(_finTab==='despesas'?'':'none')+'">'+despHtml+'</div>';
 }
 
@@ -8039,6 +8034,11 @@ function finShowDropName(inputId, nameElId) {
 function finVerDesp(mes) {
   _despMesSel = mes;
   finSetTab('despesas');
+}
+
+function finSelMesVisao(k) {
+  finSelMes(k);
+  finToggleMesDropVisao(true);
 }
 
 function finToggleMesDropVisao(forceClose) {

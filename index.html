@@ -7147,7 +7147,7 @@ function renderFinDetalheCard(calc, desp, aliq, MONTHS) {
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem">'+
         // ML
         '<div class="card" style="padding:1.25rem">'+
-          '<div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#f97316;margin-bottom:1rem">🟠 Mercado Livre</div>'+
+          '<div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#EAB308;margin-bottom:1rem">🟡 Mercado Livre</div>'+
           '<div style="font-size:1.8rem;font-weight:800;color:var(--text)">'+finFmt(calc.fat_ml)+'</div>'+
           '<div style="margin-top:1rem;display:flex;flex-direction:column;gap:6px">'+
             '<div style="display:flex;justify-content:space-between;font-size:0.83rem;padding:6px 0;border-bottom:0.5px solid var(--border)"><span style="color:var(--text2)">Total de linhas na planilha</span><span style="font-weight:600">'+mlRows.length+'</span></div>'+
@@ -7161,7 +7161,7 @@ function renderFinDetalheCard(calc, desp, aliq, MONTHS) {
         '</div>'+
         // Shopee
         '<div class="card" style="padding:1.25rem">'+
-          '<div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#EE4D2D;margin-bottom:1rem">🔴 Shopee</div>'+
+          '<div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#F97316;margin-bottom:1rem">🟠 Shopee</div>'+
           '<div style="font-size:1.8rem;font-weight:800;color:var(--text)">'+finFmt(calc.fat_sp)+'</div>'+
           '<div style="margin-top:1rem;display:flex;flex-direction:column;gap:6px">'+
             '<div style="display:flex;justify-content:space-between;font-size:0.83rem;padding:6px 0;border-bottom:0.5px solid var(--border)"><span style="color:var(--text2)">Total de pedidos na planilha</span><span style="font-weight:600">'+spRows.length+'</span></div>'+
@@ -7293,7 +7293,7 @@ function renderFinDetalheCard(calc, desp, aliq, MONTHS) {
             return '<tr style="border-bottom:0.5px solid var(--border);opacity:'+(zerado?'0.55':'1')+';'+(i%2===1?'background:var(--bg3)':'')+'">' +
               '<td style="padding:7px 12px;font-weight:'+(r.qtd>0?'600':'400')+'">'+esc(r.nome)+'</td>'+
               '<td style="padding:7px 12px;text-align:center;font-family:monospace;font-size:0.75rem;color:var(--text3)">'+r.sku+'</td>'+
-              '<td style="padding:7px 12px;text-align:right;color:'+(r.ml>0?'#f97316':'var(--text3)')+'">'+r.ml+'</td>'+
+              '<td style="padding:7px 12px;text-align:right;color:'+(r.ml>0?'#EAB308':'var(--text3)')+'">'+r.ml+'</td>'+
               '<td style="padding:7px 12px;text-align:right;color:'+(r.sp>0?'#EE4D2D':'var(--text3)')+'">'+r.sp+'</td>'+
               '<td style="padding:7px 12px;text-align:right;color:'+(r.tt>0?'#6366f1':'var(--text3)')+'">'+r.tt+'</td>'+
               '<td style="padding:7px 12px;text-align:right;font-weight:700">'+r.qtd+'</td>'+
@@ -7408,14 +7408,15 @@ function renderFinanceiro() {
   /* ── PIE CHART SVG ── */
   function pieSVG(fatMl, fatSp, fatTt) {
     var total = fatMl + fatSp + fatTt || 1;
+    // Novas cores: amarelo ML, laranja Shopee, preto TikTok
     var segs = [
-      { v:fatMl, c:'#f97316', l:'Mercado Livre', icon:'🟠' },
-      { v:fatSp, c:'#EE4D2D', l:'Shopee',        icon:'🔴' },
-      { v:fatTt, c:'#6366f1', l:'TikTok',        icon:'⚫' },
+      { v:fatMl, c:'#EAB308', l:'Mercado Livre', icon:'🟡' },
+      { v:fatSp, c:'#F97316', l:'Shopee',        icon:'🟠' },
+      { v:fatTt, c:'#1a1a1a', l:'TikTok',        icon:'⚫' },
     ];
 
-    // Donut SVG
-    var cx=110, cy=110, rOuter=90, rInner=52, out='', angle=-Math.PI/2;
+    // Donut SVG — maior
+    var cx=130, cy=130, rOuter=115, rInner=68, out='', angle=-Math.PI/2;
     segs.forEach(function(s){
       if(s.v<=0) return;
       var a = s.v/total*2*Math.PI;
@@ -7482,8 +7483,8 @@ function renderFinanceiro() {
       }).join('')+
     '</div>';
 
-    return '<div style="display:grid;grid-template-columns:auto 1fr;gap:1.25rem;align-items:start">'+
-      '<svg viewBox="0 0 220 220" style="width:170px;height:170px;flex-shrink:0">'+out+'</svg>'+
+    return '<div style="display:flex;flex-direction:column;gap:1rem;width:100%">'+
+      '<svg viewBox="0 0 260 260" style="width:100%;max-width:260px;height:auto;display:block;margin:0 auto">'+out+'</svg>'+
       '<div>'+
         '<div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);margin-bottom:8px">Por plataforma</div>'+
         legPlat+
@@ -7495,51 +7496,61 @@ function renderFinanceiro() {
   /* ── VISÃO GERAL ── */
   var lucroColor = calc.lucro>=0?'var(--green)':'var(--red)';
   var visaoHtml =
-    /* ROW 1 — 6 KPI cards 3+3 + gráfico */
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem">'+
-      '<div style="display:flex;flex-direction:column;gap:0.7rem">'+
-        /* Linha topo: Lucro | Faturamento | Taxas */
-        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.7rem">'+
-          '<div class="fin-kpi" style="border-left:4px solid '+(calc.lucro>=0?'var(--green)':'var(--red)')+';cursor:pointer" onclick="finAbrirDetalhe(\'lucro\')">'+
-            '<div class="fin-kpi-label">📈 Lucro Líquido <span style="font-size:0.65rem;color:var(--text3)">↗ detalhe</span></div>'+
-            '<div class="fin-kpi-val" style="color:'+lucroColor+'">'+(calc.lucro<0?'− ':'')+finFmt(Math.abs(calc.lucro))+'</div>'+
-            '<div class="fin-kpi-sub">Fat − Taxas − Desp − Imp − Custo</div>'+
-          '</div>'+
-          '<div class="fin-kpi" style="border-left:4px solid var(--green);cursor:pointer" onclick="finAbrirDetalhe(\'fat\')">'+
-            '<div class="fin-kpi-label">💰 Faturamento <span style="font-size:0.65rem;color:var(--text3)">↗</span></div>'+
-            '<div class="fin-kpi-val">'+finFmt(calc.fat)+'</div>'+
-            '<div class="fin-kpi-sub">ML + Shopee + TikTok</div>'+
-          '</div>'+
-          '<div class="fin-kpi" style="border-left:4px solid var(--amber)">'+
-            '<div class="fin-kpi-label">🏦 Taxas de Venda</div>'+
-            '<div class="fin-kpi-val" style="color:var(--amber)">− '+finFmt(calc.taxas)+'</div>'+
-            '<div class="fin-kpi-sub">ML '+finFmt(calc.taxas_ml)+' · SP '+finFmt(calc.taxas_sp)+'</div>'+
-          '</div>'+
+    /* ROW 1 — 6 cards (grid 3×2) + gráfico lado direito, mesma altura */
+    '<div style="display:grid;grid-template-columns:1fr 420px;gap:1.25rem;margin-bottom:1.25rem;align-items:stretch">'+
+
+      /* Esquerda: 6 cards em grid 2 linhas × 3 colunas */
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr;gap:0.7rem">'+
+
+        /* Card 1 — Lucro */
+        '<div class="fin-kpi" style="border-left:4px solid '+(calc.lucro>=0?'var(--green)':'var(--red)')+';cursor:pointer;display:flex;flex-direction:column;justify-content:center" onclick="finAbrirDetalhe(\'lucro\')">'+
+          '<div class="fin-kpi-label">📈 Lucro Líquido <span style="font-size:0.6rem;color:var(--text3)">↗</span></div>'+
+          '<div class="fin-kpi-val" style="color:'+lucroColor+'">'+(calc.lucro<0?'− ':'')+finFmt(Math.abs(calc.lucro))+'</div>'+
+          '<div class="fin-kpi-sub">Fat − Taxas − Desp − Imp − Custo</div>'+
         '</div>'+
-        /* Linha baixo: Custo | Despesas | Imposto */
-        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.7rem">'+
-          '<div class="fin-kpi" style="border-left:4px solid #8b5cf6;cursor:pointer" onclick="finAbrirDetalhe(\'custo\')" title="Ver detalhe do custo de produtos">'+
-            '<div class="fin-kpi-label">📦 Custo Produtos <span style="font-size:0.65rem;color:var(--text3)">↗ detalhe</span></div>'+
-            '<div class="fin-kpi-val" style="color:#8b5cf6">− '+finFmt(calc.custoProd)+'</div>'+
-            '<div class="fin-kpi-sub">'+(calc.custoProd===0?'Configure em Estoque':'SKU × unidades vendidas')+'</div>'+
-          '</div>'+
-          '<div class="fin-kpi" style="border-left:4px solid var(--red)">'+
-            '<div class="fin-kpi-label">💸 Despesas</div>'+
-            '<div class="fin-kpi-val" style="color:var(--red)">− '+finFmt(calc.despesas)+'</div>'+
-            '<div class="fin-kpi-sub">'+(desp.length)+' lançamento(s)</div>'+
-          '</div>'+
-          '<div class="fin-kpi" style="border-left:4px solid #0ea5e9;cursor:pointer" onclick="finEditAliquota()">'+
-            '<div class="fin-kpi-label">🧾 Imposto <span style="font-size:0.65rem;color:var(--text3)">✏️ '+aliq+'%</span></div>'+
-            '<div class="fin-kpi-val" style="color:#0ea5e9">− '+finFmt(calc.imposto)+'</div>'+
-            '<div class="fin-kpi-sub">'+aliq+'% sobre faturamento</div>'+
-          '</div>'+
+
+        /* Card 2 — Faturamento */
+        '<div class="fin-kpi" style="border-left:4px solid var(--green);cursor:pointer;display:flex;flex-direction:column;justify-content:center" onclick="finAbrirDetalhe(\'fat\')">'+
+          '<div class="fin-kpi-label">💰 Faturamento <span style="font-size:0.6rem;color:var(--text3)">↗</span></div>'+
+          '<div class="fin-kpi-val">'+finFmt(calc.fat)+'</div>'+
+          '<div class="fin-kpi-sub">ML + Shopee + TikTok</div>'+
         '</div>'+
+
+        /* Card 3 — Taxas */
+        '<div class="fin-kpi" style="border-left:4px solid var(--amber);cursor:pointer;display:flex;flex-direction:column;justify-content:center" onclick="finAbrirDetalhe(\'taxas\')">'+
+          '<div class="fin-kpi-label">🏦 Taxas de Venda <span style="font-size:0.6rem;color:var(--text3)">↗</span></div>'+
+          '<div class="fin-kpi-val" style="color:var(--amber)">− '+finFmt(calc.taxas)+'</div>'+
+          '<div class="fin-kpi-sub">ML '+finFmt(calc.taxas_ml)+' · SP '+finFmt(calc.taxas_sp)+'</div>'+
+        '</div>'+
+
+        /* Card 4 — Custo */
+        '<div class="fin-kpi" style="border-left:4px solid #8b5cf6;cursor:pointer;display:flex;flex-direction:column;justify-content:center" onclick="finAbrirDetalhe(\'custo\')">'+
+          '<div class="fin-kpi-label">📦 Custo Produtos <span style="font-size:0.6rem;color:var(--text3)">↗</span></div>'+
+          '<div class="fin-kpi-val" style="color:#8b5cf6">− '+finFmt(calc.custoProd)+'</div>'+
+          '<div class="fin-kpi-sub">'+(calc.custoProd===0?'Configure em Estoque':'SKU × unidades')+'</div>'+
+        '</div>'+
+
+        /* Card 5 — Despesas */
+        '<div class="fin-kpi" style="border-left:4px solid var(--red);cursor:pointer;display:flex;flex-direction:column;justify-content:center" onclick="finAbrirDetalhe(\'despesas\')">'+
+          '<div class="fin-kpi-label">💸 Despesas <span style="font-size:0.6rem;color:var(--text3)">↗</span></div>'+
+          '<div class="fin-kpi-val" style="color:var(--red)">− '+finFmt(calc.despesas)+'</div>'+
+          '<div class="fin-kpi-sub">'+(desp.length)+' lançamento(s)</div>'+
+        '</div>'+
+
+        /* Card 6 — Imposto */
+        '<div class="fin-kpi" style="border-left:4px solid #0ea5e9;cursor:pointer;display:flex;flex-direction:column;justify-content:center" onclick="finEditAliquota()">'+
+          '<div class="fin-kpi-label">🧾 Imposto <span style="font-size:0.6rem;color:var(--text3)">✏️ '+aliq+'%</span></div>'+
+          '<div class="fin-kpi-val" style="color:#0ea5e9">− '+finFmt(calc.imposto)+'</div>'+
+          '<div class="fin-kpi-sub">'+aliq+'% sobre faturamento</div>'+
+        '</div>'+
+
       '</div>'+
-      /* Right: pizza */
-      '<div class="fin-kpi" style="display:flex;flex-direction:column;justify-content:center;align-items:center;padding:1.5rem">'+
-        '<div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.6px;color:var(--text3);margin-bottom:1rem">Participação no Faturamento</div>'+
+
+      /* Direita: gráfico ocupa toda a altura dos 6 cards */
+      '<div class="fin-kpi" style="display:flex;flex-direction:column;justify-content:center;padding:1.25rem">'+
         pieSVG(calc.fat_ml, calc.fat_sp, calc.fat_tt)+
       '</div>'+
+
     '</div>'+
     /* ROW 2 */
     '<div style="display:grid;grid-template-columns:1fr 1.5fr;gap:1.25rem">'+
@@ -7547,9 +7558,9 @@ function renderFinanceiro() {
       '<div style="display:flex;flex-direction:column;gap:0.7rem">'+
         (function(){
           var cards=[
-            {icon:'🟠',l:'Mercado Livre',v:calc.fat_ml,c:'#f97316'},
-            {icon:'🔴',l:'Shopee',v:calc.fat_sp,c:'#EE4D2D'},
-            {icon:'⚫',l:'TikTok Shop',v:calc.fat_tt,c:'#6366f1'},
+            {icon:'🟡',l:'Mercado Livre',v:calc.fat_ml,c:'#EAB308'},
+            {icon:'🟠',l:'Shopee',v:calc.fat_sp,c:'#F97316'},
+            {icon:'⚫',l:'TikTok Shop',v:calc.fat_tt,c:'#1a1a1a'},
           ];
           return cards.map(function(c){
             var pct=calc.fat>0?(c.v/calc.fat*100).toFixed(1):0;

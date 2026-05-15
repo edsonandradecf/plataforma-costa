@@ -7129,7 +7129,7 @@ function renderFinDetalheCard(calc, desp, aliq, MONTHS) {
   // ── FATURAMENTO ─────────────────────────────────────────────
   if (card === 'fat') {
     var mes = _finMesSel ? (state.financeiro.meses||{})[_finMesSel] : null;
-    var mlRows = [], spRows = [];
+    var mlRows = [], spRows = [], ttRows = [];
     if (mes && mes.ml) {
       var ML_INVALID_LOCAL = ['Cancelada pelo comprador','Venda cancelada. Não envie.','Cancelada. Não despache','O seu comprador quer cancelar','Devolução em preparação','Devolução a caminho'];
       mes.ml.forEach(function(r){
@@ -7143,52 +7143,77 @@ function renderFinDetalheCard(calc, desp, aliq, MONTHS) {
     if (mes && mes.sp) {
       mes.sp.forEach(function(r){
         var status = String(r['Status do pedido']||'');
-        var sku = String(r['Número de referência SKU']||'').trim();
         var vt = parseFloat(r['Valor Total'])||0;
-        spRows.push({ status:status, sku:sku, vt:vt, cancelado:status==='Cancelado' });
+        spRows.push({ status:status, vt:vt, cancelado:status==='Cancelado' });
       });
     }
-    var mlTotal = mlRows.filter(function(r){ return !r.invalido && r.sku && r.sku!=='nan'; }).reduce(function(s,r){ return s+r.rec; },0);
+    if (mes && mes.tt) {
+      var ttSeen2 = {};
+      mes.tt.forEach(function(r){
+        var st = String(r['Order Status']||'');
+        var oid = String(r['Order ID']||'');
+        var sku = String(r['Seller SKU']||'').trim();
+        var key = oid+'|'+sku;
+        var cancelado = st==='Cancelado'||st==='Não pago';
+        if (!ttSeen2[key]) { ttSeen2[key]=true; ttRows.push({ status:st, cancelado:cancelado }); }
+      });
+    }
     var mlFiltradas = mlRows.filter(function(r){ return r.invalido; }).length;
     var mlSemSku = mlRows.filter(function(r){ return !r.invalido && (!r.sku||r.sku==='nan'); }).length;
-    var spTotal = spRows.filter(function(r){ return !r.cancelado; }).reduce(function(s,r){ return s+r.vt; },0);
     var spCancelados = spRows.filter(function(r){ return r.cancelado; }).length;
+    var ttCancelados = ttRows.filter(function(r){ return r.cancelado; }).length;
 
     return voltar +
       '<div style="font-size:1.1rem;font-weight:700;margin-bottom:1.5rem">💰 Detalhe do Faturamento</div>'+
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem">'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.25rem;margin-bottom:1.25rem">'+
+
         // ML
         '<div class="card" style="padding:1.25rem">'+
           '<div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#EAB308;margin-bottom:1rem">🟡 Mercado Livre</div>'+
-          '<div style="font-size:1.8rem;font-weight:800;color:var(--text)">'+finFmt(calc.fat_ml)+'</div>'+
+          '<div style="font-size:1.5rem;font-weight:800;color:var(--text)">'+finFmt(calc.fat_ml)+'</div>'+
           '<div style="margin-top:1rem;display:flex;flex-direction:column;gap:6px">'+
-            '<div style="display:flex;justify-content:space-between;font-size:0.83rem;padding:6px 0;border-bottom:0.5px solid var(--border)"><span style="color:var(--text2)">Total de linhas na planilha</span><span style="font-weight:600">'+mlRows.length+'</span></div>'+
-            '<div style="display:flex;justify-content:space-between;font-size:0.83rem;padding:6px 0;border-bottom:0.5px solid var(--border)"><span style="color:var(--red)">Filtradas (cancelamentos/devoluções)</span><span style="font-weight:600;color:var(--red)">− '+mlFiltradas+'</span></div>'+
-            (mlSemSku ? '<div style="display:flex;justify-content:space-between;font-size:0.83rem;padding:6px 0;border-bottom:0.5px solid var(--border)"><span style="color:var(--amber)">Sem SKU (não somadas)</span><span style="font-weight:600;color:var(--amber)">'+mlSemSku+'</span></div>' : '')+
-            '<div style="display:flex;justify-content:space-between;font-size:0.83rem;padding:8px 0"><span style="color:var(--green);font-weight:600">✓ Linhas válidas somadas</span><span style="font-weight:700;color:var(--green)">'+(mlRows.length - mlFiltradas - mlSemSku)+'</span></div>'+
+            '<div style="display:flex;justify-content:space-between;font-size:0.82rem;padding:5px 0;border-bottom:0.5px solid var(--border)"><span style="color:var(--text2)">Total de linhas</span><span style="font-weight:600">'+mlRows.length+'</span></div>'+
+            '<div style="display:flex;justify-content:space-between;font-size:0.82rem;padding:5px 0;border-bottom:0.5px solid var(--border)"><span style="color:var(--red)">Cancelamentos/devoluções</span><span style="font-weight:600;color:var(--red)">− '+mlFiltradas+'</span></div>'+
+            (mlSemSku ? '<div style="display:flex;justify-content:space-between;font-size:0.82rem;padding:5px 0;border-bottom:0.5px solid var(--border)"><span style="color:var(--amber)">Sem SKU</span><span style="font-weight:600;color:var(--amber)">− '+mlSemSku+'</span></div>' : '')+
+            '<div style="display:flex;justify-content:space-between;font-size:0.82rem;padding:7px 0"><span style="color:var(--green);font-weight:600">✓ Válidas somadas</span><span style="font-weight:700;color:var(--green)">'+(mlRows.length-mlFiltradas-mlSemSku)+'</span></div>'+
           '</div>'+
-          '<div style="margin-top:0.75rem;padding:10px;background:rgba(249,115,22,0.06);border-radius:8px;font-size:0.78rem;color:var(--text3)">'+
-            'Usa coluna "Receita por produtos (BRL)" da planilha ML. Vendas brutas do ML incluem cancelamentos futuros que a planilha já desconta no estado.'+
+          '<div style="margin-top:0.75rem;padding:8px 10px;background:rgba(234,179,8,0.06);border-radius:8px;font-size:0.75rem;color:var(--text3)">'+
+            'Coluna "Receita por produtos (BRL)"'+
           '</div>'+
         '</div>'+
+
         // Shopee
         '<div class="card" style="padding:1.25rem">'+
           '<div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#F97316;margin-bottom:1rem">🟠 Shopee</div>'+
-          '<div style="font-size:1.8rem;font-weight:800;color:var(--text)">'+finFmt(calc.fat_sp)+'</div>'+
+          '<div style="font-size:1.5rem;font-weight:800;color:var(--text)">'+finFmt(calc.fat_sp)+'</div>'+
           '<div style="margin-top:1rem;display:flex;flex-direction:column;gap:6px">'+
-            '<div style="display:flex;justify-content:space-between;font-size:0.83rem;padding:6px 0;border-bottom:0.5px solid var(--border)"><span style="color:var(--text2)">Total de pedidos na planilha</span><span style="font-weight:600">'+spRows.length+'</span></div>'+
-            '<div style="display:flex;justify-content:space-between;font-size:0.83rem;padding:6px 0;border-bottom:0.5px solid var(--border)"><span style="color:var(--red)">Cancelados (excluídos)</span><span style="font-weight:600;color:var(--red)">− '+spCancelados+'</span></div>'+
-            '<div style="display:flex;justify-content:space-between;font-size:0.83rem;padding:8px 0"><span style="color:var(--green);font-weight:600">✓ Pedidos válidos somados</span><span style="font-weight:700;color:var(--green)">'+(spRows.length - spCancelados)+'</span></div>'+
+            '<div style="display:flex;justify-content:space-between;font-size:0.82rem;padding:5px 0;border-bottom:0.5px solid var(--border)"><span style="color:var(--text2)">Total de pedidos</span><span style="font-weight:600">'+spRows.length+'</span></div>'+
+            '<div style="display:flex;justify-content:space-between;font-size:0.82rem;padding:5px 0;border-bottom:0.5px solid var(--border)"><span style="color:var(--red)">Cancelados</span><span style="font-weight:600;color:var(--red)">− '+spCancelados+'</span></div>'+
+            '<div style="display:flex;justify-content:space-between;font-size:0.82rem;padding:7px 0"><span style="color:var(--green);font-weight:600">✓ Válidos somados</span><span style="font-weight:700;color:var(--green)">'+(spRows.length-spCancelados)+'</span></div>'+
           '</div>'+
-          '<div style="margin-top:0.75rem;padding:10px;background:rgba(238,77,45,0.06);border-radius:8px;font-size:0.78rem;color:var(--text3)">'+
-            'Usa coluna "Valor Total" da planilha Shopee. Esse valor já é o valor pago pelo comprador, após descontos da Shopee aplicados pelo consumidor (cupons de comprador).'+
+          '<div style="margin-top:0.75rem;padding:8px 10px;background:rgba(249,115,22,0.06);border-radius:8px;font-size:0.75rem;color:var(--text3)">'+
+            'Coluna "Valor Total" (valor pago pelo comprador)'+
           '</div>'+
         '</div>'+
+
+        // TikTok
+        '<div class="card" style="padding:1.25rem">'+
+          '<div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#1a1a1a;margin-bottom:1rem">⚫ TikTok Shop</div>'+
+          '<div style="font-size:1.5rem;font-weight:800;color:var(--text)">'+finFmt(calc.fat_tt)+'</div>'+
+          '<div style="margin-top:1rem;display:flex;flex-direction:column;gap:6px">'+
+            '<div style="display:flex;justify-content:space-between;font-size:0.82rem;padding:5px 0;border-bottom:0.5px solid var(--border)"><span style="color:var(--text2)">Total de itens (dedup.)</span><span style="font-weight:600">'+ttRows.length+'</span></div>'+
+            '<div style="display:flex;justify-content:space-between;font-size:0.82rem;padding:5px 0;border-bottom:0.5px solid var(--border)"><span style="color:var(--red)">Cancelados/Não pagos</span><span style="font-weight:600;color:var(--red)">− '+ttCancelados+'</span></div>'+
+            '<div style="display:flex;justify-content:space-between;font-size:0.82rem;padding:7px 0"><span style="color:var(--green);font-weight:600">✓ Válidos somados</span><span style="font-weight:700;color:var(--green)">'+(ttRows.length-ttCancelados)+'</span></div>'+
+          '</div>'+
+          '<div style="margin-top:0.75rem;padding:8px 10px;background:rgba(26,26,26,0.05);border-radius:8px;font-size:0.75rem;color:var(--text3)">'+
+            'Before Discount − Platform Discount − Seller Discount. Deduplicado por Order ID + SKU.'+
+          '</div>'+
+        '</div>'+
+
       '</div>'+
       '<div class="card" style="padding:1rem;font-size:0.83rem;color:var(--text2)">'+
-        '<strong>ℹ️ Por que difere do painel do ML/Shopee?</strong><br>'+
-        'O ML reporta "Vendas brutas" no painel (inclui cancelamentos ainda em aberto). A plataforma usa a planilha exportada que já filtra pelo status final de cada venda. '+
-        'A Shopee no painel soma descontos do Shopee Ads e da plataforma separadamente — a planilha usa o valor pago efetivamente pelo comprador.'+
+        '<strong>ℹ️ Por que difere do painel das plataformas?</strong><br>'+
+        'ML reporta "Vendas brutas" (inclui cancelamentos em aberto). Shopee no painel inclui descontos de Ads separadamente. TikTok pode diferir por conta do cálculo de descontos. A plataforma sempre usa o valor final da planilha exportada.'+
       '</div>';
   }
 

@@ -6975,12 +6975,15 @@ function finCalcMes() {
       var estado = String(r['Estado']||'');
       if (ML_INVALID.some(function(x){ return estado.indexOf(x)!==-1; })) return;
       if (estado.indexOf('Pacote de')!==-1) return;
+      // Exclui linhas que são pacotes (coluna dedicada)
+      if (String(r['Pacote de diversos produtos']||'').toLowerCase() === 'sim') return;
+      if (String(r['Pertence a um kit']||'').toLowerCase() === 'sim') return;
       var sku = String(r['SKU']||'').trim();
       if (!sku || sku==='nan') return;
-      var rec = parseFloat(r['Receita por produtos (BRL)'])||0;
-      var tar = parseFloat(r['Tarifa de venda e impostos (BRL)'])||0;
-      var env = parseFloat(r['Tarifas de envio (BRL)'])||0;
-      var uni = parseFloat(r['Unidades'])||0;
+      var rec = parseFloat(String(r['Receita por produtos (BRL)']||'').replace(',','.'))||0;
+      var tar = parseFloat(String(r['Tarifa de venda e impostos (BRL)']||'').replace(',','.'))||0;
+      var env = parseFloat(String(r['Tarifas de envio (BRL)']||'').replace(',','.'))||0;
+      var uni = parseFloat(String(r['Unidades']||'').replace(',','.'))||0;
       res.fat_ml += rec;
       res.taxas_ml += Math.abs(tar) + Math.abs(env);
       skuMl[sku] = (skuMl[sku]||0) + uni;
@@ -7134,7 +7137,9 @@ function renderFinDetalheCard(calc, desp, aliq, MONTHS) {
       var ML_INVALID_LOCAL = ['Cancelada pelo comprador','Venda cancelada. Não envie.','Cancelada. Não despache','O seu comprador quer cancelar','Devolução em preparação','Devolução a caminho'];
       mes.ml.forEach(function(r){
         var estado = String(r['Estado']||'');
-        var invalido = ML_INVALID_LOCAL.some(function(x){ return estado.indexOf(x)!==-1; }) || estado.indexOf('Pacote de')!==-1;
+        var invalido = ML_INVALID_LOCAL.some(function(x){ return estado.indexOf(x)!==-1; }) || estado.indexOf('Pacote de')!==-1
+          || String(r['Pacote de diversos produtos']||'').toLowerCase()==='sim'
+          || String(r['Pertence a um kit']||'').toLowerCase()==='sim';
         var sku = String(r['SKU']||'').trim();
         var rec = parseFloat(r['Receita por produtos (BRL)'])||0;
         mlRows.push({ estado:estado, sku:sku, rec:rec, invalido:invalido, semSku:(!sku||sku==='nan') });
@@ -7284,7 +7289,7 @@ function renderFinDetalheCard(calc, desp, aliq, MONTHS) {
       if (mesData.ml) mesData.ml.forEach(function(r){
         var estado = String(r['Estado']||'');
         if (ML_INV2.some(function(x){ return estado.indexOf(x)!==-1; })) return;
-        if (estado.indexOf('Pacote de')!==-1) return;
+        if (estado.indexOf('Pacote de')!==-1||String(r['Pacote de diversos produtos']||'').toLowerCase()==='sim'||String(r['Pertence a um kit']||'').toLowerCase()==='sim') return;
         var sku = String(r['SKU']||'').trim().toLowerCase(); if (!sku||sku==='nan') return;
         if (!skuVendas[sku]) skuVendas[sku]={ml:0,sp:0,tt:0};
         skuVendas[sku].ml += parseFloat(r['Unidades'])||0;

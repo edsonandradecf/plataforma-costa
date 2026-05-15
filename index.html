@@ -6963,7 +6963,7 @@ function finCalcMes() {
     _finMesSel = keys[0] || '';
   }
   var mes = _finMesSel ? meses[_finMesSel] : null;
-  var res = { fat_ml:0, fat_sp:0, fat_tt:0, fat:0, taxas_ml:0, taxas_sp:0, taxas:0,
+  var res = { fat_ml:0, fat_sp:0, fat_tt:0, fat:0, taxas_ml:0, taxas_sp:0, taxas_tt:0, taxas:0,
               despesas:0, imposto:0, lucro:0, skus:[] };
   if (!mes) return res;
 
@@ -6979,9 +6979,10 @@ function finCalcMes() {
       if (!sku || sku==='nan') return;
       var rec = parseFloat(r['Receita por produtos (BRL)'])||0;
       var tar = parseFloat(r['Tarifa de venda e impostos (BRL)'])||0;
+      var env = parseFloat(r['Tarifas de envio (BRL)'])||0;
       var uni = parseFloat(r['Unidades'])||0;
       res.fat_ml += rec;
-      res.taxas_ml += Math.abs(tar);
+      res.taxas_ml += Math.abs(tar) + Math.abs(env);
       skuMl[sku] = (skuMl[sku]||0) + uni;
     });
   }
@@ -7012,18 +7013,29 @@ function finCalcMes() {
       var sku = String(r['Seller SKU']||'').trim();
       var oid = String(r['Order ID']||'');
       var qty = parseInt(r['Quantity'])||0;
-      var val = finParseBRL(r['SKU Subtotal After Discount']);
+      // Valor de venda = SKU Subtotal Before Discount - SKU Platform Discount - SKU Seller Discount
+      var before   = finParseBRL(r['SKU Subtotal Before Discount']);
+      var platDisc = finParseBRL(r['SKU Platform Discount']);
+      var sellDisc = finParseBRL(r['SKU Seller Discount']);
+      var valVenda = before - platDisc - sellDisc;
+      // Fallback para SKU Subtotal After Discount se os campos não existirem
+      if (!before && !platDisc && !sellDisc) {
+        valVenda = finParseBRL(r['SKU Subtotal After Discount']);
+      }
+      // Tarifa TikTok: 12% do valor de venda + R$4 por item
+      var tarifa = valVenda * 0.12 + 4 * qty;
       var key = oid+'|'+sku;
       if (!ttSeen[key]) {
         ttSeen[key]=true;
-        res.fat_tt += val;
+        res.fat_tt   += valVenda;
+        res.taxas_tt  = (res.taxas_tt||0) + tarifa;
         skuTt[sku]=(skuTt[sku]||0)+qty;
       }
     });
   }
 
   res.fat   = res.fat_ml + res.fat_sp + res.fat_tt;
-  res.taxas = res.taxas_ml + res.taxas_sp;
+  res.taxas = res.taxas_ml + res.taxas_sp + (res.taxas_tt||0);
 
   var despObj = state.financeiro.despesas || {};
   var desp = Array.isArray(despObj) ? despObj : (despObj[_finMesSel] || []);
@@ -8172,6 +8184,7 @@ function finComprimirML(rows) {
       u: parseFloat(r['Unidades'])||0,
       f: parseFloat(r['Receita por produtos (BRL)'])||0,
       t: parseFloat(r['Tarifa de venda e impostos (BRL)'])||0,
+      v: parseFloat(r['Tarifas de envio (BRL)'])||0,
     };
   });
 }
@@ -8202,6 +8215,9 @@ function finComprimirTT(rows) {
       oid: oid,
       q:  parseInt(r['Quantity'])||0,
       v:  finParseBRL(r['SKU Subtotal After Discount']),
+      vb: finParseBRL(r['SKU Subtotal Before Discount']),
+      dp: finParseBRL(r['SKU Platform Discount']),
+      ds: finParseBRL(r['SKU Seller Discount']),
     });
   });
   return out;
@@ -8216,6 +8232,7 @@ function finExpandirML(rows) {
       'Unidades': r.u||0,
       'Receita por produtos (BRL)': r.f||0,
       'Tarifa de venda e impostos (BRL)': r.t||0,
+      'Tarifas de envio (BRL)': r.v||0,
     };
   });
 }
@@ -8238,7 +8255,10 @@ function finExpandirTT(rows) {
       'Seller SKU':    r.sk||'',
       'Order ID':      r.oid||'',
       'Quantity':      r.q||0,
-      'SKU Subtotal After Discount': 'BRL ' + String(r.v||0).replace('.',','),
+      'SKU Subtotal After Discount':  'BRL ' + String(r.v||0).replace('.',','),
+      'SKU Subtotal Before Discount': 'BRL ' + String(r.vb||0).replace('.',','),
+      'SKU Platform Discount':        'BRL ' + String(r.dp||0).replace('.',','),
+      'SKU Seller Discount':          'BRL ' + String(r.ds||0).replace('.',','),
     };
   });
 }

@@ -7196,34 +7196,60 @@ function renderFinDetalheCard(calc, desp, aliq, MONTHS) {
   if (card === 'taxas') {
     return voltar +
       '<div style="font-size:1.1rem;font-weight:700;margin-bottom:1.5rem">🏦 Detalhe das Taxas de Venda</div>'+
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1.25rem">'+
+
+        // ML
         '<div class="card" style="padding:1.25rem">'+
-          '<div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#f97316;margin-bottom:1rem">🟠 Taxas Mercado Livre</div>'+
-          '<div style="font-size:1.8rem;font-weight:800;color:var(--amber)">'+finFmt(calc.taxas_ml)+'</div>'+
-          '<div style="margin-top:0.75rem;padding:10px;background:rgba(249,115,22,0.06);border-radius:8px;font-size:0.78rem;color:var(--text3)">'+
-            'Coluna "Tarifa de venda e impostos (BRL)" da planilha ML. Valor negativo convertido para positivo (Math.abs).'+
+          '<div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#EAB308;margin-bottom:1rem">🟡 Taxas Mercado Livre</div>'+
+          '<div style="font-size:1.6rem;font-weight:800;color:var(--amber)">'+finFmt(calc.taxas_ml)+'</div>'+
+          '<div style="margin-top:0.75rem;padding:10px;background:rgba(234,179,8,0.06);border-radius:8px;font-size:0.78rem;color:var(--text2)">'+
+            '<div style="margin-bottom:4px">📋 <strong>Tarifa de venda e impostos (BRL)</strong></div>'+
+            '<div>📋 <strong>Tarifas de envio (BRL)</strong></div>'+
+            '<div style="margin-top:6px;color:var(--text3)">Ambas negativas na planilha → convertidas para positivo</div>'+
           '</div>'+
           (calc.fat_ml>0?'<div style="margin-top:10px;font-size:0.85rem;color:var(--text2)">% sobre faturamento ML: <strong>'+((calc.taxas_ml/calc.fat_ml)*100).toFixed(1)+'%</strong></div>':'')+
         '</div>'+
+
+        // Shopee
         '<div class="card" style="padding:1.25rem">'+
-          '<div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#EE4D2D;margin-bottom:1rem">🔴 Taxas Shopee</div>'+
-          '<div style="font-size:1.8rem;font-weight:800;color:var(--amber)">'+finFmt(calc.taxas_sp)+'</div>'+
-          '<div style="margin-top:0.75rem;padding:10px;background:rgba(238,77,45,0.06);border-radius:8px;font-size:0.78rem;color:var(--text3)">'+
-            'Soma de "Taxa de comissão bruta" + "Taxa de serviço bruta" da planilha Shopee.'+
+          '<div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#F97316;margin-bottom:1rem">🟠 Taxas Shopee</div>'+
+          '<div style="font-size:1.6rem;font-weight:800;color:var(--amber)">'+finFmt(calc.taxas_sp)+'</div>'+
+          '<div style="margin-top:0.75rem;padding:10px;background:rgba(249,115,22,0.06);border-radius:8px;font-size:0.78rem;color:var(--text2)">'+
+            '<div style="margin-bottom:4px">📋 <strong>Taxa de comissão bruta</strong></div>'+
+            '<div>📋 <strong>Taxa de serviço bruta</strong></div>'+
+            '<div style="margin-top:6px;color:var(--text3)">Soma das duas colunas por pedido válido</div>'+
           '</div>'+
           (calc.fat_sp>0?'<div style="margin-top:10px;font-size:0.85rem;color:var(--text2)">% sobre faturamento Shopee: <strong>'+((calc.taxas_sp/calc.fat_sp)*100).toFixed(1)+'%</strong></div>':'')+
         '</div>'+
+
+        // TikTok
+        '<div class="card" style="padding:1.25rem">'+
+          '<div style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#1a1a1a;margin-bottom:1rem">⚫ Taxas TikTok Shop</div>'+
+          '<div style="font-size:1.6rem;font-weight:800;color:var(--amber)">'+finFmt(calc.taxas_tt||0)+'</div>'+
+          '<div style="margin-top:0.75rem;padding:10px;background:rgba(26,26,26,0.05);border-radius:8px;font-size:0.78rem;color:var(--text2)">'+
+            '<div style="margin-bottom:6px">Calculado por item vendido:</div>'+
+            '<div style="font-family:monospace;background:var(--bg3);padding:6px 10px;border-radius:6px;font-size:0.77rem">Valor × 12% + R$ 4,00 por unidade</div>'+
+            '<div style="margin-top:6px;color:var(--text3)">Valor = Before − Platform Discount − Seller Discount</div>'+
+          '</div>'+
+          (calc.fat_tt>0?'<div style="margin-top:10px;font-size:0.85rem;color:var(--text2)">% sobre faturamento TikTok: <strong>'+((calc.taxas_tt||0)/calc.fat_tt*100).toFixed(1)+'%</strong></div>':
+            '<div style="margin-top:10px;font-size:0.82rem;color:var(--text3)">Sem vendas TikTok neste mês</div>')+
+        '</div>'+
+
       '</div>'+
       '<div class="card" style="padding:1rem;margin-top:1rem;font-size:0.88rem">'+
         '<div style="display:flex;justify-content:space-between;align-items:center">'+
-          '<span style="color:var(--text2)">Total de taxas</span>'+
+          '<div>'+
+            '<div style="color:var(--text2);font-weight:600">Total de taxas</div>'+
+            '<div style="font-size:0.75rem;color:var(--text3);margin-top:2px">'+
+              'ML '+finFmt(calc.taxas_ml)+' · Shopee '+finFmt(calc.taxas_sp)+' · TikTok '+finFmt(calc.taxas_tt||0)+
+            '</div>'+
+          '</div>'+
           '<span style="font-size:1.2rem;font-weight:800;color:var(--amber)">'+finFmt(calc.taxas)+'</span>'+
         '</div>'+
         (calc.fat>0?'<div style="font-size:0.8rem;color:var(--text3);margin-top:4px">'+((calc.taxas/calc.fat)*100).toFixed(1)+'% do faturamento total</div>':'')+
       '</div>';
   }
 
-  // ── CUSTO PRODUTOS ──────────────────────────────────────────
   if (card === 'custo') {
     var custos2 = state.financeiro.custoProdutos || {};
     var skuVendas = {};

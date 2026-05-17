@@ -399,7 +399,7 @@ let state = {
   agenda: [],
   logs: [],
   tabnutri: [],
-  financeiro: { meses: {}, despesas: {}, aliquota: 0, custoProdutos: {} },
+  financeiro: { meses: {}, despesas: {}, aliquota: 0, custoProdutos: {}, tarifasSku: {} },
   estoque: { produtos: [], movimentacoes: [], historicoManual: [] },
   ponto: { colaboradores: [], registros: [] },
   devolucoes: [],
@@ -6968,6 +6968,9 @@ function finCalcMes() {
   if (!mes) return res;
 
   var skuMl={}, skuSp={}, skuTt={};
+  var fatSkuMl={}, fatSkuSp={}, fatSkuTt={}; // faturamento por SKU por plataforma
+  var tarifas = state.financeiro.tarifasSku || {};
+  var usaTarifasCustom = Object.keys(tarifas).length > 0;
 
   // ML
   if (mes.ml && mes.ml.length) {
@@ -6975,17 +6978,25 @@ function finCalcMes() {
       var estado = String(r['Estado']||'');
       if (ML_INVALID.some(function(x){ return estado.indexOf(x)!==-1; })) return;
       if (estado.indexOf('Pacote de')!==-1) return;
-      var sku = String(r['SKU']||'').trim();
+      var sku = String(r['SKU']||'').trim().toLowerCase();
       if (!sku || sku==='nan') return;
-      // Ignora SKUs que não estão no catálogo da plataforma
-      if (!SKU_NAMES[sku.toLowerCase()]) return;
-      var rec = parseFloat(String(r['Preço unitário de venda do anúncio (BRL)']||'').replace(',','.'))||0;
-      var tar = parseFloat(String(r['Tarifa de venda e impostos (BRL)']||'').replace(',','.'))||0;
-      var env = parseFloat(String(r['Tarifas de envio (BRL)']||'').replace(',','.'))||0;
-      var uni = parseFloat(String(r['Unidades']||'').replace(',','.'))||0;
-      res.fat_ml += rec;
-      res.taxas_ml += Math.abs(tar) + Math.abs(env);
+      if (!SKU_NAMES[sku]) return;
+      var preco = parseFloat(String(r['Preço unitário de venda do anúncio (BRL)']||'').replace(',','.'))||0;
+      var uni   = parseFloat(String(r['Unidades']||'').replace(',','.'))||0;
+      var fatLinha = preco * uni;
+      res.fat_ml += fatLinha;
       skuMl[sku] = (skuMl[sku]||0) + uni;
+      fatSkuMl[sku] = (fatSkuMl[sku]||0) + fatLinha;
+
+      // Tarifa: custom ou da planilha
+      if (usaTarifasCustom && tarifas[sku] && tarifas[sku].ml) {
+        var t = tarifas[sku].ml;
+        res.taxas_ml += fatLinha * ((t.pctVenda||0)/100) + (t.envio||0) * uni;
+      } else {
+        var tar = parseFloat(String(r['Tarifa de venda e impostos (BRL)']||'').replace(',','.'))||0;
+        var env = parseFloat(String(r['Tarifas de envio (BRL)']||'').replace(',','.'))||0;
+        res.taxas_ml += Math.abs(tar) + Math.abs(env);
+      }
     });
   }
 
@@ -6994,16 +7005,23 @@ function finCalcMes() {
     mes.sp.forEach(function(r) {
       var status = String(r['Status do pedido']||'');
       if (status==='Cancelado') return;
-      var sku = String(r['Número de referência SKU']||'').trim();
+      var sku = String(r['Número de referência SKU']||'').trim().toLowerCase();
       if (!sku) return;
-      // Ignora SKUs que não estão no catálogo da plataforma
-      if (!SKU_NAMES[sku.toLowerCase()]) return;
+      if (!SKU_NAMES[sku]) return;
+      var vt  = parseFloat(r['Valor Total'])||0;
       var com = parseFloat(r['Taxa de comissão bruta'])||0;
       var srv = parseFloat(r['Taxa de serviço bruta'])||0;
       var qty = parseInt(r['Quantidade'])||0;
       res.fat_sp += vt;
-      res.taxas_sp += (com+srv);
       skuSp[sku] = (skuSp[sku]||0) + qty;
+      fatSkuSp[sku] = (fatSkuSp[sku]||0) + vt;
+
+      if (usaTarifasCustom && tarifas[sku] && tarifas[sku].sp) {
+        var ts = tarifas[sku].sp;
+        res.taxas_sp += vt * ((ts.pctVenda||0)/100) + (ts.envio||0) * qty;
+      } else {
+        res.taxas_sp += (com+srv);
+      }
     });
   }
 
@@ -7027,14 +7045,22 @@ function finCalcMes() {
       if (!before && !platDisc && !sellDisc) {
         valVenda = finParseBRL(r['SKU Subtotal After Discount']);
       }
-      // Tarifa TikTok: 12% do valor de venda + R$4 por item
-      var tarifa = valVenda * 0.12 + 4 * qty;
+      // Tarifa TikTok: custom ou padrão 12% + R$4
+      var tarifa;
+      var skuLow = sku.toLowerCase();
+      if (usaTarifasCustom && tarifas[skuLow] && tarifas[skuLow].tt) {
+        var tt2 = tarifas[skuLow].tt;
+        tarifa = valVenda * ((tt2.pctVenda||0)/100) + (tt2.envio||0) * qty;
+      } else {
+        tarifa = valVenda * 0.12 + 4 * qty;
+      }
       var key = oid+'|'+sku;
       if (!ttSeen[key]) {
         ttSeen[key]=true;
         res.fat_tt   += valVenda;
         res.taxas_tt  = (res.taxas_tt||0) + tarifa;
         skuTt[sku]=(skuTt[sku]||0)+qty;
+        fatSkuTt[sku]=(fatSkuTt[sku]||0)+valVenda;
       }
     });
   }
@@ -7447,6 +7473,158 @@ function renderFinDetalheCard(calc, desp, aliq, MONTHS) {
   }
 
   return voltar + '<div class="empty-state">'+iconEmpty()+'<p>Detalhe não disponível</p></div>';
+}
+
+function renderFinTarifas() {
+  var tarifas = state.financeiro.tarifasSku || {};
+  var custos  = state.financeiro.custoProdutos || {};
+
+  var html =
+    '<style>'+
+      '.tar-table{width:100%;border-collapse:collapse;font-size:0.82rem}'+
+      '.tar-table th{padding:9px 10px;text-align:center;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);background:var(--bg3);border-bottom:2px solid var(--border)}'+
+      '.tar-table th.left{text-align:left}'+
+      '.tar-table td{padding:7px 8px;border-bottom:0.5px solid var(--border);text-align:center;vertical-align:middle}'+
+      '.tar-input{width:72px;padding:5px 7px;border:0.5px solid var(--border2);border-radius:6px;background:var(--input-bg);color:var(--text);font-size:0.8rem;text-align:center;font-family:inherit}'+
+      '.tar-input:focus{border-color:var(--green);outline:none}'+
+      '.tar-plat-header{display:flex;align-items:center;justify-content:center;gap:4px;font-weight:700}'+
+    '</style>'+
+
+    '<div style="margin-bottom:1rem;font-size:0.82rem;color:var(--text3)">'+
+      'Configure a tarifa de venda (%) e taxa de envio (R$) de cada produto por plataforma. '+
+      'Se preenchido, substitui os valores da planilha. Deixe em branco para usar os valores da planilha.'+
+    '</div>'+
+
+    '<div class="card" style="padding:0;overflow:hidden;margin-bottom:1rem">'+
+      '<table class="tar-table">'+
+        '<thead>'+
+          '<tr>'+
+            '<th class="left" style="padding:9px 14px;min-width:180px">Produto / SKU</th>'+
+            '<th style="min-width:70px">Custo unit.</th>'+
+            /* ML */
+            '<th colspan="2" style="border-left:2px solid var(--border)">'+
+              '<div class="tar-plat-header"><span style="color:#EAB308">🟡</span> Mercado Livre</div>'+
+            '</th>'+
+            /* Shopee */
+            '<th colspan="2" style="border-left:2px solid var(--border)">'+
+              '<div class="tar-plat-header"><span style="color:#F97316">🟠</span> Shopee</div>'+
+            '</th>'+
+            /* TikTok */
+            '<th colspan="2" style="border-left:2px solid var(--border)">'+
+              '<div class="tar-plat-header">⚫ TikTok</div>'+
+            '</th>'+
+            '<th style="width:60px"></th>'+
+          '</tr>'+
+          '<tr style="background:var(--bg3)">'+
+            '<th class="left" style="padding:5px 14px;font-size:0.65rem;color:var(--text3)">Nome · SKU</th>'+
+            '<th style="font-size:0.65rem;color:var(--text3)">R$</th>'+
+            '<th style="border-left:2px solid var(--border);font-size:0.65rem">% Venda</th>'+
+            '<th style="font-size:0.65rem">Envio R$</th>'+
+            '<th style="border-left:2px solid var(--border);font-size:0.65rem">% Venda</th>'+
+            '<th style="font-size:0.65rem">Envio R$</th>'+
+            '<th style="border-left:2px solid var(--border);font-size:0.65rem">% Venda</th>'+
+            '<th style="font-size:0.65rem">Envio R$</th>'+
+            '<th></th>'+
+          '</tr>'+
+        '</thead>'+
+        '<tbody>'+
+          PRODUTOS_CUSTO.map(function(p, idx) {
+            var t   = tarifas[p.sku] || {};
+            var ml  = t.ml  || {};
+            var sp  = t.sp  || {};
+            var tt  = t.tt  || {};
+            var c   = custos[p.sku];
+            var custoVal = (c && c.custoFinal !== undefined) ? finFmt(c.custoFinal) : '—';
+            var bg = idx%2===1 ? 'background:var(--bg3)' : '';
+            return '<tr style="'+bg+'">'+
+              '<td style="text-align:left;padding:7px 14px">'+
+                '<div style="font-weight:500;font-size:0.83rem">'+esc(p.nome)+'</div>'+
+                '<div style="font-size:0.7rem;color:var(--text3);font-family:monospace">'+p.sku+'</div>'+
+              '</td>'+
+              '<td style="font-size:0.8rem;color:var(--green);font-weight:600">'+custoVal+'</td>'+
+              /* ML */
+              '<td style="border-left:2px solid var(--border)">'+
+                '<input class="tar-input" type="number" min="0" max="100" step="0.1" placeholder="%" '+
+                  'value="'+(ml.pctVenda||'')+'" '+
+                  'onchange="finSalvarTarifa(\''+p.sku+'\',\'ml\',\'pctVenda\',this.value)">'+
+              '</td>'+
+              '<td>'+
+                '<input class="tar-input" type="number" min="0" step="0.01" placeholder="R$" '+
+                  'value="'+(ml.envio||'')+'" '+
+                  'onchange="finSalvarTarifa(\''+p.sku+'\',\'ml\',\'envio\',this.value)">'+
+              '</td>'+
+              /* Shopee */
+              '<td style="border-left:2px solid var(--border)">'+
+                '<input class="tar-input" type="number" min="0" max="100" step="0.1" placeholder="%" '+
+                  'value="'+(sp.pctVenda||'')+'" '+
+                  'onchange="finSalvarTarifa(\''+p.sku+'\',\'sp\',\'pctVenda\',this.value)">'+
+              '</td>'+
+              '<td>'+
+                '<input class="tar-input" type="number" min="0" step="0.01" placeholder="R$" '+
+                  'value="'+(sp.envio||'')+'" '+
+                  'onchange="finSalvarTarifa(\''+p.sku+'\',\'sp\',\'envio\',this.value)">'+
+              '</td>'+
+              /* TikTok */
+              '<td style="border-left:2px solid var(--border)">'+
+                '<input class="tar-input" type="number" min="0" max="100" step="0.1" placeholder="%" '+
+                  'value="'+(tt.pctVenda||'')+'" '+
+                  'onchange="finSalvarTarifa(\''+p.sku+'\',\'tt\',\'pctVenda\',this.value)">'+
+              '</td>'+
+              '<td>'+
+                '<input class="tar-input" type="number" min="0" step="0.01" placeholder="R$" '+
+                  'value="'+(tt.envio||'')+'" '+
+                  'onchange="finSalvarTarifa(\''+p.sku+'\',\'tt\',\'envio\',this.value)">'+
+              '</td>'+
+              '<td id="tar-status-'+p.sku+'" style="font-size:0.75rem;color:var(--text3)"></td>'+
+            '</tr>';
+          }).join('')+
+        '</tbody>'+
+      '</table>'+
+    '</div>'+
+
+    '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">'+
+      '<div style="font-size:0.8rem;color:var(--text3)">As tarifas são salvas automaticamente ao sair do campo.</div>'+
+      '<button onclick="finAplicarTarifaGlobal()" style="padding:8px 18px;background:var(--card);border:0.5px solid var(--border2);border-radius:8px;color:var(--text2);font-size:0.82rem;cursor:pointer">'+
+        '⚡ Aplicar mesma tarifa para todos os SKUs'+
+      '</button>'+
+    '</div>';
+
+  return html;
+}
+
+function finSalvarTarifa(sku, plat, campo, valor) {
+  if (!state.financeiro.tarifasSku) state.financeiro.tarifasSku = {};
+  if (!state.financeiro.tarifasSku[sku]) state.financeiro.tarifasSku[sku] = {};
+  if (!state.financeiro.tarifasSku[sku][plat]) state.financeiro.tarifasSku[sku][plat] = {};
+  var v = parseFloat(valor.replace(',','.'));
+  if (!isNaN(v) && v >= 0) {
+    state.financeiro.tarifasSku[sku][plat][campo] = v;
+  } else {
+    delete state.financeiro.tarifasSku[sku][plat][campo];
+  }
+  var statusEl = document.getElementById('tar-status-'+sku);
+  if (statusEl) { statusEl.textContent = '✓'; statusEl.style.color='var(--green)'; setTimeout(function(){ statusEl.textContent=''; }, 1500); }
+  finSaveFirebase();
+}
+
+function finAplicarTarifaGlobal() {
+  var pct    = prompt('% de tarifa de venda para TODAS as plataformas e SKUs (ex: 12):');
+  var envio  = prompt('Taxa de envio fixa R$ para TODAS as plataformas e SKUs (ex: 4):');
+  if (pct === null) return;
+  var pctV  = parseFloat(pct)||0;
+  var envioV = parseFloat(envio)||0;
+  if (!state.financeiro.tarifasSku) state.financeiro.tarifasSku = {};
+  PRODUTOS_CUSTO.forEach(function(p) {
+    state.financeiro.tarifasSku[p.sku] = {
+      ml: { pctVenda: pctV, envio: envioV },
+      sp: { pctVenda: pctV, envio: envioV },
+      tt: { pctVenda: pctV, envio: envioV },
+    };
+  });
+  finSaveFirebase().then(function(){
+    var c = document.getElementById('page-content');
+    if (c) { c.innerHTML = renderFinanceiro(); bindFinanceiro(); }
+  });
 }
 
 function renderFinanceiro() {
@@ -7945,6 +8123,7 @@ function renderFinanceiro() {
       '<button class="fin-tab'+(_finTab==='visao'?' active':'')+'" data-tab="visao" onclick="finSetTab(\'visao\')">📊 Visão Geral</button>'+
       '<button class="fin-tab'+(_finTab==='upload'?' active':'')+'" data-tab="upload" onclick="finSetTab(\'upload\')">📁 Importar Planilhas</button>'+
       '<button class="fin-tab'+(_finTab==='despesas'?' active':'')+'" data-tab="despesas" onclick="finSetTab(\'despesas\')">💸 Despesas</button>'+
+      '<button class="fin-tab'+(_finTab==='produtos'?' active':'')+'" data-tab="produtos" onclick="finSetTab(\'produtos\')">🏷️ Tarifas por Produto</button>'+
     '</div>'+
     '<div id="fin-visao"  style="display:'+(_finTab==='visao'?'':'none')+'">'+
       (mesKeys.length>0?(function(){
@@ -7961,7 +8140,8 @@ function renderFinanceiro() {
       })():'')+visaoHtml+
     '</div>'+
     '<div id="fin-upload" style="display:'+(_finTab==='upload'?'':'none')+'">'+uploadHtml+'</div>'+
-    '<div id="fin-despesas" style="display:'+(_finTab==='despesas'?'':'none')+'">'+despHtml+'</div>';
+    '<div id="fin-despesas" style="display:'+(_finTab==='despesas'?'':'none')+'">'+despHtml+'</div>'+
+    '<div id="fin-produtos" style="display:'+(_finTab==='produtos'?'':'none')+'">'+renderFinTarifas()+'</div>';
 }
 
 var _finLoaded = false;
@@ -8329,6 +8509,7 @@ async function finSaveFirebase() {
       aliquota:      state.financeiro.aliquota || 0,
       mesKeys:       Object.keys(meses),
       custoProdutos: state.financeiro.custoProdutos || {},
+      tarifasSku:    state.financeiro.tarifasSku    || {},
     };
     var r1 = await fetch(FIREBASE_URL + '/financeiro/meta.json', {
       method: 'PUT',
@@ -8379,6 +8560,7 @@ async function finLoadFirebase() {
     }
     state.financeiro.aliquota     = meta.aliquota || 0;
     state.financeiro.custoProdutos = meta.custoProdutos || {};
+    state.financeiro.tarifasSku    = meta.tarifasSku    || {};
 
     // 2. Carrega cada mês
     var mesKeys = meta.mesKeys || [];

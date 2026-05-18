@@ -6914,10 +6914,11 @@ var _despMesSel = ''; // mês das despesas — INDEPENDENTE do mês das planilha
 
 function finSetTab(t) {
   _finTab = t;
+  _finCardSel = null;
   document.querySelectorAll('.fin-tab').forEach(function(el){
     el.classList.toggle('active', el.dataset.tab === t);
   });
-  var sections = { visao: 'fin-visao', upload: 'fin-upload', despesas: 'fin-despesas' };
+  var sections = { visao: 'fin-visao', upload: 'fin-upload', despesas: 'fin-despesas', produtos: 'fin-produtos' };
   Object.values(sections).forEach(function(id){
     var el = document.getElementById(id);
     if (el) el.style.display = 'none';
@@ -7502,16 +7503,31 @@ function renderFinTarifas() {
             '<th class="left" style="padding:9px 14px;min-width:180px">Produto / SKU</th>'+
             '<th style="min-width:70px">Custo unit.</th>'+
             /* ML */
-            '<th colspan="2" style="border-left:2px solid var(--border)">'+
-              '<div class="tar-plat-header"><span style="color:#EAB308">🟡</span> Mercado Livre</div>'+
+            '<th colspan="2" style="border-left:2px solid var(--border);padding:6px 8px">'+
+              '<div class="tar-plat-header" style="margin-bottom:6px"><span style="color:#EAB308">🟡</span> Mercado Livre</div>'+
+              '<div style="display:flex;gap:4px;justify-content:center">'+
+                '<input id="tar-all-ml-pct" type="number" min="0" max="100" step="0.1" placeholder="%" style="width:52px;padding:4px 5px;border:0.5px solid var(--border2);border-radius:5px;background:var(--input-bg);color:var(--text);font-size:0.75rem;text-align:center">'+
+                '<input id="tar-all-ml-env" type="number" min="0" step="0.01" placeholder="R$" style="width:52px;padding:4px 5px;border:0.5px solid var(--border2);border-radius:5px;background:var(--input-bg);color:var(--text);font-size:0.75rem;text-align:center">'+
+                '<button onclick="finAplicarColuna(\'ml\')" style="padding:4px 8px;background:var(--green);color:#fff;border:none;border-radius:5px;font-size:0.72rem;cursor:pointer;white-space:nowrap">✓ Todos</button>'+
+              '</div>'+
             '</th>'+
             /* Shopee */
-            '<th colspan="2" style="border-left:2px solid var(--border)">'+
-              '<div class="tar-plat-header"><span style="color:#F97316">🟠</span> Shopee</div>'+
+            '<th colspan="2" style="border-left:2px solid var(--border);padding:6px 8px">'+
+              '<div class="tar-plat-header" style="margin-bottom:6px"><span style="color:#F97316">🟠</span> Shopee</div>'+
+              '<div style="display:flex;gap:4px;justify-content:center">'+
+                '<input id="tar-all-sp-pct" type="number" min="0" max="100" step="0.1" placeholder="%" style="width:52px;padding:4px 5px;border:0.5px solid var(--border2);border-radius:5px;background:var(--input-bg);color:var(--text);font-size:0.75rem;text-align:center">'+
+                '<input id="tar-all-sp-env" type="number" min="0" step="0.01" placeholder="R$" style="width:52px;padding:4px 5px;border:0.5px solid var(--border2);border-radius:5px;background:var(--input-bg);color:var(--text);font-size:0.75rem;text-align:center">'+
+                '<button onclick="finAplicarColuna(\'sp\')" style="padding:4px 8px;background:var(--green);color:#fff;border:none;border-radius:5px;font-size:0.72rem;cursor:pointer;white-space:nowrap">✓ Todos</button>'+
+              '</div>'+
             '</th>'+
             /* TikTok */
-            '<th colspan="2" style="border-left:2px solid var(--border)">'+
-              '<div class="tar-plat-header">⚫ TikTok</div>'+
+            '<th colspan="2" style="border-left:2px solid var(--border);padding:6px 8px">'+
+              '<div class="tar-plat-header" style="margin-bottom:6px">⚫ TikTok</div>'+
+              '<div style="display:flex;gap:4px;justify-content:center">'+
+                '<input id="tar-all-tt-pct" type="number" min="0" max="100" step="0.1" placeholder="%" style="width:52px;padding:4px 5px;border:0.5px solid var(--border2);border-radius:5px;background:var(--input-bg);color:var(--text);font-size:0.75rem;text-align:center">'+
+                '<input id="tar-all-tt-env" type="number" min="0" step="0.01" placeholder="R$" style="width:52px;padding:4px 5px;border:0.5px solid var(--border2);border-radius:5px;background:var(--input-bg);color:var(--text);font-size:0.75rem;text-align:center">'+
+                '<button onclick="finAplicarColuna(\'tt\')" style="padding:4px 8px;background:var(--green);color:#fff;border:none;border-radius:5px;font-size:0.72rem;cursor:pointer;white-space:nowrap">✓ Todos</button>'+
+              '</div>'+
             '</th>'+
             '<th style="width:60px"></th>'+
           '</tr>'+
@@ -7582,12 +7598,7 @@ function renderFinTarifas() {
       '</table>'+
     '</div>'+
 
-    '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">'+
-      '<div style="font-size:0.8rem;color:var(--text3)">As tarifas são salvas automaticamente ao sair do campo.</div>'+
-      '<button onclick="finAplicarTarifaGlobal()" style="padding:8px 18px;background:var(--card);border:0.5px solid var(--border2);border-radius:8px;color:var(--text2);font-size:0.82rem;cursor:pointer">'+
-        '⚡ Aplicar mesma tarifa para todos os SKUs'+
-      '</button>'+
-    '</div>';
+    '<div style="font-size:0.8rem;color:var(--text3);margin-top:0.75rem">As tarifas são salvas automaticamente ao sair do campo.</div>';
 
   return html;
 }
@@ -7607,19 +7618,19 @@ function finSalvarTarifa(sku, plat, campo, valor) {
   finSaveFirebase();
 }
 
-function finAplicarTarifaGlobal() {
-  var pct    = prompt('% de tarifa de venda para TODAS as plataformas e SKUs (ex: 12):');
-  var envio  = prompt('Taxa de envio fixa R$ para TODAS as plataformas e SKUs (ex: 4):');
-  if (pct === null) return;
-  var pctV  = parseFloat(pct)||0;
-  var envioV = parseFloat(envio)||0;
+function finAplicarColuna(plat) {
+  var pctEl = document.getElementById('tar-all-'+plat+'-pct');
+  var envEl = document.getElementById('tar-all-'+plat+'-env');
+  if (!pctEl || !envEl) return;
+  var pct   = parseFloat(pctEl.value.replace(',','.'));
+  var envio = parseFloat(envEl.value.replace(',','.'));
+  if (isNaN(pct) && isNaN(envio)) { alert('Preencha ao menos % de venda ou envio R$.'); return; }
   if (!state.financeiro.tarifasSku) state.financeiro.tarifasSku = {};
   PRODUTOS_CUSTO.forEach(function(p) {
-    state.financeiro.tarifasSku[p.sku] = {
-      ml: { pctVenda: pctV, envio: envioV },
-      sp: { pctVenda: pctV, envio: envioV },
-      tt: { pctVenda: pctV, envio: envioV },
-    };
+    if (!state.financeiro.tarifasSku[p.sku]) state.financeiro.tarifasSku[p.sku] = {};
+    if (!state.financeiro.tarifasSku[p.sku][plat]) state.financeiro.tarifasSku[p.sku][plat] = {};
+    if (!isNaN(pct))   state.financeiro.tarifasSku[p.sku][plat].pctVenda = pct;
+    if (!isNaN(envio)) state.financeiro.tarifasSku[p.sku][plat].envio    = envio;
   });
   finSaveFirebase().then(function(){
     var c = document.getElementById('page-content');

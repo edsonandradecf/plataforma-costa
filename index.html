@@ -6918,7 +6918,7 @@ function finSetTab(t) {
   document.querySelectorAll('.fin-tab').forEach(function(el){
     el.classList.toggle('active', el.dataset.tab === t);
   });
-  var sections = { visao: 'fin-visao', upload: 'fin-upload', despesas: 'fin-despesas', produtos: 'fin-produtos' };
+  var sections = { visao: 'fin-visao', upload: 'fin-upload', despesas: 'fin-despesas', produtos: 'fin-produtos', mkts: 'fin-mkts' };
   Object.values(sections).forEach(function(id){
     var el = document.getElementById(id);
     if (el) el.style.display = 'none';
@@ -7474,6 +7474,217 @@ function renderFinDetalheCard(calc, desp, aliq, MONTHS) {
   }
 
   return voltar + '<div class="empty-state">'+iconEmpty()+'<p>Detalhe não disponível</p></div>';
+}
+
+function renderFinMarketplaces() {
+  var tarifas = state.financeiro.tarifasSku || {};
+  var custos  = state.financeiro.custoProdutos || {};
+  var aliq    = parseFloat(state.financeiro.aliquota)||0;
+  var mes     = _finMesSel ? (state.financeiro.meses||{})[_finMesSel] : null;
+
+  // Calcular vendas por SKU por plataforma a partir da planilha
+  var vendas = {}; // vendas[sku] = { ml:{qty, fat}, sp:{qty, fat}, tt:{qty, fat} }
+  PRODUTOS_CUSTO.forEach(function(p){ vendas[p.sku] = { ml:{qty:0,fat:0}, sp:{qty:0,fat:0}, tt:{qty:0,fat:0} }; });
+
+  if (mes) {
+    var ML_INV = ['Cancelada pelo comprador','Venda cancelada. Não envie.','Cancelada. Não despache','O seu comprador quer cancelar','Devolução em preparação','Devolução a caminho'];
+    if (mes.ml) mes.ml.forEach(function(r){
+      var estado = String(r['Estado']||'');
+      if (ML_INV.some(function(x){ return estado.indexOf(x)!==-1; })) return;
+      if (estado.indexOf('Pacote de')!==-1) return;
+      var sku = String(r['SKU']||'').trim().toLowerCase();
+      if (!sku || !vendas[sku]) return;
+      var uni = parseFloat(String(r['Unidades']||'').replace(',','.'))||0;
+      var preco = parseFloat(String(r['Preço unitário de venda do anúncio (BRL)']||'').replace(',','.'))||0;
+      vendas[sku].ml.qty += uni;
+      vendas[sku].ml.fat += preco * uni;
+    });
+    if (mes.sp) mes.sp.forEach(function(r){
+      if (String(r['Status do pedido']||'')==='Cancelado') return;
+      var sku = String(r['Número de referência SKU']||'').trim().toLowerCase();
+      if (!sku || !vendas[sku]) return;
+      var qty = parseInt(r['Quantidade'])||0;
+      var vt  = parseFloat(r['Valor Total'])||0;
+      vendas[sku].sp.qty += qty;
+      vendas[sku].sp.fat += vt;
+    });
+    if (mes.tt) {
+      var ttSeen = {};
+      mes.tt.forEach(function(r){
+        var st = String(r['Order Status']||'');
+        if (st==='Cancelado'||st==='Não pago') return;
+        var sku = String(r['Seller SKU']||'').trim().toLowerCase();
+        var oid = String(r['Order ID']||'');
+        var key = oid+'|'+sku;
+        if (ttSeen[key] || !sku || !vendas[sku]) return;
+        ttSeen[key] = true;
+        var qty = parseInt(r['Quantity'])||0;
+        var before = finParseBRL(r['SKU Subtotal Before Discount']);
+        var pd = finParseBRL(r['SKU Platform Discount']);
+        var sd = finParseBRL(r['SKU Seller Discount']);
+        var val = (before-pd-sd) || finParseBRL(r['SKU Subtotal After Discount']);
+        vendas[sku].tt.qty += qty;
+        vendas[sku].tt.fat += val;
+      });
+    }
+  }
+
+  // Calcula lucro por unidade e total para um SKU numa plataforma
+  function calcPlat(sku, plat, v) {
+    var t = (tarifas[sku]||{})[plat] || {};
+    var c = custos[sku];
+    var custoUnit = (c && c.custoFinal !== undefined) ? c.custoFinal : null;
+    var qty = v.qty;
+    if (qty === 0) return null;
+    // Preço médio por unidade
+    var precoUnit = qty > 0 ? v.fat / qty : 0;
+    // Tarifa: usa custom se disponível
+    var pctTar = t.pctVenda || 0;
+    var envioFix = t.envio || 0;
+    // Se não tiver tarifa custom para TikTok, usa padrão 12% + R$4
+    if (!t.pctVenda && !t.envio && plat === 'tt') { pctTar = 12; envioFix = 4; }
+    var valorTarifa = precoUnit * (pctTar/100);
+    var valorEnvio  = envioFix;
+    var valorImposto = precoUnit * (aliq/100);
+    var lucroPorUni = custoUnit !== null
+      ? precoUnit - valorTarifa - valorEnvio - custoUnit - valorImposto
+      : null;
+    var lucroLiq = lucroPorUni !== null ? lucroPorUni * qty : null;
+    var margem   = (lucroLiq !== null && v.fat > 0) ? lucroLiq * 100 / v.fat : null;
+    return { precoUnit, pctTar, valorTarifa, envioFix, valorEnvio, custoUnit, valorImposto, lucroPorUni, qty, lucroLiq, margem };
+  }
+
+  var fmt = finFmt;
+  var fmtN = function(v, dec) {
+    if (v === null || v === undefined) return '<span style="color:var(--text3)">—</span>';
+    return (v >= 0 ? '' : '− ') + 'R$ ' + Math.abs(v).toLocaleString('pt-BR',{minimumFractionDigits:dec||2, maximumFractionDigits:dec||2});
+  };
+  var fmtPct = function(v) {
+    if (v === null || v === undefined) return '<span style="color:var(--text3)">—</span>';
+    return (v >= 0 ? '' : '− ') + Math.abs(v).toFixed(1) + '%';
+  };
+  var cor = function(v) { return v === null ? '' : (v >= 0 ? 'color:var(--green)' : 'color:var(--red)'); };
+
+  var platCfg = [
+    { id:'ml', label:'Mercado Livre', emoji:'🟡', color:'#EAB308' },
+    { id:'sp', label:'Shopee',        emoji:'🟠', color:'#F97316' },
+    { id:'tt', label:'TikTok Shop',   emoji:'⚫', color:'#1a1a1a' },
+  ];
+
+  // Filtro: mostrar só SKUs com pelo menos uma venda no mês (ou todos)
+  var _mktsVerTodos = window._mktsVerTodos || false;
+
+  var skusVisiveis = PRODUTOS_CUSTO.filter(function(p){
+    if (_mktsVerTodos) return true;
+    var v = vendas[p.sku];
+    return v && (v.ml.qty > 0 || v.sp.qty > 0 || v.tt.qty > 0);
+  });
+
+  var html =
+    '<style>'+
+      '.mkt-card{background:var(--card);backdrop-filter:blur(16px);border:0.5px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:1.25rem}'+
+      '.mkt-card-header{padding:12px 16px;border-bottom:2px solid var(--border);display:flex;align-items:center;justify-content:space-between}'+
+      '.mkt-table{width:100%;border-collapse:collapse;font-size:0.8rem}'+
+      '.mkt-table td,.mkt-table th{padding:8px 12px;border-bottom:0.5px solid var(--border)}'+
+      '.mkt-table tr:last-child td{border-bottom:none}'+
+      '.mkt-table th{font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3);text-align:right;background:var(--bg3);font-weight:600}'+
+      '.mkt-table th:first-child{text-align:left}'+
+      '.mkt-table td:first-child{font-weight:600}'+
+      '.mkt-table td{text-align:right;color:var(--text2)}'+
+      '.mkt-zero{opacity:0.45}'+
+    '</style>'+
+
+    // Controles do topo
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:8px">'+
+      '<div style="font-size:0.82rem;color:var(--text3)">'+
+        (mes ? 'Dados do mês <strong>'+_finMesSel+'</strong> · imposto '+aliq+'%' : '<span style="color:var(--amber)">Selecione um mês no topo para ver os dados</span>')+
+      '</div>'+
+      '<button onclick="window._mktsVerTodos='+(!_mktsVerTodos)+';var c=document.getElementById(\'page-content\');if(c){c.innerHTML=renderFinanceiro();bindFinanceiro()}" '+
+        'style="padding:6px 14px;border:0.5px solid var(--border2);border-radius:8px;background:var(--card);color:var(--text2);font-size:0.8rem;cursor:pointer">'+
+        (_mktsVerTodos ? '👁 Mostrar só com vendas' : '👁 Mostrar todos os SKUs')+
+      '</button>'+
+    '</div>'+
+
+    (skusVisiveis.length === 0 ?
+      '<div class="card" style="padding:3rem;text-align:center;color:var(--text3)">'+
+        '<div style="font-size:2rem;margin-bottom:8px">📊</div>'+
+        '<div>Nenhuma venda encontrada neste mês.</div>'+
+        '<div style="font-size:0.82rem;margin-top:6px">Importe as planilhas ou clique em "Mostrar todos os SKUs".</div>'+
+      '</div>'
+    :
+      skusVisiveis.map(function(p){
+        var v = vendas[p.sku];
+        var c = custos[p.sku];
+        var custoDisp = (c && c.custoFinal !== undefined) ? finFmt(c.custoFinal) : '<span style="color:var(--amber)">sem custo</span>';
+
+        var rows = platCfg.map(function(plat){
+          var vp = v[plat.id];
+          var d  = calcPlat(p.sku, plat.id, vp);
+          if (!d) {
+            return '<tr class="mkt-zero">'+
+              '<td><span style="color:'+plat.color+'">'+plat.emoji+'</span> '+plat.label+'</td>'+
+              '<td colspan="8" style="text-align:center;color:var(--text3);font-size:0.75rem">Sem vendas neste mês</td>'+
+            '</tr>';
+          }
+          return '<tr>'+
+            '<td><span style="color:'+plat.color+'">'+plat.emoji+'</span> '+plat.label+'</td>'+
+            '<td>'+finFmt(d.precoUnit)+'</td>'+
+            '<td>'+finFmt(d.valorTarifa)+'<br><span style="font-size:0.7rem;color:var(--text3)">'+d.pctTar+'%</span></td>'+
+            '<td>'+finFmt(d.valorEnvio)+'</td>'+
+            '<td>'+(d.custoUnit!==null?finFmt(d.custoUnit):'<span style="color:var(--amber)">—</span>')+'</td>'+
+            '<td>'+finFmt(d.valorImposto)+'<br><span style="font-size:0.7rem;color:var(--text3)">'+aliq+'%</span></td>'+
+            '<td style="font-weight:700;'+cor(d.lucroPorUni)+'">'+fmtN(d.lucroPorUni)+'</td>'+
+            '<td style="font-weight:600">'+d.qty+' un</td>'+
+            '<td style="font-weight:700;'+cor(d.lucroLiq)+'">'+fmtN(d.lucroLiq)+'</td>'+
+            '<td style="font-weight:700;'+cor(d.margem)+'">'+fmtPct(d.margem)+'</td>'+
+          '</tr>';
+        }).join('');
+
+        // Totalizador cross-platform
+        var totalQty = 0, totalLucro = 0, totalFat = 0;
+        platCfg.forEach(function(plat){
+          var d = calcPlat(p.sku, plat.id, v[plat.id]);
+          if (d && d.lucroLiq !== null) { totalLucro += d.lucroLiq; totalQty += d.qty; totalFat += v[plat.id].fat; }
+        });
+        var margemTotal = totalFat > 0 ? totalLucro * 100 / totalFat : null;
+
+        return '<div class="mkt-card">'+
+          '<div class="mkt-card-header">'+
+            '<div>'+
+              '<div style="font-weight:700;font-size:0.95rem">'+esc(p.nome)+'</div>'+
+              '<div style="font-size:0.72rem;color:var(--text3);margin-top:2px">'+
+                'SKU: <code style="background:var(--bg3);padding:1px 6px;border-radius:4px">'+p.sku+'</code>'+
+                ' · Custo: '+custoDisp+
+              '</div>'+
+            '</div>'+
+            '<div style="text-align:right">'+
+              '<div style="font-size:0.72rem;color:var(--text3)">Lucro total · '+totalQty+' un</div>'+
+              '<div style="font-size:1.1rem;font-weight:800;'+(totalLucro>=0?'color:var(--green)':'color:var(--red)')+'">'+
+                (totalLucro>=0?'':'-')+finFmt(Math.abs(totalLucro))+
+              '</div>'+
+              (margemTotal!==null?'<div style="font-size:0.75rem;color:var(--text3)">Margem: '+margemTotal.toFixed(1)+'%</div>':'')+
+            '</div>'+
+          '</div>'+
+          '<table class="mkt-table">'+
+            '<thead><tr>'+
+              '<th style="text-align:left">Plataforma</th>'+
+              '<th>Preço médio</th>'+
+              '<th>Tarifa</th>'+
+              '<th>Envio</th>'+
+              '<th>Custo</th>'+
+              '<th>Imposto</th>'+
+              '<th>Lucro/un</th>'+
+              '<th>Qtd</th>'+
+              '<th>Lucro líq.</th>'+
+              '<th>Margem</th>'+
+            '</tr></thead>'+
+            '<tbody>'+rows+'</tbody>'+
+          '</table>'+
+        '</div>';
+      }).join('')
+    );
+
+  return html;
 }
 
 function renderFinTarifas() {
@@ -8135,6 +8346,7 @@ function renderFinanceiro() {
       '<button class="fin-tab'+(_finTab==='upload'?' active':'')+'" data-tab="upload" onclick="finSetTab(\'upload\')">📁 Importar Planilhas</button>'+
       '<button class="fin-tab'+(_finTab==='despesas'?' active':'')+'" data-tab="despesas" onclick="finSetTab(\'despesas\')">💸 Despesas</button>'+
       '<button class="fin-tab'+(_finTab==='produtos'?' active':'')+'" data-tab="produtos" onclick="finSetTab(\'produtos\')">🏷️ Tarifas por Produto</button>'+
+      '<button class="fin-tab'+(_finTab==='mkts'?' active':'')+'" data-tab="mkts" onclick="finSetTab(\'mkts\')">🏪 Marketplaces</button>'+
     '</div>'+
     '<div id="fin-visao"  style="display:'+(_finTab==='visao'?'':'none')+'">'+
       (mesKeys.length>0?(function(){
@@ -8152,7 +8364,8 @@ function renderFinanceiro() {
     '</div>'+
     '<div id="fin-upload" style="display:'+(_finTab==='upload'?'':'none')+'">'+uploadHtml+'</div>'+
     '<div id="fin-despesas" style="display:'+(_finTab==='despesas'?'':'none')+'">'+despHtml+'</div>'+
-    '<div id="fin-produtos" style="display:'+(_finTab==='produtos'?'':'none')+'">'+renderFinTarifas()+'</div>';
+    '<div id="fin-produtos" style="display:'+(_finTab==='produtos'?'':'none')+'">'+renderFinTarifas()+'</div>'+
+    '<div id="fin-mkts" style="display:'+(_finTab==='mkts'?'':'none')+'">'+renderFinMarketplaces()+'</div>';
 }
 
 var _finLoaded = false;

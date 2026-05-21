@@ -849,15 +849,16 @@ function getPagesAdmin() {
     { id: 'etiquetas',  label: 'Gerador de Etiquetas',  icon: iconLabel() },
     { id: 'agenda',     label: 'Agenda',                icon: iconCal() },
     { id: 'tabnutri',   label: 'Tabela Nutricional',    icon: iconTabNutri() },
-    { id: '__sep__',    label: '',                      icon: '' }, // separador
-    { id: 'produtos',   label: 'Produtos',              icon: iconProdutos() },
-    { id: 'vendas',     label: 'Vendas',                icon: iconVendas() },
-    { id: 'financeiro', label: 'Financeiro',            icon: iconFinanceiro() },
-    { id: 'logs',       label: 'Logs',                  icon: iconLog() },
+    { id: '__sep__',      label: '',                      icon: '' },
+    { id: 'produtos',     label: 'Produtos',              icon: iconProdutos() },
+    { id: 'marketplaces', label: 'Marketplaces',          icon: iconMkts() },
+    { id: 'vendas',       label: 'Vendas',                icon: iconVendas() },
+    { id: 'financeiro',   label: 'Financeiro',            icon: iconFinanceiro() },
+    { id: 'logs',         label: 'Logs',                  icon: iconLog() },
   ];
 }
 function getPagesLimited() {
-  return getPagesAdmin().filter(p => p.id !== 'logs' && p.id !== 'vendas' && p.id !== 'financeiro' && p.id !== 'produtos' && p.id !== '__sep__');
+  return getPagesAdmin().filter(p => p.id !== 'logs' && p.id !== 'vendas' && p.id !== 'financeiro' && p.id !== 'produtos' && p.id !== 'marketplaces' && p.id !== '__sep__');
 }
 
 function buildSidebar() {
@@ -964,7 +965,7 @@ async function renovarTokens() {
 
 function renderPage() {
   if (!state.currentUser) return;
-  var titles = { inicio:'Início', expedicao:'Expedição', producao:'Produção', compras:'Compras', estoque:'Estoque', devolucao:'Devolução', ponto:'Ponto Virtual', mural:'Mural', etiquetas:'Gerador de Etiquetas', agenda:'Agenda', tabnutri:'Tabela Nutricional', produtos:'Produtos', vendas:'Vendas', logs:'Logs', financeiro:'Financeiro' };
+  var titles = { inicio:'Início', expedicao:'Expedição', producao:'Produção', compras:'Compras', estoque:'Estoque', devolucao:'Devolução', ponto:'Ponto Virtual', mural:'Mural', etiquetas:'Gerador de Etiquetas', agenda:'Agenda', tabnutri:'Tabela Nutricional', produtos:'Produtos', marketplaces:'Marketplaces', vendas:'Vendas', logs:'Logs', financeiro:'Financeiro' };
   var titleEl = document.getElementById('page-title');
   if (titleEl) titleEl.textContent = titles[state.currentPage] || '';
   var c = document.getElementById('page-content');
@@ -979,7 +980,8 @@ function renderPage() {
   if (pg === 'agenda')    { c.innerHTML = renderAgenda(); return; }
   if (pg === 'tabnutri')  { c.innerHTML = renderTabNutri(); setupTabNutri(); return; }
   if (pg === 'estoque')   { c.innerHTML = renderEstoque(); setupEstoque(); return; }
-  if (pg === 'produtos')  { c.innerHTML = renderProdutos(); return; }
+  if (pg === 'produtos')      { c.innerHTML = renderProdutos(); return; }
+  if (pg === 'marketplaces')  { c.innerHTML = renderMarketplaces(); return; }
   if (pg === 'devolucao') { c.innerHTML = renderDevolucao(); setupDevolucao(); return; }
   if (pg === 'ponto')     { c.innerHTML = renderPonto(); return; }
   if (pg === 'vendas')    { c.innerHTML = renderVendas(); bindVendas(); return; }
@@ -6908,6 +6910,7 @@ function iconLabel() { return `<svg viewBox="0 0 24 24" fill="none" stroke="curr
 function iconCal() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`; }
 function iconLog() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`; }
 function iconProdutos() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>`; }
+function iconMkts() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v4H3z"/><path d="M3 7v13a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V7"/><path d="M9 11h6M9 15h6"/></svg>`; }
 function iconTabNutri() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/></svg>`; }
 function iconVendas() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`; }
 function iconFinanceiro() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M12 11v-4M9 9h6M9 13h6"/></svg>`; }
@@ -6971,7 +6974,7 @@ function finSetTab(t) {
   document.querySelectorAll('.fin-tab').forEach(function(el){
     el.classList.toggle('active', el.dataset.tab === t);
   });
-  var sections = { visao: 'fin-visao', upload: 'fin-upload', despesas: 'fin-despesas', produtos: 'fin-produtos', mkts: 'fin-mkts' };
+  var sections = { visao: 'fin-visao', upload: 'fin-upload', despesas: 'fin-despesas', produtos: 'fin-produtos' };
   Object.values(sections).forEach(function(id){
     var el = document.getElementById(id);
     if (el) el.style.display = 'none';
@@ -7527,6 +7530,292 @@ function renderFinDetalheCard(calc, desp, aliq, MONTHS) {
   }
 
   return voltar + '<div class="empty-state">'+iconEmpty()+'<p>Detalhe não disponível</p></div>';
+}
+
+var _mktsTab = 'ml'; // 'ml' | 'sp' | 'tt'
+var _mktsVerTodos = false;
+var _mktsMesSel  = ''; // mês independente
+
+function renderMarketplaces() {
+  var tarifas = state.financeiro.tarifasSku  || {};
+  var custos  = state.financeiro.custoProdutos || {};
+  var aliq    = parseFloat(state.financeiro.aliquota) || 0;
+
+  // Carregar financeiro se ainda não carregou
+  if (!_finLoaded) {
+    _finLoaded = true;
+    finLoadFirebase().then(function(){
+      var c = document.getElementById('page-content');
+      if (c && state.currentPage === 'marketplaces') c.innerHTML = renderMarketplaces();
+    });
+    return '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4rem;gap:1rem">'+
+      '<div style="width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin 0.7s linear infinite"></div>'+
+      '<div style="color:var(--text2);font-size:0.9rem">Carregando dados...</div>'+
+    '</div>';
+  }
+
+  var meses     = state.financeiro.meses || {};
+  var mesKeys   = Object.keys(meses).sort().reverse();
+  if (!_mktsMesSel && mesKeys.length) _mktsMesSel = mesKeys[0];
+  var mes       = _mktsMesSel ? meses[_mktsMesSel] : null;
+
+  var MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  function mesLbl(k){ var p=k.split('-'); return MONTHS[parseInt(p[1])-1]+'/'+p[0]; }
+
+  // Calcular vendas por SKU por plataforma
+  var vendas = {};
+  PRODUTOS_CUSTO.forEach(function(p){ vendas[p.sku]={ml:{qty:0,fat:0},sp:{qty:0,fat:0},tt:{qty:0,fat:0}}; });
+
+  if (mes) {
+    var ML_INV = ['Cancelada pelo comprador','Venda cancelada. Não envie.','Cancelada. Não despache','O seu comprador quer cancelar','Devolução em preparação','Devolução a caminho'];
+    if (mes.ml) mes.ml.forEach(function(r){
+      var estado = String(r['Estado']||'');
+      if (ML_INV.some(function(x){ return estado.indexOf(x)!==-1; })) return;
+      if (estado.indexOf('Pacote de')!==-1) return;
+      var sku = String(r['SKU']||'').trim().toLowerCase();
+      if (!sku || !vendas[sku]) return;
+      var uni   = parseFloat(String(r['Unidades']||'').replace(',','.'))||0;
+      var preco = parseFloat(String(r['Preço unitário de venda do anúncio (BRL)']||'').replace(',','.'))||0;
+      vendas[sku].ml.qty += uni;
+      vendas[sku].ml.fat += preco * uni;
+    });
+    if (mes.sp) mes.sp.forEach(function(r){
+      if (String(r['Status do pedido']||'')==='Cancelado') return;
+      var sku = String(r['Número de referência SKU']||'').trim().toLowerCase();
+      if (!sku || !vendas[sku]) return;
+      var qty = parseInt(r['Quantidade'])||0;
+      var vt  = parseFloat(r['Valor Total'])||0;
+      vendas[sku].sp.qty += qty;
+      vendas[sku].sp.fat += vt;
+    });
+    if (mes.tt) {
+      var ttSeen = {};
+      mes.tt.forEach(function(r){
+        var st = String(r['Order Status']||'');
+        if (st==='Cancelado'||st==='Não pago') return;
+        var sku = String(r['Seller SKU']||'').trim().toLowerCase();
+        var oid = String(r['Order ID']||'');
+        var key = oid+'|'+sku;
+        if (ttSeen[key]||!sku||!vendas[sku]) return;
+        ttSeen[key]=true;
+        var qty = parseInt(r['Quantity'])||0;
+        var before=finParseBRL(r['SKU Subtotal Before Discount']);
+        var pd=finParseBRL(r['SKU Platform Discount']);
+        var sd=finParseBRL(r['SKU Seller Discount']);
+        var val=(before-pd-sd)||finParseBRL(r['SKU Subtotal After Discount']);
+        vendas[sku].tt.qty+=qty;
+        vendas[sku].tt.fat+=val;
+      });
+    }
+  }
+
+  function calcPlat(sku, plat, v) {
+    var t = (tarifas[sku]||{})[plat] || {};
+    var c2 = custos[sku];
+    var custoUnit = (c2 && c2.custoFinal !== undefined) ? c2.custoFinal : null;
+    var qty = v.qty;
+    if (qty === 0) return null;
+    var precoUnit = v.fat / qty;
+    var pctTar = t.pctVenda || 0;
+    var envioFix = t.envio || 0;
+    if (!t.pctVenda && !t.envio && plat==='tt') { pctTar=12; envioFix=4; }
+    var valorTarifa  = precoUnit * (pctTar/100);
+    var valorEnvio   = envioFix;
+    var valorImposto = precoUnit * (aliq/100);
+    var lucroPorUni  = custoUnit !== null ? precoUnit - valorTarifa - valorEnvio - custoUnit - valorImposto : null;
+    var lucroLiq     = lucroPorUni !== null ? lucroPorUni * qty : null;
+    var margem       = (lucroLiq !== null && v.fat > 0) ? lucroLiq * 100 / v.fat : null;
+    return { precoUnit, pctTar, valorTarifa, envioFix, valorEnvio, custoUnit, valorImposto, lucroPorUni, qty, lucroLiq, margem };
+  }
+
+  var platCfg = [
+    { id:'ml', label:'Mercado Livre', emoji:'🟡', color:'#EAB308', bg:'rgba(234,179,8,0.06)' },
+    { id:'sp', label:'Shopee',        emoji:'🟠', color:'#F97316', bg:'rgba(249,115,22,0.06)' },
+    { id:'tt', label:'TikTok Shop',   emoji:'⚫', color:'#1a1a1a', bg:'rgba(26,26,26,0.04)' },
+  ];
+
+  var plat = platCfg.find(function(p){ return p.id===_mktsTab; }) || platCfg[0];
+
+  function fmtN(v){ if(v===null||v===undefined) return '<span style="color:var(--text3)">—</span>'; return (v>=0?'':'− ')+'R$ '+Math.abs(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function fmtPct(v){ if(v===null||v===undefined) return '<span style="color:var(--text3)">—</span>'; return (v>=0?'':'− ')+Math.abs(v).toFixed(1)+'%'; }
+  function cor(v){ return v===null?'':(v>=0?'color:var(--green)':'color:var(--red)'); }
+
+  // Filtrar SKUs com venda na plataforma atual (ou todos)
+  var skusVisiveis = PRODUTOS_CUSTO.filter(function(p){
+    if (_mktsVerTodos) return true;
+    return vendas[p.sku][_mktsTab].qty > 0;
+  });
+
+  // Seletor de mês
+  var mesDrop = mesKeys.length ?
+    '<div style="position:relative;display:inline-block" id="mkts-mes-wrap">'+
+      '<button onclick="mktsToggleMes()" style="display:flex;align-items:center;gap:8px;padding:7px 14px 7px 12px;background:var(--card);border:0.5px solid var(--border);border-radius:10px;cursor:pointer;font-size:0.88rem;font-weight:600;color:var(--text);backdrop-filter:blur(16px)">'+
+        '<span>📅</span><span>'+(_mktsMesSel?mesLbl(_mktsMesSel):'Selecionar mês')+'</span><span style="color:var(--text3);font-size:0.7rem">▾</span>'+
+      '</button>'+
+      '<div id="mkts-mes-drop" style="display:none;position:absolute;top:calc(100% + 6px);left:0;z-index:999;background:var(--card);border:0.5px solid var(--border);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.15);backdrop-filter:blur(20px);min-width:150px;overflow:hidden">'+
+        mesKeys.map(function(k){
+          var act = k===_mktsMesSel;
+          return '<button onclick="mktsSelMes(\''+k+'\')" style="display:block;width:100%;text-align:left;padding:10px 16px;background:'+(act?'rgba(26,138,74,0.1)':'transparent')+';border:none;color:'+(act?'var(--green)':'var(--text)')+';font-weight:'+(act?'700':'400')+';font-size:0.88rem;cursor:pointer;font-family:inherit;border-bottom:0.5px solid var(--border2)">'+(act?'✓ ':'')+mesLbl(k)+'</button>';
+        }).join('')+
+      '</div>'+
+    '</div>'
+  : '<span style="font-size:0.82rem;color:var(--amber)">Nenhum mês importado</span>';
+
+  // Tabs por plataforma
+  var tabsHtml =
+    '<div style="display:flex;gap:4px;border-bottom:1.5px solid var(--border);margin-bottom:1.5rem;padding-bottom:0">'+
+      platCfg.map(function(p){
+        var ativo = p.id === _mktsTab;
+        return '<button onclick="mktsSetTab(\''+p.id+'\')" style="padding:9px 20px;background:none;border:none;border-bottom:3px solid '+(ativo?p.color:'transparent')+';color:'+(ativo?p.color:'var(--text2)')+';font-weight:'+(ativo?'700':'400')+';font-size:0.9rem;cursor:pointer;transition:all 0.15s;margin-bottom:-2px">'+
+          p.emoji+' '+p.label+
+        '</button>';
+      }).join('')+
+    '</div>';
+
+  // Totais da plataforma ativa
+  var totQty=0, totLucro=0, totFat=0, totSemCusto=0;
+  PRODUTOS_CUSTO.forEach(function(p){
+    var v = vendas[p.sku][_mktsTab];
+    var d = calcPlat(p.sku, _mktsTab, v);
+    if (d) {
+      totQty  += d.qty;
+      totFat  += v.fat;
+      if (d.lucroLiq !== null) totLucro += d.lucroLiq;
+      else totSemCusto++;
+    }
+  });
+  var totMargem = totFat > 0 ? totLucro * 100 / totFat : null;
+
+  // Cards de resumo
+  var resumo =
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem">'+
+      '<div class="card" style="padding:1rem;border-left:4px solid '+plat.color+'">'+
+        '<div style="font-size:0.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Faturamento</div>'+
+        '<div style="font-size:1.3rem;font-weight:800;margin-top:4px">'+finFmt(totFat)+'</div>'+
+        '<div style="font-size:0.75rem;color:var(--text3);margin-top:2px">'+totQty+' unidades vendidas</div>'+
+      '</div>'+
+      '<div class="card" style="padding:1rem;border-left:4px solid var(--amber)">'+
+        '<div style="font-size:0.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Ticket médio</div>'+
+        '<div style="font-size:1.3rem;font-weight:800;margin-top:4px">'+(totQty>0?finFmt(totFat/totQty):'—')+'</div>'+
+        '<div style="font-size:0.75rem;color:var(--text3);margin-top:2px">por unidade</div>'+
+      '</div>'+
+      '<div class="card" style="padding:1rem;border-left:4px solid '+(totLucro>=0?'var(--green)':'var(--red)')+'">'+
+        '<div style="font-size:0.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Lucro líquido</div>'+
+        '<div style="font-size:1.3rem;font-weight:800;margin-top:4px;'+(totLucro>=0?'color:var(--green)':'color:var(--red)')+'">'+finFmt(Math.abs(totLucro))+'</div>'+
+        (totSemCusto>0?'<div style="font-size:0.72rem;color:var(--amber)">⚠ '+totSemCusto+' SKU(s) sem custo</div>':'')+
+      '</div>'+
+      '<div class="card" style="padding:1rem;border-left:4px solid #8b5cf6">'+
+        '<div style="font-size:0.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Margem</div>'+
+        '<div style="font-size:1.3rem;font-weight:800;margin-top:4px;'+(totMargem!==null?(totMargem>=0?'color:var(--green)':'color:var(--red)'):'')+'">'+
+          (totMargem!==null?totMargem.toFixed(1)+'%':'—')+
+        '</div>'+
+        '<div style="font-size:0.75rem;color:var(--text3);margin-top:2px">sobre faturamento</div>'+
+      '</div>'+
+    '</div>';
+
+  // Tabela de SKUs
+  var tabelaHtml = skusVisiveis.length === 0 ?
+    '<div class="card" style="padding:3rem;text-align:center;color:var(--text3)">'+
+      '<div style="font-size:2rem;margin-bottom:8px">'+plat.emoji+'</div>'+
+      '<div>Nenhuma venda em '+plat.label+' neste mês</div>'+
+      '<div style="font-size:0.82rem;margin-top:6px">Importe a planilha ou clique em "Mostrar todos os SKUs"</div>'+
+    '</div>'
+  :
+    '<div class="card" style="padding:0;overflow:hidden">'+
+      '<table style="width:100%;border-collapse:collapse;font-size:0.82rem">'+
+        '<thead><tr style="background:var(--bg3);border-bottom:2px solid var(--border)">'+
+          '<th style="padding:9px 14px;text-align:left;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Produto</th>'+
+          '<th style="padding:9px 10px;text-align:right;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Preço médio</th>'+
+          '<th style="padding:9px 10px;text-align:right;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--amber)">Tarifa</th>'+
+          '<th style="padding:9px 10px;text-align:right;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--amber)">Envio</th>'+
+          '<th style="padding:9px 10px;text-align:right;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:#8b5cf6">Custo</th>'+
+          '<th style="padding:9px 10px;text-align:right;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:#0ea5e9">Imposto</th>'+
+          '<th style="padding:9px 10px;text-align:right;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--green)">Lucro/un</th>'+
+          '<th style="padding:9px 10px;text-align:right;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Qtd</th>'+
+          '<th style="padding:9px 10px;text-align:right;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--green)">Lucro líq.</th>'+
+          '<th style="padding:9px 10px;text-align:right;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:#8b5cf6">Margem</th>'+
+        '</tr></thead>'+
+        '<tbody>'+
+          skusVisiveis.map(function(p, idx){
+            var v = vendas[p.sku][_mktsTab];
+            var d = calcPlat(p.sku, _mktsTab, v);
+            if (!d) {
+              return '<tr style="opacity:0.45;'+(idx%2===1?'background:var(--bg3)':'')+'">'+
+                '<td style="padding:8px 14px">'+
+                  '<div style="font-weight:500">'+esc(p.nome)+'</div>'+
+                  '<div style="font-size:0.7rem;color:var(--text3);font-family:monospace">'+p.sku+'</div>'+
+                '</td>'+
+                '<td colspan="9" style="text-align:center;color:var(--text3);font-size:0.75rem">Sem vendas</td>'+
+              '</tr>';
+            }
+            return '<tr style="border-bottom:0.5px solid var(--border);'+(idx%2===1?'background:var(--bg3)':'')+'">'+
+              '<td style="padding:8px 14px">'+
+                '<div style="font-weight:600">'+esc(p.nome)+'</div>'+
+                '<div style="font-size:0.7rem;color:var(--text3);font-family:monospace">'+p.sku+'</div>'+
+              '</td>'+
+              '<td style="padding:8px 10px;text-align:right">'+finFmt(d.precoUnit)+'</td>'+
+              '<td style="padding:8px 10px;text-align:right;color:var(--amber)">'+finFmt(d.valorTarifa)+'<br><span style="font-size:0.68rem;color:var(--text3)">'+d.pctTar+'%</span></td>'+
+              '<td style="padding:8px 10px;text-align:right;color:var(--amber)">'+finFmt(d.valorEnvio)+'</td>'+
+              '<td style="padding:8px 10px;text-align:right;color:#8b5cf6">'+(d.custoUnit!==null?finFmt(d.custoUnit):'<span style="color:var(--amber);font-size:0.75rem">⚠</span>')+'</td>'+
+              '<td style="padding:8px 10px;text-align:right;color:#0ea5e9">'+finFmt(d.valorImposto)+'</td>'+
+              '<td style="padding:8px 10px;text-align:right;font-weight:700;'+cor(d.lucroPorUni)+'">'+fmtN(d.lucroPorUni)+'</td>'+
+              '<td style="padding:8px 10px;text-align:right;font-weight:600;color:var(--text2)">'+d.qty+'</td>'+
+              '<td style="padding:8px 10px;text-align:right;font-weight:700;'+cor(d.lucroLiq)+'">'+fmtN(d.lucroLiq)+'</td>'+
+              '<td style="padding:8px 10px;text-align:right;font-weight:700;'+cor(d.margem)+'">'+fmtPct(d.margem)+'</td>'+
+            '</tr>';
+          }).join('')+
+          // Linha de total
+          '<tr style="background:var(--bg3);border-top:2px solid var(--border);font-weight:700">'+
+            '<td style="padding:9px 14px">Total</td>'+
+            '<td style="padding:9px 10px;text-align:right">'+finFmt(totQty>0?totFat/totQty:0)+'</td>'+
+            '<td colspan="4"></td>'+
+            '<td></td>'+
+            '<td style="padding:9px 10px;text-align:right">'+totQty+'</td>'+
+            '<td style="padding:9px 10px;text-align:right;'+(totLucro>=0?'color:var(--green)':'color:var(--red)')+';font-size:0.95rem">'+finFmt(Math.abs(totLucro))+'</td>'+
+            '<td style="padding:9px 10px;text-align:right;'+(totMargem!==null?(totMargem>=0?'color:var(--green)':'color:var(--red)'):'')+'">'+
+              (totMargem!==null?totMargem.toFixed(1)+'%':'—')+
+            '</td>'+
+          '</tr>'+
+        '</tbody>'+
+      '</table>'+
+    '</div>';
+
+  return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:8px">'+
+    mesDrop+
+    '<button onclick="_mktsVerTodos=!_mktsVerTodos;var c=document.getElementById(\'page-content\');if(c)c.innerHTML=renderMarketplaces()" '+
+      'style="padding:6px 14px;border:0.5px solid var(--border2);border-radius:8px;background:var(--card);color:var(--text2);font-size:0.8rem;cursor:pointer">'+
+      (_mktsVerTodos?'👁 Só com vendas':'👁 Todos os SKUs')+
+    '</button>'+
+  '</div>'+
+  tabsHtml + resumo + tabelaHtml;
+}
+
+function mktsSetTab(t) {
+  _mktsTab = t;
+  var c = document.getElementById('page-content');
+  if (c) c.innerHTML = renderMarketplaces();
+}
+
+function mktsSelMes(k) {
+  _mktsMesSel = k;
+  var drop = document.getElementById('mkts-mes-drop');
+  if (drop) drop.style.display = 'none';
+  var c = document.getElementById('page-content');
+  if (c) c.innerHTML = renderMarketplaces();
+}
+
+function mktsToggleMes() {
+  var drop = document.getElementById('mkts-mes-drop');
+  if (!drop) return;
+  drop.style.display = drop.style.display === 'none' ? 'block' : 'none';
+  if (drop.style.display === 'block') {
+    setTimeout(function(){
+      document.addEventListener('click', function fechar(e){
+        var wrap = document.getElementById('mkts-mes-wrap');
+        if (!wrap || !wrap.contains(e.target)) { drop.style.display='none'; document.removeEventListener('click',fechar); }
+      });
+    }, 10);
+  }
 }
 
 function renderFinMarketplaces() {
@@ -8399,8 +8688,7 @@ function renderFinanceiro() {
       '<button class="fin-tab'+(_finTab==='upload'?' active':'')+'" data-tab="upload" onclick="finSetTab(\'upload\')">📁 Importar Planilhas</button>'+
       '<button class="fin-tab'+(_finTab==='despesas'?' active':'')+'" data-tab="despesas" onclick="finSetTab(\'despesas\')">💸 Despesas</button>'+
       '<button class="fin-tab'+(_finTab==='produtos'?' active':'')+'" data-tab="produtos" onclick="finSetTab(\'produtos\')">🏷️ Tarifas por Produto</button>'+
-      '<button class="fin-tab'+(_finTab==='mkts'?' active':'')+'" data-tab="mkts" onclick="finSetTab(\'mkts\')">🏪 Marketplaces</button>'+
-    '</div>'+
+          '</div>'+
     '<div id="fin-visao"  style="display:'+(_finTab==='visao'?'':'none')+'">'+
       (mesKeys.length>0?(function(){
         function mL(k){var p=k.split('-');return ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(p[1])-1]+'/'+p[0];}
@@ -8418,7 +8706,7 @@ function renderFinanceiro() {
     '<div id="fin-upload" style="display:'+(_finTab==='upload'?'':'none')+'">'+uploadHtml+'</div>'+
     '<div id="fin-despesas" style="display:'+(_finTab==='despesas'?'':'none')+'">'+despHtml+'</div>'+
     '<div id="fin-produtos" style="display:'+(_finTab==='produtos'?'':'none')+'">'+renderFinTarifas()+'</div>'+
-    '<div id="fin-mkts" style="display:'+(_finTab==='mkts'?'':'none')+'">'+renderFinMarketplaces()+'</div>';
+    '';
 }
 
 var _finLoaded = false;

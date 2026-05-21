@@ -6974,7 +6974,7 @@ function finSetTab(t) {
   document.querySelectorAll('.fin-tab').forEach(function(el){
     el.classList.toggle('active', el.dataset.tab === t);
   });
-  var sections = { visao: 'fin-visao', upload: 'fin-upload', despesas: 'fin-despesas', produtos: 'fin-produtos' };
+  var sections = { visao: 'fin-visao', upload: 'fin-upload', despesas: 'fin-despesas' };
   Object.values(sections).forEach(function(id){
     var el = document.getElementById(id);
     if (el) el.style.display = 'none';
@@ -7632,6 +7632,7 @@ function renderMarketplaces() {
     { id:'ml', label:'Mercado Livre', emoji:'🟡', color:'#EAB308', bg:'rgba(234,179,8,0.06)' },
     { id:'sp', label:'Shopee',        emoji:'🟠', color:'#F97316', bg:'rgba(249,115,22,0.06)' },
     { id:'tt', label:'TikTok Shop',   emoji:'⚫', color:'#1a1a1a', bg:'rgba(26,26,26,0.04)' },
+    { id:'tarifas', label:'Tarifas por Produto', emoji:'🏷️', color:'var(--text2)', bg:'' },
   ];
 
   var plat = platCfg.find(function(p){ return p.id===_mktsTab; }) || platCfg[0];
@@ -7726,9 +7727,10 @@ function renderMarketplaces() {
         '<thead><tr style="background:var(--bg3);border-bottom:2px solid var(--border)">'+
           '<th style="padding:9px 14px;text-align:left;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Produto</th>'+
           '<th style="padding:9px 10px;text-align:right;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Preço médio</th>'+
+          '<th style="padding:9px 10px;text-align:right;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--amber)">Ingrediente</th>'+
           '<th style="padding:9px 10px;text-align:right;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--amber)">Tarifa</th>'+
           '<th style="padding:9px 10px;text-align:right;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--amber)">Envio</th>'+
-          '<th style="padding:9px 10px;text-align:right;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:#8b5cf6">Custo</th>'+
+          '<th style="padding:9px 10px;text-align:right;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:#8b5cf6">Custo total</th>'+
           '<th style="padding:9px 10px;text-align:right;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:#0ea5e9">Imposto</th>'+
           '<th style="padding:9px 10px;text-align:right;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--green)">Lucro/un</th>'+
           '<th style="padding:9px 10px;text-align:right;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Qtd</th>'+
@@ -7739,13 +7741,18 @@ function renderMarketplaces() {
           skusVisiveis.map(function(p, idx){
             var v = vendas[p.sku][_mktsTab];
             var d = calcPlat(p.sku, _mktsTab, v);
+            // Custo ingrediente = custoFinal - embalagem - caixa
+            var c2 = custos[p.sku];
+            var ingrediente = (c2 && c2.custoFinal !== undefined)
+              ? c2.custoFinal - (c2.embalagem||0) - (c2.caixa||0)
+              : null;
             if (!d) {
               return '<tr style="opacity:0.45;'+(idx%2===1?'background:var(--bg3)':'')+'">'+
                 '<td style="padding:8px 14px">'+
                   '<div style="font-weight:500">'+esc(p.nome)+'</div>'+
                   '<div style="font-size:0.7rem;color:var(--text3);font-family:monospace">'+p.sku+'</div>'+
                 '</td>'+
-                '<td colspan="9" style="text-align:center;color:var(--text3);font-size:0.75rem">Sem vendas</td>'+
+                '<td colspan="10" style="text-align:center;color:var(--text3);font-size:0.75rem">Sem vendas</td>'+
               '</tr>';
             }
             return '<tr style="border-bottom:0.5px solid var(--border);'+(idx%2===1?'background:var(--bg3)':'')+'">'+
@@ -7754,6 +7761,7 @@ function renderMarketplaces() {
                 '<div style="font-size:0.7rem;color:var(--text3);font-family:monospace">'+p.sku+'</div>'+
               '</td>'+
               '<td style="padding:8px 10px;text-align:right">'+finFmt(d.precoUnit)+'</td>'+
+              '<td style="padding:8px 10px;text-align:right;color:var(--amber)">'+(ingrediente!==null?finFmt(ingrediente):'<span style="color:var(--amber);font-size:0.75rem">⚠</span>')+'</td>'+
               '<td style="padding:8px 10px;text-align:right;color:var(--amber)">'+finFmt(d.valorTarifa)+'<br><span style="font-size:0.68rem;color:var(--text3)">'+d.pctTar+'%</span></td>'+
               '<td style="padding:8px 10px;text-align:right;color:var(--amber)">'+finFmt(d.valorEnvio)+'</td>'+
               '<td style="padding:8px 10px;text-align:right;color:#8b5cf6">'+(d.custoUnit!==null?finFmt(d.custoUnit):'<span style="color:var(--amber);font-size:0.75rem">⚠</span>')+'</td>'+
@@ -7768,13 +7776,11 @@ function renderMarketplaces() {
           '<tr style="background:var(--bg3);border-top:2px solid var(--border);font-weight:700">'+
             '<td style="padding:9px 14px">Total</td>'+
             '<td style="padding:9px 10px;text-align:right">'+finFmt(totQty>0?totFat/totQty:0)+'</td>'+
-            '<td colspan="4"></td>'+
+            '<td colspan="5"></td>'+
             '<td></td>'+
             '<td style="padding:9px 10px;text-align:right">'+totQty+'</td>'+
             '<td style="padding:9px 10px;text-align:right;'+(totLucro>=0?'color:var(--green)':'color:var(--red)')+';font-size:0.95rem">'+finFmt(Math.abs(totLucro))+'</td>'+
-            '<td style="padding:9px 10px;text-align:right;'+(totMargem!==null?(totMargem>=0?'color:var(--green)':'color:var(--red)'):'')+'">'+
-              (totMargem!==null?totMargem.toFixed(1)+'%':'—')+
-            '</td>'+
+            '<td style="padding:9px 10px;text-align:right;'+(totMargem!==null?(totMargem>=0?'color:var(--green)':'color:var(--red)'):'')+'">'+(totMargem!==null?totMargem.toFixed(1)+'%':'—')+'</td>'+
           '</tr>'+
         '</tbody>'+
       '</table>'+
@@ -7782,12 +7788,15 @@ function renderMarketplaces() {
 
   return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:8px">'+
     mesDrop+
-    '<button onclick="_mktsVerTodos=!_mktsVerTodos;var c=document.getElementById(\'page-content\');if(c)c.innerHTML=renderMarketplaces()" '+
-      'style="padding:6px 14px;border:0.5px solid var(--border2);border-radius:8px;background:var(--card);color:var(--text2);font-size:0.8rem;cursor:pointer">'+
-      (_mktsVerTodos?'👁 Só com vendas':'👁 Todos os SKUs')+
-    '</button>'+
+    (_mktsTab !== 'tarifas' ?
+      '<button onclick="_mktsVerTodos=!_mktsVerTodos;var c=document.getElementById(\'page-content\');if(c)c.innerHTML=renderMarketplaces()" '+
+        'style="padding:6px 14px;border:0.5px solid var(--border2);border-radius:8px;background:var(--card);color:var(--text2);font-size:0.8rem;cursor:pointer">'+
+        (_mktsVerTodos?'👁 Só com vendas':'👁 Todos os SKUs')+
+      '</button>'
+    : '')+
   '</div>'+
-  tabsHtml + resumo + tabelaHtml;
+  tabsHtml +
+  (_mktsTab === 'tarifas' ? renderFinTarifas() : resumo + tabelaHtml);
 }
 
 function mktsSetTab(t) {
@@ -8160,7 +8169,7 @@ function finSalvarTarifa(sku, plat, campo, valor) {
   if (!state.financeiro.tarifasSku) state.financeiro.tarifasSku = {};
   if (!state.financeiro.tarifasSku[sku]) state.financeiro.tarifasSku[sku] = {};
   if (!state.financeiro.tarifasSku[sku][plat]) state.financeiro.tarifasSku[sku][plat] = {};
-  var v = parseFloat(valor.replace(',','.'));
+  var v = parseFloat(String(valor).replace(',','.'));
   if (!isNaN(v) && v >= 0) {
     state.financeiro.tarifasSku[sku][plat][campo] = v;
   } else {
@@ -8187,7 +8196,10 @@ function finAplicarColuna(plat) {
   });
   finSaveFirebase().then(function(){
     var c = document.getElementById('page-content');
-    if (c) { c.innerHTML = renderFinanceiro(); bindFinanceiro(); }
+    if (c) {
+      if (state.currentPage === 'marketplaces') c.innerHTML = renderMarketplaces();
+      else { c.innerHTML = renderFinanceiro(); bindFinanceiro(); }
+    }
   });
 }
 
@@ -8687,8 +8699,7 @@ function renderFinanceiro() {
       '<button class="fin-tab'+(_finTab==='visao'?' active':'')+'" data-tab="visao" onclick="finSetTab(\'visao\')">📊 Visão Geral</button>'+
       '<button class="fin-tab'+(_finTab==='upload'?' active':'')+'" data-tab="upload" onclick="finSetTab(\'upload\')">📁 Importar Planilhas</button>'+
       '<button class="fin-tab'+(_finTab==='despesas'?' active':'')+'" data-tab="despesas" onclick="finSetTab(\'despesas\')">💸 Despesas</button>'+
-      '<button class="fin-tab'+(_finTab==='produtos'?' active':'')+'" data-tab="produtos" onclick="finSetTab(\'produtos\')">🏷️ Tarifas por Produto</button>'+
-          '</div>'+
+                '</div>'+
     '<div id="fin-visao"  style="display:'+(_finTab==='visao'?'':'none')+'">'+
       (mesKeys.length>0?(function(){
         function mL(k){var p=k.split('-');return ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(p[1])-1]+'/'+p[0];}
@@ -8705,7 +8716,6 @@ function renderFinanceiro() {
     '</div>'+
     '<div id="fin-upload" style="display:'+(_finTab==='upload'?'':'none')+'">'+uploadHtml+'</div>'+
     '<div id="fin-despesas" style="display:'+(_finTab==='despesas'?'':'none')+'">'+despHtml+'</div>'+
-    '<div id="fin-produtos" style="display:'+(_finTab==='produtos'?'':'none')+'">'+renderFinTarifas()+'</div>'+
     '';
 }
 

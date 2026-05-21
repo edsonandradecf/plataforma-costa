@@ -849,13 +849,15 @@ function getPagesAdmin() {
     { id: 'etiquetas',  label: 'Gerador de Etiquetas',  icon: iconLabel() },
     { id: 'agenda',     label: 'Agenda',                icon: iconCal() },
     { id: 'tabnutri',   label: 'Tabela Nutricional',    icon: iconTabNutri() },
+    { id: '__sep__',    label: '',                      icon: '' }, // separador
+    { id: 'produtos',   label: 'Produtos',              icon: iconProdutos() },
     { id: 'vendas',     label: 'Vendas',                icon: iconVendas() },
-    { id: 'financeiro', label: 'Financeiro',             icon: iconFinanceiro() },
+    { id: 'financeiro', label: 'Financeiro',            icon: iconFinanceiro() },
     { id: 'logs',       label: 'Logs',                  icon: iconLog() },
   ];
 }
 function getPagesLimited() {
-  return getPagesAdmin().filter(p => p.id !== 'logs' && p.id !== 'vendas' && p.id !== 'financeiro');
+  return getPagesAdmin().filter(p => p.id !== 'logs' && p.id !== 'vendas' && p.id !== 'financeiro' && p.id !== 'produtos' && p.id !== '__sep__');
 }
 
 function buildSidebar() {
@@ -865,6 +867,13 @@ function buildSidebar() {
   nav.innerHTML = '';
   const pages = state.currentUser.role === 'admin' ? getPagesAdmin() : getPagesLimited();
   pages.forEach(p => {
+    if (p.id === '__sep__') {
+      const sep = document.createElement('div');
+      sep.style.cssText = 'margin:6px 12px;border-top:0.5px solid var(--border2);position:relative;';
+      sep.innerHTML = '<span style="position:absolute;top:-9px;left:8px;background:var(--sidebar-bg);padding:0 6px;font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text3)">Admin</span>';
+      nav.appendChild(sep);
+      return;
+    }
     const el = document.createElement('div');
     el.className = 'nav-item' + (state.currentPage === p.id ? ' active' : '');
     el.innerHTML = p.icon + `<span class="nav-item-label">${p.label}</span>`;
@@ -955,7 +964,7 @@ async function renovarTokens() {
 
 function renderPage() {
   if (!state.currentUser) return;
-  var titles = { inicio:'Início', expedicao:'Expedição', producao:'Produção', compras:'Compras', estoque:'Estoque', devolucao:'Devolução', ponto:'Ponto Virtual', mural:'Mural', etiquetas:'Gerador de Etiquetas', agenda:'Agenda', tabnutri:'Tabela Nutricional', vendas:'Vendas', logs:'Logs', financeiro:'Financeiro' };
+  var titles = { inicio:'Início', expedicao:'Expedição', producao:'Produção', compras:'Compras', estoque:'Estoque', devolucao:'Devolução', ponto:'Ponto Virtual', mural:'Mural', etiquetas:'Gerador de Etiquetas', agenda:'Agenda', tabnutri:'Tabela Nutricional', produtos:'Produtos', vendas:'Vendas', logs:'Logs', financeiro:'Financeiro' };
   var titleEl = document.getElementById('page-title');
   if (titleEl) titleEl.textContent = titles[state.currentPage] || '';
   var c = document.getElementById('page-content');
@@ -970,6 +979,7 @@ function renderPage() {
   if (pg === 'agenda')    { c.innerHTML = renderAgenda(); return; }
   if (pg === 'tabnutri')  { c.innerHTML = renderTabNutri(); setupTabNutri(); return; }
   if (pg === 'estoque')   { c.innerHTML = renderEstoque(); setupEstoque(); return; }
+  if (pg === 'produtos')  { c.innerHTML = renderProdutos(); return; }
   if (pg === 'devolucao') { c.innerHTML = renderDevolucao(); setupDevolucao(); return; }
   if (pg === 'ponto')     { c.innerHTML = renderPonto(); return; }
   if (pg === 'vendas')    { c.innerHTML = renderVendas(); bindVendas(); return; }
@@ -4911,8 +4921,6 @@ function renderEstoque() {
     '<div style="display:flex;border-bottom:2px solid var(--border);margin-bottom:1.5rem">' +
       tabBtn('estoque',      '📦 Estoque',              isEst)  +
       tabBtn('movimentacao', '↕ Entrada / Saída',       isMov)  +
-      (isAdmin() ? tabBtn('historico', '📈 Histórico de Preços', isHist) : '') +
-      (isAdmin() ? tabBtn('custo',     '🧮 Custo dos Produtos',  isCust) : '') +
     '</div>';
 
   if (isEst)   return tabBar + renderEstoqueCards();
@@ -6899,12 +6907,57 @@ function iconMural() { return `<svg viewBox="0 0 24 24" fill="none" stroke="curr
 function iconLabel() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>`; }
 function iconCal() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`; }
 function iconLog() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`; }
+function iconProdutos() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>`; }
 function iconTabNutri() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/></svg>`; }
 function iconVendas() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`; }
 function iconFinanceiro() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M12 11v-4M9 9h6M9 13h6"/></svg>`; }
 function iconEmpty() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`; }
 
 /* ════════════ FINANCEIRO ════════════════════════════════════════ */
+
+var _prodTab = 'custo'; // 'custo' | 'historico'
+
+function renderProdutos() {
+  var tabBar =
+    '<div style="display:flex;gap:4px;margin-bottom:1.5rem;border-bottom:1.5px solid var(--border);padding-bottom:0">'+
+      '<button class="fin-tab'+(_prodTab==='custo'?' active':'')+'" onclick="prodSetTab(\'custo\')" style="font-size:0.88rem">📦 Custo dos Produtos</button>'+
+      '<button class="fin-tab'+(_prodTab==='historico'?' active':'')+'" onclick="prodSetTab(\'historico\')" style="font-size:0.88rem">📈 Histórico de Preços</button>'+
+    '</div>';
+
+  if (_prodTab === 'custo') {
+    // Garante que custoProdutos está carregado
+    var custos = state.financeiro.custoProdutos || {};
+    if (Object.keys(custos).length === 0 && !_estoqueCustoCarregando) {
+      _estoqueCustoCarregando = true;
+      fetch(FIREBASE_URL + '/financeiro/meta.json')
+        .then(function(r){ return r.json(); })
+        .then(function(meta){
+          _estoqueCustoCarregando = false;
+          if (meta && meta.custoProdutos) {
+            state.financeiro.custoProdutos = meta.custoProdutos;
+            if (meta.tarifasSku) state.financeiro.tarifasSku = meta.tarifasSku;
+            if (meta.aliquota !== undefined) state.financeiro.aliquota = meta.aliquota;
+            var c = document.getElementById('page-content');
+            if (c && state.currentPage === 'produtos') c.innerHTML = renderProdutos();
+          }
+        })
+        .catch(function(){ _estoqueCustoCarregando = false; });
+    }
+    return tabBar + renderEstoqueCusto();
+  }
+
+  if (_prodTab === 'historico') {
+    return tabBar + renderEstoqueHistorico();
+  }
+
+  return tabBar;
+}
+
+function prodSetTab(t) {
+  _prodTab = t;
+  var c = document.getElementById('page-content');
+  if (c) c.innerHTML = renderProdutos();
+}
 
 var _finTab     = 'visao';
 var _finCardSel = null; // 'lucro'|'fat'|'taxas'|'custo'|'despesas'|'imposto'
@@ -7404,7 +7457,7 @@ function renderFinDetalheCard(calc, desp, aliq, MONTHS) {
       '</div>'+
       (semCusto2.length?'<div class="card" style="padding:0.875rem 1rem;margin-top:0.75rem;background:rgba(186,117,23,0.06);border-color:rgba(186,117,23,0.2);font-size:0.82rem;color:var(--text2)">'+
         '⚠️ '+semCusto2.length+' SKU(s) sem custo cadastrado. '+
-        '<button onclick="estoqueSetTab(\'custo\');navigate(\'estoque\')" style="background:none;border:none;color:var(--green);cursor:pointer;font-size:0.82rem;text-decoration:underline">Cadastrar agora →</button>'+
+        '<button onclick="prodSetTab(\'custo\');navigate(\'produtos\')" style="background:none;border:none;color:var(--green);cursor:pointer;font-size:0.82rem;text-decoration:underline">Cadastrar agora →</button>'+
       '</div>':'');
   }
 

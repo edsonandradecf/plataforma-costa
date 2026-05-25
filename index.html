@@ -477,9 +477,13 @@ function applyParsed(parsed, forceMerge) {
     historicoManual: Array.isArray(est.historicoManual) ? est.historicoManual : [],
   };
   var pt = parsed.ponto || {};
+  // Formato correto: { colaboradores: [...], registros: [...] }
   state.ponto = {
-    colaboradores: Array.isArray(pt.colaboradores) ? pt.colaboradores : [],
-    registros:     Array.isArray(pt.registros)     ? pt.registros     : [],
+    colaboradores: Array.isArray(pt.colaboradores) && pt.colaboradores.length > 0
+      ? pt.colaboradores
+      : (state.ponto && Array.isArray(state.ponto.colaboradores) && state.ponto.colaboradores.length > 0
+          ? state.ponto.colaboradores : []),
+    registros: Array.isArray(pt.registros) ? pt.registros : [],
   };
   state.devolucoes = Array.isArray(parsed.devolucoes) && parsed.devolucoes.length > 0
     ? parsed.devolucoes
@@ -3796,7 +3800,7 @@ function pontoStatCard(icon, label, valor) {
 
 // -- VISÃO ADMIN ---------------------------------------------------------------
 function renderPontoAdmin() {
-  if (_pontoColabSel !== null && state.ponto.colaboradores[_pontoColabSel]) {
+  if (_pontoColabSel !== null && state.ponto.colaboradores && state.ponto.colaboradores[_pontoColabSel]) {
     return renderPontoColabAberto(_pontoColabSel);
   }
   var isCards = _pontoTab === 'cards';

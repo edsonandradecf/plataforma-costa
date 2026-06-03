@@ -2333,130 +2333,150 @@ function tnGeneratePDF(qtdEtiquetas) {
 
   try {
     var jsPDFLib = window.jspdf;
-    var W = 100, H = 150;
-    var px = 4, py = 4, lw = W - px*2;
+    // Paisagem 15×10 cm
+    var W = 150, H = 100;
+    var px = 4, py = 4;
+
+    // Layout: coluna esquerda = tabela nutricional | coluna direita = resto
+    var colEsqW = 72;  // largura da tabela nutricional
+    var colDirX = px + colEsqW + 4; // início da coluna direita
+    var colDirW = W - colDirX - px; // largura da coluna direita
+    var lw = colEsqW; // largura útil da tabela
 
     function nv(v, suf) { v = (v||'').trim(); return v ? v+(suf||'') : '--'; }
 
-    // Colunas
-    var cLabel = 34, c100 = 14, cPorc = 19, cVd = lw - cLabel - c100 - cPorc;
+    // Colunas da tabela nutricional
+    var cLabel = 29, c100 = 13, cPorc = 16, cVd = lw - cLabel - c100 - cPorc;
     var colB = px+cLabel, colC = px+cLabel+c100, colD = px+cLabel+c100+cPorc;
 
-    // Barcode: 60% do espaço disponível (40% menor)
-    var qrSize = 20;
-    var bcWFull = lw - qrSize - 3;
-    var bcW = bcWFull * 0.6;
-    var bcH = qrSize * 0.6;
+    var qrSize = 18;
 
     function desenharPagina(doc, numEtiqueta, totalEtiquetas) {
-      // -- Contagem no canto superior esquerdo ---------------
       if (totalEtiquetas > 1) {
-        doc.setFontSize(5.5); doc.setFont('helvetica','normal'); doc.setTextColor(130,130,130);
+        doc.setFontSize(5); doc.setFont('helvetica','normal'); doc.setTextColor(130,130,130);
         doc.text(numEtiqueta + '/' + totalEtiquetas, px, py - 0.5);
         doc.setTextColor(0,0,0);
       }
 
-      // -- Nome do produto -----------------------------------
-      doc.setFontSize(12); doc.setFont('helvetica','bold');
-      doc.text(d.nome || 'Produto', W/2, py+5, { align:'center' });
-      if (d.descricao) { doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.text(d.descricao, W/2, py+10, { align:'center' }); }
+      // ── COLUNA ESQUERDA: tabela nutricional ──────────────────
+      var y = py;
 
-      var y = py + 13;
+      // Nome do produto (acima da tabela, na coluna esquerda)
+      doc.setFontSize(10); doc.setFont('helvetica','bold');
+      var nomeLines = doc.splitTextToSize(d.nome || 'Produto', lw);
+      doc.text(nomeLines, px + lw/2, y + 4, { align:'center' });
+      y += nomeLines.length * 4.5 + 1;
+      if (d.descricao) {
+        doc.setFontSize(7); doc.setFont('helvetica','normal');
+        var descLines = doc.splitTextToSize(d.descricao, lw);
+        doc.text(descLines, px + lw/2, y + 2.5, { align:'center' });
+        y += descLines.length * 3 + 1;
+      }
+
       var tabelaTop = y;
 
-      // -- Header preto --------------------------------------
-      doc.setFillColor(0,0,0); doc.rect(px, y, lw, 6, 'F');
-      doc.setTextColor(255,255,255); doc.setFontSize(9.5); doc.setFont('helvetica','bold');
-      doc.text('INFORMAÇÃO NUTRICIONAL', px+2, y+4.2);
-      doc.setTextColor(0,0,0); y += 7;
+      // Header preto
+      doc.setFillColor(0,0,0); doc.rect(px, y, lw, 5.5, 'F');
+      doc.setTextColor(255,255,255); doc.setFontSize(8.5); doc.setFont('helvetica','bold');
+      doc.text('INFORMAÇÃO NUTRICIONAL', px+2, y+3.8);
+      doc.setTextColor(0,0,0); y += 6;
 
       // Porções
-      doc.setFontSize(7); doc.setFont('helvetica','normal');
-      doc.text('Porções por embalagem: ' + (d.porcoes||'--'), px+1, y+3.2);
-      y += 4;
-      doc.text('Porção: ' + (d.porcao||'--'), px+1, y+3.2);
-      y += 5;
+      doc.setFontSize(6.5); doc.setFont('helvetica','normal');
+      doc.text('Porções por embalagem: ' + (d.porcoes||'--'), px+1, y+2.8);
+      y += 3.5;
+      doc.text('Porção: ' + (d.porcao||'--'), px+1, y+2.8);
+      y += 4.5;
 
-      // -- Header de colunas (BRANCO -- sem fill) -------------
+      // Header colunas
       doc.setLineWidth(0.5); doc.setDrawColor(0,0,0);
-      doc.line(px, y, px+lw, y);                   // linha grossa acima
-      doc.setFont('helvetica','bold'); doc.setFontSize(6.5);
-      doc.text('100g',             colB + c100/2,  y+3.5, { align:'center' });
-      doc.text(d.porcao||'Porção', colC + cPorc/2, y+3.5, { align:'center' });
-      doc.text('%VD*',             colD + cVd - 1, y+3.5, { align:'right'  });
-      doc.line(px, y+5, px+lw, y+5);               // linha grossa abaixo
-      doc.setLineWidth(0.2);
-      y += 5;
+      doc.line(px, y, px+lw, y);
+      doc.setFont('helvetica','bold'); doc.setFontSize(6);
+      doc.text('100g',             colB + c100/2,  y+3, { align:'center' });
+      doc.text(d.porcao||'Porção', colC + cPorc/2, y+3, { align:'center' });
+      doc.text('%VD*',             colD + cVd - 1, y+3, { align:'right'  });
+      doc.line(px, y+4.5, px+lw, y+4.5);
+      doc.setLineWidth(0.2); y += 4.5;
 
-      // -- Linhas nutricionais -------------------------------
+      // Linhas nutricionais
       function nutriRow(label, v100, vPorc, vd, bold, grosso, indent) {
-        var rowH = 4.5;
-        doc.setFontSize(7);
+        var rowH = 4;
+        doc.setFontSize(6.2);
         if (bold) { doc.setFont('helvetica','bold'); } else { doc.setFont('helvetica','normal'); }
-        doc.text(label, px+(indent||1), y+3.2);
+        doc.text(label, px+(indent||1), y+2.8);
         doc.setFont('helvetica','normal');
-        doc.text(v100,  colB + c100/2,  y+3.2, { align:'center' });
-        doc.text(vPorc, colC + cPorc/2, y+3.2, { align:'center' });
+        doc.text(v100,  colB + c100/2,  y+2.8, { align:'center' });
+        doc.text(vPorc, colC + cPorc/2, y+2.8, { align:'center' });
         if (bold) doc.setFont('helvetica','bold');
-        doc.text(vd,    colD + cVd - 1, y+3.2, { align:'right'  });
+        doc.text(vd,    colD + cVd - 1, y+2.8, { align:'right'  });
         doc.setFont('helvetica','normal');
         y += rowH;
-        if (grosso) { doc.setLineWidth(0.45); doc.setDrawColor(0,0,0); doc.line(px, y, px+lw, y); doc.setLineWidth(0.2); }
+        if (grosso) { doc.setLineWidth(0.4); doc.setDrawColor(0,0,0); doc.line(px, y, px+lw, y); doc.setLineWidth(0.2); }
         else        { doc.setDrawColor(170,170,170); doc.line(px, y, px+lw, y); doc.setDrawColor(0,0,0); }
       }
 
       nutriRow('Valor Energético (kcal)', nv(d.kcal100),      nv(d.energia),         nv(d.vce_energia,'%'),        true,  true,  1);
       nutriRow('Carboidratos (g)',         nv(d.carb100),      nv(d.carboidratos),    nv(d.carboidratos_vd,'%'),    true,  false, 1);
-      nutriRow('  Açúcares Totais (g)',    nv(d.acucar100),    nv(d.acucares),        '--',                          false, false, 4);
-      nutriRow('  Açúcares Adicionados',   nv(d.acucar_ad100), nv(d.acucares_ad),     nv(d.acucar_ad_vd,'%'),       false, false, 4);
+      nutriRow('  Açúcares Totais (g)',    nv(d.acucar100),    nv(d.acucares),        '--',                          false, false, 3);
+      nutriRow('  Açúcares Adicionados',   nv(d.acucar_ad100), nv(d.acucares_ad),     nv(d.acucar_ad_vd,'%'),       false, false, 3);
       nutriRow('Proteínas (g)',            nv(d.prot100),      nv(d.proteinas),       nv(d.proteinas_vd,'%'),       true,  false, 1);
       nutriRow('Gorduras Totais (g)',      nv(d.gord100),      nv(d.gorduras_totais), nv(d.gorduras_totais_vd,'%'), true,  false, 1);
-      nutriRow('  Gorduras Saturadas (g)', nv(d.gordsat100),   nv(d.gorduras_sat),    nv(d.gorduras_sat_vd,'%'),    false, false, 4);
-      nutriRow('  Gorduras Trans (g)',     nv(d.gordtrans100), nv(d.gorduras_trans),  '--',                          false, false, 4);
+      nutriRow('  Gorduras Saturadas (g)', nv(d.gordsat100),   nv(d.gorduras_sat),    nv(d.gorduras_sat_vd,'%'),    false, false, 3);
+      nutriRow('  Gorduras Trans (g)',     nv(d.gordtrans100), nv(d.gorduras_trans),  '--',                          false, false, 3);
       nutriRow('Fibras Alimentares (g)',   nv(d.fibra100),     nv(d.fibras),          nv(d.fibras_vd,'%'),          true,  false, 1);
       nutriRow('Sódio (mg)',               nv(d.sodio100),     nv(d.sodio),           nv(d.sodio_vd,'%'),           true,  true,  1);
 
-      // Borda ao redor da tabela
+      // Borda tabela
       doc.setLineWidth(0.5); doc.rect(px, tabelaTop, lw, y - tabelaTop); doc.setLineWidth(0.2);
 
-      // -- Nota %VD -----------------------------------------
-      y += 2;
-      doc.setFontSize(5.8); doc.setFont('helvetica','normal');
-      var vdNote = '*% Valores Diários de referência com base em uma dieta de 2000kcal. Seus valores diários podem ser maiores ou menores dependendo de suas necessidades energéticas.';
+      // Nota %VD
+      y += 1.5;
+      doc.setFontSize(5); doc.setFont('helvetica','normal');
+      var vdNote = '*% Valores Diários de referência com base em uma dieta de 2000kcal.';
       var vdLines = doc.splitTextToSize(vdNote, lw);
-      doc.text(vdLines, px, y+3); y += vdLines.length * 3.1 + 2;
+      doc.text(vdLines, px, y+2.5); y += vdLines.length * 2.8 + 1;
 
-      // -- Ingredientes --------------------------------------
+      // ── COLUNA DIREITA: informações extras ───────────────────
+      var yr = py;
+
+      // Linha divisória vertical
+      doc.setDrawColor(200,200,200); doc.setLineWidth(0.3);
+      doc.line(colDirX - 2, py, colDirX - 2, H - py);
+      doc.setDrawColor(0,0,0); doc.setLineWidth(0.2);
+
+      // Ingredientes
       if (d.ingredientes) {
         doc.setFontSize(6.5); doc.setFont('helvetica','bold');
-        doc.text('Ingredientes:', px, y+3);
-        doc.setFont('helvetica','normal');
-        var iLines = doc.splitTextToSize(d.ingredientes, lw);
-        doc.text(iLines, px, y+6.5); y += iLines.length * 3.2 + 6;
+        doc.text('Ingredientes:', colDirX, yr+3);
+        doc.setFont('helvetica','normal'); doc.setFontSize(6);
+        var iLines = doc.splitTextToSize(d.ingredientes, colDirW);
+        doc.text(iLines, colDirX, yr+6.5);
+        yr += iLines.length * 3 + 8;
       }
 
-      // -- Alérgenos -----------------------------------------
+      // Alérgenos
       if (d.alergicos) {
         doc.setFontSize(6.5); doc.setFont('helvetica','bold');
-        var aLines = doc.splitTextToSize(d.alergicos, lw);
-        doc.text(aLines, px, y+3); y += aLines.length * 3.2 + 3;
+        var aLines = doc.splitTextToSize(d.alergicos, colDirW);
+        doc.text(aLines, colDirX, yr+3);
+        yr += aLines.length * 3 + 5;
       }
 
-      // -- Peso / Validade / Lote ----------------------------
+      // Peso / Validade / Lote
       doc.setFontSize(6.5); doc.setFont('helvetica','normal');
-      var infoLine = 'Peso Líq.: '+(d.peso||'--')+(d.validade?'  |  Validade: '+d.validade:'')+(d.lote?'  |  Lote: '+d.lote:'');
-      doc.text(infoLine, px, y+3); y += 4.5;
+      if (d.peso)     { doc.text('Peso Líq.: ' + d.peso,       colDirX, yr+3); yr += 4; }
+      if (d.validade) { doc.text('Validade: ' + d.validade,    colDirX, yr+3); yr += 4; }
+      if (d.lote)     { doc.text('Lote: ' + d.lote,            colDirX, yr+3); yr += 4; }
+      if (d.ean)      { doc.text('EAN: ' + d.ean,              colDirX, yr+3); yr += 4; }
 
-      // -- CNPJ + SAC ----------------------------------------
-      if (d.cnpj || d.sac) {
-        var cLine = (d.cnpj?'CNPJ: '+d.cnpj:'')+(d.cnpj&&d.sac?'  |  ':'')+(d.sac?'SAC WhatsApp: '+d.sac:'');
-        doc.text(cLine, px, y+3); y += 4.5;
-      }
-
-      return y + 1; // retorna posição Y para os códigos
+      // CNPJ + SAC no rodapé da coluna direita
+      var yrFoot = H - py - 2;
+      doc.setFontSize(6); doc.setFont('helvetica','normal');
+      if (d.sac)  { doc.text('SAC WhatsApp: ' + d.sac,  colDirX, yrFoot - 3.5); }
+      if (d.cnpj) { doc.text('CNPJ: ' + d.cnpj,         colDirX, yrFoot); }
     }
 
-    var doc = new jsPDFLib.jsPDF({ orientation: 'portrait', unit: 'mm', format: [W, H] });
+    var doc = new jsPDFLib.jsPDF({ orientation: 'landscape', unit: 'mm', format: [W, H] });
 
     // Renderiza página 1 e coleta codeY
     var codeY = desenharPagina(doc, 1, qtdEtiquetas);
@@ -2488,21 +2508,27 @@ function tnGeneratePDF(qtdEtiquetas) {
     }
 
     function montarPaginas(qrData, bcData) {
-      // Adiciona imagens na página 1
-      if (qrData)  try { doc.addImage(qrData, 'PNG', px+bcW+4, codeY, qrSize, qrSize); } catch(e){}
-      if (bcData)  try { doc.addImage(bcData, 'PNG', px, codeY+(qrSize-bcH)/2, bcW, bcH); } catch(e){}
+      // QR e barcode ficam no rodapé da coluna direita no layout paisagem
+      var qrX = W - px - qrSize;
+      var qrY = H - py - qrSize;
+      var bcW2 = colDirW - qrSize - 3;
+      var bcH2 = qrSize * 0.55;
+      var bcX  = colDirX;
+      var bcY  = H - py - bcH2;
 
-      // Páginas 2..N
+      if (qrData)  try { doc.addImage(qrData, 'PNG', qrX, qrY, qrSize, qrSize); } catch(e){}
+      if (bcData)  try { doc.addImage(bcData, 'PNG', bcX, bcY, bcW2, bcH2); } catch(e){}
+
       for (var n = 2; n <= qtdEtiquetas; n++) {
-        doc.addPage();
-        var cy = desenharPagina(doc, n, qtdEtiquetas);
-        if (qrData) try { doc.addImage(qrData, 'PNG', px+bcW+4, cy, qrSize, qrSize); } catch(e){}
-        if (bcData) try { doc.addImage(bcData, 'PNG', px, cy+(qrSize-bcH)/2, bcW, bcH); } catch(e){}
+        doc.addPage([W, H], 'landscape');
+        desenharPagina(doc, n, qtdEtiquetas);
+        if (qrData) try { doc.addImage(qrData, 'PNG', qrX, qrY, qrSize, qrSize); } catch(e){}
+        if (bcData) try { doc.addImage(bcData, 'PNG', bcX, bcY, bcW2, bcH2); } catch(e){}
       }
 
       doc.save('tabela-nutricional-'+(d.nome||'produto').replace(/\s+/g,'-').toLowerCase()+'.pdf');
       addLog('Gerou PDF de tabela nutricional: "'+d.nome+'" ('+qtdEtiquetas+'x)');
-      status.textContent = 'v ' + qtdEtiquetas + ' etiqueta(s) gerada(s)!';
+      status.textContent = '✓ ' + qtdEtiquetas + ' etiqueta(s) gerada(s)!';
       setTimeout(function(){ status.textContent=''; }, 4000);
     }
 

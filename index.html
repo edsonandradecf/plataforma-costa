@@ -2108,6 +2108,11 @@ function renderTabNutri() {
 
       '<div class="tn-section">Código de Barras e QR Code</div>' +
       '<div style="margin-bottom:1rem"><label class="tn-label">Código EAN (8 ou 13 dígitos)</label><input class="tn-input" id="tn-ean" placeholder="7891234567890" oninput="tnLiveUpdate()"></div>' +
+      '<div style="margin-bottom:1rem">' +
+        '<label class="tn-label">Link para QR Code</label>' +
+        '<input class="tn-input" id="tn-url" placeholder="https://costanaturelife.com.br/produto/..." oninput="tnLiveUpdate()">' +
+        '<div style="font-size:0.75rem;color:var(--text3);margin-top:4px">O QR Code na etiqueta vai apontar para este link. Se vazio, usa o site da loja.</div>' +
+      '</div>' +
 
       '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
         '<button class="btn btn-green" style="flex:1;padding:0.7rem" onclick="tnSave()">💾 Salvar Tabela</button>' +
@@ -2184,7 +2189,7 @@ function tnGetFormData() {
     'gordtrans100','gorduras_trans',
     'fibra100','fibras','fibras_vd',
     'sodio100','sodio','sodio_vd',
-    'ingredientes','alergicos','validade','lote','cnpj','sac','ean'];
+    'ingredientes','alergicos','validade','lote','cnpj','sac','ean','url'];
   var data = {};
   fields.forEach(function(f) {
     var el = document.getElementById('tn-' + f);
@@ -2485,7 +2490,8 @@ function tnGeneratePDF(qtdEtiquetas) {
     var qrDiv = document.createElement('div');
     qrDiv.style.cssText = 'position:fixed;left:-9999px;top:0';
     document.body.appendChild(qrDiv);
-    new QRCode(qrDiv, { text: 'https://costanaturelife.com.br/', width:200, height:200, correctLevel: QRCode.CorrectLevel.M });
+    var qrLink = (d.url && d.url.trim()) ? d.url.trim() : 'https://costanaturelife.com.br/';
+    new QRCode(qrDiv, { text: qrLink, width:200, height:200, correctLevel: QRCode.CorrectLevel.M });
 
     function gerarBarcode(callback) {
       if (!d.ean || d.ean.length < 8) { callback(null); return; }
@@ -2508,7 +2514,6 @@ function tnGeneratePDF(qtdEtiquetas) {
     }
 
     function montarPaginas(qrData, bcData) {
-      // QR e barcode ficam no rodapé da coluna direita no layout paisagem
       var qrX = W - px - qrSize;
       var qrY = H - py - qrSize;
       var bcW2 = colDirW - qrSize - 3;
@@ -2516,21 +2521,31 @@ function tnGeneratePDF(qtdEtiquetas) {
       var bcX  = colDirX;
       var bcY  = H - py - bcH2;
 
-      if (qrData)  try { doc.addImage(qrData, 'PNG', qrX, qrY, qrSize, qrSize); } catch(e){}
-      if (bcData)  try { doc.addImage(bcData, 'PNG', bcX, bcY, bcW2, bcH2); } catch(e){}
+      function adicionarQrTexto(doc2) {
+        if (qrData) {
+          try { doc2.addImage(qrData, 'PNG', qrX, qrY, qrSize, qrSize); } catch(e){}
+          var maxW = qrX - colDirX - 3;
+          doc2.setFontSize(6); doc2.setFont('helvetica','bold');
+          var linhas = doc2.splitTextToSize('Saiba mais sobre o seu produto lendo o QR Code', maxW);
+          doc2.text(linhas, colDirX, qrY + 5);
+        }
+        if (bcData) { try { doc2.addImage(bcData, 'PNG', bcX, bcY, bcW2, bcH2); } catch(e){} }
+      }
+
+      adicionarQrTexto(doc);
 
       for (var n = 2; n <= qtdEtiquetas; n++) {
         doc.addPage([W, H], 'landscape');
         desenharPagina(doc, n, qtdEtiquetas);
-        if (qrData) try { doc.addImage(qrData, 'PNG', qrX, qrY, qrSize, qrSize); } catch(e){}
-        if (bcData) try { doc.addImage(bcData, 'PNG', bcX, bcY, bcW2, bcH2); } catch(e){}
+        adicionarQrTexto(doc);
       }
 
       doc.save('tabela-nutricional-'+(d.nome||'produto').replace(/\s+/g,'-').toLowerCase()+'.pdf');
       addLog('Gerou PDF de tabela nutricional: "'+d.nome+'" ('+qtdEtiquetas+'x)');
-      status.textContent = '✓ ' + qtdEtiquetas + ' etiqueta(s) gerada(s)!';
+      status.textContent = '\u2713 ' + qtdEtiquetas + ' etiqueta(s) gerada(s)!';
       setTimeout(function(){ status.textContent=''; }, 4000);
     }
+
 
     setTimeout(function() {
       var qrImgEl = qrDiv.querySelector('img');

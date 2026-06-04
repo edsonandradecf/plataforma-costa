@@ -2550,8 +2550,9 @@ function tnGeneratePDF(qtdEtiquetas) {
     function montarPaginas(qrData, bcData) {
       var rodapeY = H - 8;
       // Barcode: col esquerda, fixo acima do rodapé
-      var bcH = 9, bcW = 80 - pad - 2;
-      var bcX = pad, bcY = rodapeY - bcH - 3;
+      var bcH = 8, bcW = 40;
+      var bcX = pad + (divX - pad - 2 - bcW) / 2; // centralizado na col esquerda
+      var bcY = rodapeY - bcH - 4;
 
       // QR: canto inf direito
       var qrSz = 18;

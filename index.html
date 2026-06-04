@@ -2345,22 +2345,21 @@ function tnGeneratePDF(qtdEtiquetas) {
     var doc = new jsPDFLib.jsPDF({ orientation: 'landscape', unit: 'mm', format: [W, H] });
 
     // Layout
-    var pad   = 3;            // margem externa
-    var divX  = 80;           // X da linha divisória vertical
-    var colDX = divX + 3;     // início da coluna direita
-    var colDW = W - colDX - pad; // largura col direita
-    var tabW  = divX - pad - 2;  // largura da tabela (col esq)
+    var pad   = 3;
+    var divX  = 80;
+    var colDX = divX + 3;
+    var colDW = W - colDX - pad;
+    var tabW  = divX - pad - 2;
 
-    // Colunas internas da tabela
-    var cL  = 33; // largura label
-    var c1  = tabW - cL - 24 - 14; // col 100g
-    var c2  = 24; // col porção
-    var c3  = 14; // col %VD
-    var xL  = pad;
-    var x1  = xL + cL;
-    var x2  = x1 + c1;
-    var x3  = x2 + c2;
-    var xR  = xL + tabW; // borda direita tabela
+    // Colunas internas da tabela — fixas a partir da direita
+    var c3  = 10; // %VD
+    var c2  = 22; // porção
+    var c1  = 14; // 100g
+    var xR  = pad + tabW;        // borda direita tabela
+    var x3  = xR - c3;           // início %VD
+    var x2  = x3 - c2;           // início porção
+    var x1  = x2 - c1;           // início 100g
+    var xL  = pad;               // início label
 
     function nv(v) { v = String(v||'').trim(); return v||'--'; }
     function setB(doc) { doc.setFont('helvetica','bold'); }
@@ -2420,9 +2419,9 @@ function tnGeneratePDF(qtdEtiquetas) {
       // Header colunas
       doc.setLineWidth(0.6); doc.line(pad, y, xR, y);
       setB(doc); doc.setFontSize(6);
-      doc.text('100g',         x1+c1/2,    y+3, { align:'center' });
-      doc.text(nv(d.porcao),  x2+c2/2,    y+3, { align:'center' });
-      doc.text('%VD*',         xR-0.5,     y+3, { align:'right' });
+      doc.text('100g',        x1 + c1/2,  y+3, { align:'center' });
+      doc.text(nv(d.porcao), x2 + c2/2,  y+3, { align:'center' });
+      doc.text('%VD*',        xR - 0.5,   y+3, { align:'right'  });
       doc.line(pad, y+4.5, xR, y+4.5);
       doc.setLineWidth(0.2); y += 4.5;
 
@@ -2435,10 +2434,10 @@ function tnGeneratePDF(qtdEtiquetas) {
         if (bold) setB(doc); else setN(doc);
         doc.text(label, pad+(indent||1), y+2.7);
         setN(doc);
-        doc.text(nv(v1), x1+c1/2,  y+2.7, { align:'center' });
-        doc.text(nv(v2), x2+c2/2,  y+2.7, { align:'center' });
+        doc.text(nv(v1), x1 + c1/2, y+2.7, { align:'center' });
+        doc.text(nv(v2), x2 + c2/2, y+2.7, { align:'center' });
         if (bold) setB(doc);
-        doc.text(nv(vd), xR-0.5,   y+2.7, { align:'right' });
+        doc.text(nv(vd), xR - 0.5,  y+2.7, { align:'right'  });
         setN(doc);
         y += rh;
         if (grosso) { doc.setLineWidth(0.5); doc.setDrawColor(0); doc.line(pad,y,xR,y); doc.setLineWidth(0.2); }
@@ -2467,9 +2466,14 @@ function tnGeneratePDF(qtdEtiquetas) {
       doc.line(x3, tabelaTopo+4.5, x3, tabFimY);
       doc.setLineWidth(0.2);
 
-      // Nota VD
-      y += 1.5; setN(doc); doc.setFontSize(5.2);
-      doc.text('*% Valores Diários com base em dieta de 2000kcal.', pad, y+2.5);
+      // Nota VD — logo abaixo da tabela, só se couber
+      var notaY = tabFimY + 2;
+      var rodapeLimit = H - 8 - 9 - 5; // acima do barcode
+      if (notaY < rodapeLimit) {
+        setN(doc); doc.setFontSize(5);
+        var notaLines = doc.splitTextToSize('*% Valores Diários com base em dieta de 2000kcal.', tabW);
+        doc.text(notaLines, pad, notaY + 2.5);
+      }
 
       // ── COLUNA DIREITA ────────────────────────────────────────
       var yr = 11;

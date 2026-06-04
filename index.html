@@ -2213,10 +2213,10 @@ function tnLiveUpdate() {
     var fw = bold ? 'font-weight:700' : '';
     var ind = indent ? 'padding-left:14px' : '';
     return '<tr style="border-bottom:0.5px solid #aaa">'+
-      '<td style="'+fw+';'+ind+';padding:2px 3px;font-size:10px">'+label+'</td>'+
-      '<td style="'+fw+';text-align:center;padding:2px 3px;font-size:10px">'+nv(v100)+'</td>'+
-      '<td style="'+fw+';text-align:center;padding:2px 3px;font-size:10px">'+nv(vPorc)+'</td>'+
-      '<td style="'+fw+';text-align:right;padding:2px 3px;font-size:10px">'+nv(vd)+'</td>'+
+      '<td style="'+fw+';'+ind+';padding:3px 5px;font-size:13px">'+label+'</td>'+
+      '<td style="'+fw+';text-align:center;padding:3px 5px;font-size:13px">'+nv(v100)+'</td>'+
+      '<td style="'+fw+';text-align:center;padding:3px 5px;font-size:13px">'+nv(vPorc)+'</td>'+
+      '<td style="'+fw+';text-align:right;padding:3px 5px;font-size:13px">'+nv(vd)+'</td>'+
     '</tr>';
   }
 
@@ -2233,14 +2233,14 @@ function tnLiveUpdate() {
           '<div style="border-top:1px solid #000;margin-bottom:4px"></div>'+
           '<div style="border:2px solid #000;flex:1">'+
             '<div style="border-bottom:2px solid #000;padding:4px 6px;font-size:14px;font-weight:700">INFORMAÇÃO NUTRICIONAL</div>'+
-            '<div style="padding:3px 6px;font-size:10px;border-bottom:1px solid #aaa">Porções por embalagem: '+nv(d.porcoes)+'</div>'+
-            '<div style="padding:3px 6px;font-size:10px;border-bottom:1.5px solid #000">Porção: '+nv(d.porcao)+'</div>'+
+            '<div style="padding:3px 6px;font-size:12px;border-bottom:1px solid #aaa">Porções por embalagem: '+nv(d.porcoes)+'</div>'+
+            '<div style="padding:3px 6px;font-size:12px;border-bottom:1.5px solid #000">Porção: '+nv(d.porcao)+'</div>'+
             '<table style="width:100%;border-collapse:collapse">'+
               '<thead><tr style="border-bottom:1.5px solid #000">'+
-                '<th style="text-align:left;padding:2px 6px;font-size:10px;font-weight:400"></th>'+
-                '<th style="text-align:center;padding:2px 4px;font-size:10px;font-weight:700;width:60px;border-left:1px solid #aaa">100g</th>'+
-                '<th style="text-align:center;padding:2px 4px;font-size:10px;font-weight:700;width:90px;border-left:1px solid #aaa">'+esc2(d.porcao||'--')+'</th>'+
-                '<th style="text-align:right;padding:2px 6px;font-size:10px;font-weight:700;width:50px;border-left:1px solid #aaa">%VD*</th>'+
+                '<th style="text-align:left;padding:2px 6px;font-size:12px;font-weight:400"></th>'+
+                '<th style="text-align:center;padding:2px 4px;font-size:12px;font-weight:700;width:60px;border-left:1px solid #aaa">100g</th>'+
+                '<th style="text-align:center;padding:2px 4px;font-size:12px;font-weight:700;width:90px;border-left:1px solid #aaa">'+esc2(d.porcao||'--')+'</th>'+
+                '<th style="text-align:right;padding:2px 6px;font-size:12px;font-weight:700;width:50px;border-left:1px solid #aaa">%VD*</th>'+
               '</tr></thead>'+
               '<tbody>'+
                 row('Valor Energético (kcal)', d.kcal100, d.energia, nv(d.vce_energia)+'%', true, false)+
@@ -2431,10 +2431,10 @@ function tnGeneratePDF(qtdEtiquetas) {
       var fw = bold ? 'font-weight:700' : 'font-weight:400';
       var ind = indent ? 'padding-left:14px' : '';
       return '<tr style="border-bottom:0.5px solid #aaa">'+
-        '<td style="'+fw+';'+ind+';padding:2px 3px;font-size:10px">'+label+'</td>'+
-        '<td style="'+fw+';text-align:center;padding:2px 3px;font-size:10px">'+nv(v100)+'</td>'+
-        '<td style="'+fw+';text-align:center;padding:2px 3px;font-size:10px">'+nv(vPorc)+'</td>'+
-        '<td style="'+fw+';text-align:right;padding:2px 3px;font-size:10px">'+nv(vd)+'</td>'+
+        '<td style="'+fw+';'+ind+';padding:3px 5px;font-size:13px">'+label+'</td>'+
+        '<td style="'+fw+';text-align:center;padding:3px 5px;font-size:13px">'+nv(v100)+'</td>'+
+        '<td style="'+fw+';text-align:center;padding:3px 5px;font-size:13px">'+nv(vPorc)+'</td>'+
+        '<td style="'+fw+';text-align:right;padding:3px 5px;font-size:13px">'+nv(vd)+'</td>'+
       '</tr>';
     }
 
@@ -2460,15 +2460,15 @@ function tnGeneratePDF(qtdEtiquetas) {
           '<div style="border:2px solid #000;flex:1">'+
             // Header
             '<div style="border-bottom:2px solid #000;padding:4px 6px;font-size:14px;font-weight:700">INFORMAÇÃO NUTRICIONAL</div>'+
-            '<div style="padding:3px 6px;font-size:10px;border-bottom:1px solid #aaa">Porções por embalagem: '+nv(d.porcoes)+'</div>'+
-            '<div style="padding:3px 6px;font-size:10px;border-bottom:1.5px solid #000">Porção: '+nv(d.porcao)+'</div>'+
+            '<div style="padding:3px 6px;font-size:12px;border-bottom:1px solid #aaa">Porções por embalagem: '+nv(d.porcoes)+'</div>'+
+            '<div style="padding:3px 6px;font-size:12px;border-bottom:1.5px solid #000">Porção: '+nv(d.porcao)+'</div>'+
             '<table style="width:100%;border-collapse:collapse">'+
               '<thead>'+
                 '<tr style="border-bottom:1.5px solid #000">'+
-                  '<th style="text-align:left;padding:2px 6px;font-size:10px;font-weight:400"></th>'+
-                  '<th style="text-align:center;padding:2px 4px;font-size:10px;font-weight:700;width:60px;border-left:1px solid #aaa">100g</th>'+
-                  '<th style="text-align:center;padding:2px 4px;font-size:10px;font-weight:700;width:90px;border-left:1px solid #aaa">'+porção+'</th>'+
-                  '<th style="text-align:right;padding:2px 6px;font-size:10px;font-weight:700;width:50px;border-left:1px solid #aaa">%VD*</th>'+
+                  '<th style="text-align:left;padding:2px 6px;font-size:12px;font-weight:400"></th>'+
+                  '<th style="text-align:center;padding:2px 4px;font-size:12px;font-weight:700;width:60px;border-left:1px solid #aaa">100g</th>'+
+                  '<th style="text-align:center;padding:2px 4px;font-size:12px;font-weight:700;width:90px;border-left:1px solid #aaa">'+porção+'</th>'+
+                  '<th style="text-align:right;padding:2px 6px;font-size:12px;font-weight:700;width:50px;border-left:1px solid #aaa">%VD*</th>'+
                 '</tr>'+
               '</thead>'+
               '<tbody style="border-left:1px solid #aaa;border-right:1px solid #aaa">'+

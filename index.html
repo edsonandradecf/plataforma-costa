@@ -9428,7 +9428,6 @@ async function finImportar() {
       state.financeiro.meses[mes].tt=ttData;
       msgs.push('✅ TikTok: '+ttData.length+' pedidos');
     }
-
     _finMesSel=mes;
     if(status) status.innerHTML='<span style="color:var(--blue)">⏳ Salvando no servidor...</span>';
     await finSaveFirebase();

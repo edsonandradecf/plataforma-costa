@@ -27,6 +27,7 @@
   --bg2: rgba(255,255,255,0.55);
   --bg3: rgba(255,255,255,0.35);
   --bg-gradient: linear-gradient(135deg, #dfe8f0 0%, #e8edf5 50%, #dce4ee 100%);
+
   --sidebar-bg:     rgba(255,255,255,0.45);
   --sidebar-border: rgba(255,255,255,0.75);
   --sidebar-hover:  rgba(255,255,255,0.6);
@@ -2527,12 +2528,12 @@ function tnGeneratePDF(qtdEtiquetas) {
 
       // Espaço para QR+texto+barcode (adicionado em montarPaginas)
       // Rodapé
-      var yrFoot = H - 5;
-      doc.setLineWidth(0.6); doc.line(1, yrFoot-4, W-1, yrFoot-4); doc.setLineWidth(0.2);
+      var yrFoot = H - 4;
+      doc.setLineWidth(0.6); doc.line(1, H - 9, W-1, H - 9); doc.setLineWidth(0.2);
       doc.setFontSize(5.5); doc.setFont('helvetica','normal');
       if (d.cnpj) doc.text('CNPJ: ' + d.cnpj, px, yrFoot);
-      doc.text('SAC: ' + (d.sac||'(16) 99755-9693'), W/2, yrFoot, { align:'center' });
-      doc.text('costanaturelife.com.br', W-px, yrFoot, { align:'right' });
+      if (d.sac)  doc.text('SAC: ' + d.sac, W/2, yrFoot, { align:'center' });
+      doc.text('costanaturelife.com.br', W - px, yrFoot, { align:'right' });
     }
 
 
@@ -2570,31 +2571,38 @@ function tnGeneratePDF(qtdEtiquetas) {
     }
 
     function montarPaginas(qrData, bcData) {
-      // QR: canto inferior direito da coluna direita
-      var qrX  = W - px - qrSize;
-      var qrY  = H - py - 4 - qrSize;
-      // Texto "Saiba mais": à esquerda do QR, na col direita
-      var txMaxW = qrX - colDirX - 3;
-      // Barcode: embaixo da tabela nutricional, col esquerda
-      var bcH2 = 12;
+      // Rodapé fica em H-9 a H-4 (linha em H-9)
+      var rodapeY  = H - 9;
+      // Barcode: embaixo da tabela, acima do rodapé, coluna esquerda
+      var bcH2 = 10;
       var bcW2 = lw;
       var bcX  = px;
-      var bcY  = state._tnBarcodeY || (H - py - 20);
+      // Posiciona barcode: usa Y guardado pela tabela, mas limita para não invadir rodapé
+      var bcYraw = state._tnBarcodeY || (rodapeY - bcH2 - 5);
+      var bcY  = Math.min(bcYraw, rodapeY - bcH2 - 5);
+
+      // QR: canto inferior direito da coluna direita, acima do rodapé
+      var qrY  = rodapeY - qrSize - 2;
+      var qrX  = W - px - qrSize;
+
+      // Texto "Saiba mais": à esquerda do QR, mesma altura, na col direita
+      var txMaxW = qrX - colDirX - 3;
 
       function adicionarImagens(doc2) {
-        // Barcode embaixo da tabela
+        // Barcode embaixo da tabela — recortado à coluna esquerda
         if (bcData) {
           try { doc2.addImage(bcData, 'PNG', bcX, bcY, bcW2, bcH2); } catch(e){}
-          doc2.setFontSize(5.5); doc2.setFont('helvetica','normal');
-          doc2.text(d.ean||'', bcX + bcW2/2, bcY + bcH2 + 2.5, { align:'center' });
+          // Número EAN centralizado abaixo do barcode
+          doc2.setFontSize(5); doc2.setFont('helvetica','normal');
+          doc2.text(d.ean||'', bcX + bcW2/2, bcY + bcH2 + 2, { align:'center' });
         }
-        // QR + texto "Saiba mais"
+        // QR
         if (qrData) {
           try { doc2.addImage(qrData, 'PNG', qrX, qrY, qrSize, qrSize); } catch(e){}
+          // Texto "Saiba mais" centralizado verticalmente ao lado do QR
           doc2.setFontSize(6); doc2.setFont('helvetica','bold');
           var linhas = doc2.splitTextToSize('Saiba mais sobre o seu produto lendo o QR Code', txMaxW);
-          // Centralizar verticalmente ao lado do QR
-          var tyStart = qrY + (qrSize/2) - (linhas.length * 3.5)/2 + 3;
+          var tyStart = qrY + (qrSize / 2) - (linhas.length * 3) / 2 + 2;
           doc2.text(linhas, colDirX, tyStart);
         }
       }

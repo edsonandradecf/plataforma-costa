@@ -2210,7 +2210,7 @@ function tnLiveUpdate() {
   function nv(v) { return (String(v||'').trim()) || '--'; }
   function esc2(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   function row(label, v100, vPorc, vd, bold, indent) {
-    var fw = bold ? 'font-weight:700' : '';
+    var fw = 'font-weight:700';
     var ind = indent ? 'padding-left:14px' : '';
     return '<tr style="border-bottom:0.5px solid #aaa">'+
       '<td style="'+fw+';'+ind+';padding:3px 5px;font-size:13px">'+label+'</td>'+
@@ -2233,11 +2233,11 @@ function tnLiveUpdate() {
           '<div style="border-top:1px solid #000;margin-bottom:4px"></div>'+
           '<div style="border:2px solid #000;flex:1">'+
             '<div style="border-bottom:2px solid #000;padding:4px 6px;font-size:14px;font-weight:700">INFORMAÇÃO NUTRICIONAL</div>'+
-            '<div style="padding:3px 6px;font-size:12px;border-bottom:1px solid #aaa">Porções por embalagem: '+nv(d.porcoes)+'</div>'+
-            '<div style="padding:3px 6px;font-size:12px;border-bottom:1.5px solid #000">Porção: '+nv(d.porcao)+'</div>'+
+            '<div style="padding:3px 6px;font-size:12px;font-weight:700;border-bottom:1px solid #aaa">Porções por embalagem: '+nv(d.porcoes)+'</div>'+
+            '<div style="padding:3px 6px;font-size:12px;font-weight:700;border-bottom:1.5px solid #000">Porção: '+nv(d.porcao)+'</div>'+
             '<table style="width:100%;border-collapse:collapse">'+
               '<thead><tr style="border-bottom:1.5px solid #000">'+
-                '<th style="text-align:left;padding:2px 6px;font-size:12px;font-weight:400"></th>'+
+                '<th style="text-align:left;padding:2px 6px;font-size:12px;font-weight:700"></th>'+
                 '<th style="text-align:center;padding:2px 4px;font-size:12px;font-weight:700;width:60px;border-left:1px solid #aaa">100g</th>'+
                 '<th style="text-align:center;padding:2px 4px;font-size:12px;font-weight:700;width:90px;border-left:1px solid #aaa">'+esc2(d.porcao||'--')+'</th>'+
                 '<th style="text-align:right;padding:2px 6px;font-size:12px;font-weight:700;width:50px;border-left:1px solid #aaa">%VD*</th>'+
@@ -2282,9 +2282,9 @@ function tnLiveUpdate() {
             '</div>'+
           '</div>'+
           '<div style="border-top:1px solid #aaa;margin-bottom:8px"></div>'+
-          '<div style="display:flex;align-items:center;gap:10px;flex:1">'+
-            '<div style="font-size:11px;font-weight:700;flex:1;line-height:1.4">Saiba mais sobre o seu produto lendo o QR Code</div>'+
-            '<div id="tn-prev-qr" style="width:80px;height:80px;flex-shrink:0"></div>'+
+          '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:10px">'+
+            '<div id="tn-prev-qr" style="width:80px;height:80px"></div>'+
+            '<div style="font-size:11px;font-weight:700;text-align:center;line-height:1.4;max-width:180px">Saiba mais sobre o seu produto lendo o QR Code</div>'+
           '</div>'+
         '</div>'+
       '</div>'+
@@ -2317,26 +2317,6 @@ function tnLiveUpdate() {
     }
   } catch(e) {}
 }
-
-  box.innerHTML =
-    '<div class="tn-preview-product">' + (d.nome || 'Nome do Produto') + '</div>' +
-    (d.descricao ? '<div class="tn-preview-desc">' + d.descricao + '</div>' : '') +
-    '<table class="tn-tbl" style="border:2px solid #000">' +
-      '<tr><th class="tn-tbl-title" colspan="4" style="text-align:left;border-bottom:2px solid #000">INFORMAÇÃO NUTRICIONAL</th></tr>' +
-      '<tr><td colspan="4" class="tn-tbl-porcao">Porções por embalagem: <b>' + (d.porcoes||'--') + '</b><br>Porção: <b>' + (d.porcao||'--') + '</b></td></tr>' +
-      '<tr style="background:#eee"><td><b></b></td><td style="font-size:9px;text-align:center"><b>100g</b></td><td style="font-size:9px;text-align:center"><b>' + (d.porcao||'--') + '</b></td><td style="font-size:9px;text-align:right"><b>%VD*</b></td></tr>' +
-      '<tr class="tn-divider"><td class="tn-bold">Valor Energético (kcal)</td><td style="text-align:center">' + (d.kcal100||'0') + '</td><td style="text-align:center">' + (d.energia||'0') + '</td><td style="text-align:right">' + (d.vce_energia||'0') + '</td></tr>' +
-      '<tr><td class="tn-bold">Carboidratos (g)</td><td style="text-align:center">' + (d.carb100||'0') + '</td><td style="text-align:center">' + (d.carboidratos||'0') + '</td><td style="text-align:right">' + (d.carboidratos_vd||'0') + '</td></tr>' +
-      '<tr><td style="padding-left:10px">Açúcares Totais (g)</td><td style="text-align:center">' + (d.acucar100||'0') + '</td><td style="text-align:center">' + (d.acucares||'0') + '</td><td style="text-align:right">' + (d.acucar_vd||'**') + '</td></tr>' +
-      '<tr><td style="padding-left:20px">Açúcares Adicionados (g)</td><td style="text-align:center">' + (d.acucar_ad100||'0') + '</td><td style="text-align:center">' + (d.acucares_ad||'0') + '</td><td style="text-align:right">' + (d.acucar_ad_vd||'0') + '</td></tr>' +
-      '<tr><td class="tn-bold">Proteínas (g)</td><td style="text-align:center">' + (d.prot100||'0') + '</td><td style="text-align:center">' + (d.proteinas||'0') + '</td><td style="text-align:right">' + (d.proteinas_vd||'0') + '</td></tr>' +
-      '<tr><td class="tn-bold">Gorduras Totais (g)</td><td style="text-align:center">' + (d.gord100||'0') + '</td><td style="text-align:center">' + (d.gorduras_totais||'0') + '</td><td style="text-align:right">' + (d.gorduras_totais_vd||'0') + '</td></tr>' +
-      '<tr><td style="padding-left:10px">Gorduras Saturadas (g)</td><td style="text-align:center">' + (d.gordsat100||'0') + '</td><td style="text-align:center">' + (d.gorduras_sat||'0') + '</td><td style="text-align:right">' + (d.gorduras_sat_vd||'0') + '</td></tr>' +
-      '<tr><td style="padding-left:10px">Gorduras Trans (g)</td><td style="text-align:center">' + (d.gordtrans100||'0') + '</td><td style="text-align:center">' + (d.gorduras_trans||'0') + '</td><td style="text-align:right">**</td></tr>' +
-      '<tr><td class="tn-bold">Fibra Alimentar (g)</td><td style="text-align:center">' + (d.fibra100||'0') + '</td><td style="text-align:center">' + (d.fibras||'0') + '</td><td style="text-align:right">' + (d.fibras_vd||'0') + '</td></tr>' +
-      '<tr class="tn-divider"><td class="tn-bold">Sódio (mg)</td><td style="text-align:center">' + (d.sodio100||'0') + '</td><td style="text-align:center">' + (d.sodio||'0') + '</td><td style="text-align:right">' + (d.sodio_vd||'0') + '</td></tr>' +
-    '</table>' +
-    '<div class="tn-preview-info" style="margin-top:4px">*% Valores Diários de referência com base em uma dieta de 2000kcal. Seus valores diários podem ser maiores ou menores dependendo de suas necessidades energéticas.</div>' +
 
 function tnSave() {
   var d = tnGetFormData();
@@ -2428,7 +2408,7 @@ function tnGeneratePDF(qtdEtiquetas) {
     var qrSrc = (d.url && d.url.trim()) ? d.url.trim() : 'https://costanaturelife.com.br/';
 
     function row(label, v100, vPorc, vd, bold, indent) {
-      var fw = bold ? 'font-weight:700' : 'font-weight:400';
+      var fw = 'font-weight:700';
       var ind = indent ? 'padding-left:14px' : '';
       return '<tr style="border-bottom:0.5px solid #aaa">'+
         '<td style="'+fw+';'+ind+';padding:3px 5px;font-size:13px">'+label+'</td>'+
@@ -2460,12 +2440,12 @@ function tnGeneratePDF(qtdEtiquetas) {
           '<div style="border:2px solid #000;flex:1">'+
             // Header
             '<div style="border-bottom:2px solid #000;padding:4px 6px;font-size:14px;font-weight:700">INFORMAÇÃO NUTRICIONAL</div>'+
-            '<div style="padding:3px 6px;font-size:12px;border-bottom:1px solid #aaa">Porções por embalagem: '+nv(d.porcoes)+'</div>'+
-            '<div style="padding:3px 6px;font-size:12px;border-bottom:1.5px solid #000">Porção: '+nv(d.porcao)+'</div>'+
+            '<div style="padding:3px 6px;font-size:12px;font-weight:700;border-bottom:1px solid #aaa">Porções por embalagem: '+nv(d.porcoes)+'</div>'+
+            '<div style="padding:3px 6px;font-size:12px;font-weight:700;border-bottom:1.5px solid #000">Porção: '+nv(d.porcao)+'</div>'+
             '<table style="width:100%;border-collapse:collapse">'+
               '<thead>'+
                 '<tr style="border-bottom:1.5px solid #000">'+
-                  '<th style="text-align:left;padding:2px 6px;font-size:12px;font-weight:400"></th>'+
+                  '<th style="text-align:left;padding:2px 6px;font-size:12px;font-weight:700"></th>'+
                   '<th style="text-align:center;padding:2px 4px;font-size:12px;font-weight:700;width:60px;border-left:1px solid #aaa">100g</th>'+
                   '<th style="text-align:center;padding:2px 4px;font-size:12px;font-weight:700;width:90px;border-left:1px solid #aaa">'+porção+'</th>'+
                   '<th style="text-align:right;padding:2px 6px;font-size:12px;font-weight:700;width:50px;border-left:1px solid #aaa">%VD*</th>'+
@@ -2529,9 +2509,9 @@ function tnGeneratePDF(qtdEtiquetas) {
           '<div style="border-top:1px solid #aaa;margin-bottom:8px"></div>'+
 
           // QR + "Saiba mais"
-          '<div style="display:flex;align-items:center;gap:10px;flex:1">'+
-            '<div style="font-size:11px;font-weight:700;flex:1;line-height:1.4">Saiba mais sobre o seu produto lendo o QR Code</div>'+
+          '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;gap:8px">'+
             '<img id="tn-qr-img" style="width:90px;height:90px">'+
+            '<div style="font-size:11px;font-weight:700;text-align:center;line-height:1.4;max-width:200px">Saiba mais sobre o seu produto lendo o QR Code</div>'+
           '</div>'+
 
         '</div>'+

@@ -2521,7 +2521,14 @@ function tnGeneratePDF(qtdEtiquetas) {
       infoBox('VALIDADE',  d.validade, colDirX+boxW+4, yr);
       yr += boxH + 3;
       infoBox('LOTE',      d.lote,     colDirX,        yr);
-      infoBox('EAN',       d.ean,      colDirX+boxW+4, yr);
+      // EAN com fonte menor pois número pode ser longo
+      doc.setDrawColor(0,0,0); doc.setLineWidth(0.5);
+      doc.rect(colDirX+boxW+4, yr, boxW, boxH);
+      doc.setLineWidth(0.2);
+      doc.setFontSize(5.5); doc.setFont('helvetica','bold');
+      doc.text('EAN', colDirX+boxW+4+boxW/2, yr+4.5, { align:'center' });
+      doc.setFontSize(7); doc.setFont('helvetica','bold');
+      doc.text(String(d.ean||'--'), colDirX+boxW+4+boxW/2, yr+10.5, { align:'center' });
       yr += boxH + 4;
 
       doc.setLineWidth(0.4); doc.line(colDirX, yr, colDirX+colDirW, yr); doc.setLineWidth(0.2);
@@ -2571,38 +2578,32 @@ function tnGeneratePDF(qtdEtiquetas) {
     }
 
     function montarPaginas(qrData, bcData) {
-      // Rodapé fica em H-9 a H-4 (linha em H-9)
-      var rodapeY  = H - 9;
-      // Barcode: embaixo da tabela, acima do rodapé, coluna esquerda
-      var bcH2 = 10;
+      var rodapeY = H - 9;
+      // Barcode: ocupa a parte inferior da coluna esquerda, acima do rodapé
+      var bcH2 = 9;
       var bcW2 = lw;
       var bcX  = px;
-      // Posiciona barcode: usa Y guardado pela tabela, mas limita para não invadir rodapé
-      var bcYraw = state._tnBarcodeY || (rodapeY - bcH2 - 5);
-      var bcY  = Math.min(bcYraw, rodapeY - bcH2 - 5);
+      var bcY  = rodapeY - bcH2 - 4; // sempre fixo, acima do rodapé
 
-      // QR: canto inferior direito da coluna direita, acima do rodapé
-      var qrY  = rodapeY - qrSize - 2;
-      var qrX  = W - px - qrSize;
+      // QR menor para caber sem conflitar
+      var qrSz = 16;
+      var qrX  = W - px - qrSz;
+      var qrY  = rodapeY - qrSz - 1;
 
-      // Texto "Saiba mais": à esquerda do QR, mesma altura, na col direita
+      // Texto "Saiba mais": à esquerda do QR, na col direita, mesma linha
       var txMaxW = qrX - colDirX - 3;
 
       function adicionarImagens(doc2) {
-        // Barcode embaixo da tabela — recortado à coluna esquerda
+        // Barcode fixo na col esquerda
         if (bcData) {
           try { doc2.addImage(bcData, 'PNG', bcX, bcY, bcW2, bcH2); } catch(e){}
-          // Número EAN centralizado abaixo do barcode
-          doc2.setFontSize(5); doc2.setFont('helvetica','normal');
-          doc2.text(d.ean||'', bcX + bcW2/2, bcY + bcH2 + 2, { align:'center' });
         }
-        // QR
+        // QR no canto inferior direito
         if (qrData) {
-          try { doc2.addImage(qrData, 'PNG', qrX, qrY, qrSize, qrSize); } catch(e){}
-          // Texto "Saiba mais" centralizado verticalmente ao lado do QR
+          try { doc2.addImage(qrData, 'PNG', qrX, qrY, qrSz, qrSz); } catch(e){}
           doc2.setFontSize(6); doc2.setFont('helvetica','bold');
           var linhas = doc2.splitTextToSize('Saiba mais sobre o seu produto lendo o QR Code', txMaxW);
-          var tyStart = qrY + (qrSize / 2) - (linhas.length * 3) / 2 + 2;
+          var tyStart = qrY + (qrSz / 2) - (linhas.length * 3) / 2 + 2.5;
           doc2.text(linhas, colDirX, tyStart);
         }
       }

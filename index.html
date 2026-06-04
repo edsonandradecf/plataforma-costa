@@ -2337,8 +2337,9 @@ function tnGeneratePDF(qtdEtiquetas) {
   status.textContent = 'Gerando PDF...';
 
   try {
-    var jsPDFLib = window.jspdf;
-    // Paisagem 15×10 cm
+    var jsPDFLib = window.jspdf || window.jsPDF;
+    if (!jsPDFLib) throw new Error('Biblioteca jsPDF não carregada. Recarregue a página.');
+    if (!jsPDFLib.jsPDF) jsPDFLib = { jsPDF: jsPDFLib };
     var W = 150, H = 100;
     var px = 4, py = 4;
 
@@ -2631,7 +2632,8 @@ function tnGeneratePDF(qtdEtiquetas) {
     }, 200);
 
   } catch(err) {
-    document.getElementById('tn-status').textContent = 'Erro ao gerar PDF: ' + err.message;
+    console.error('Erro ao gerar PDF:', err);
+    document.getElementById('tn-status').textContent = 'Erro: ' + err.message;
   }
 }
 
@@ -9428,6 +9430,7 @@ async function finImportar() {
       state.financeiro.meses[mes].tt=ttData;
       msgs.push('✅ TikTok: '+ttData.length+' pedidos');
     }
+
     _finMesSel=mes;
     if(status) status.innerHTML='<span style="color:var(--blue)">⏳ Salvando no servidor...</span>';
     await finSaveFirebase();

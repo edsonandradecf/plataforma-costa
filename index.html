@@ -2334,293 +2334,233 @@ function tnGeneratePDF(qtdEtiquetas) {
   var d = tnGetFormData();
   if (!d.nome) { document.getElementById('tn-status').textContent = 'Preencha o nome do produto.'; return; }
   var status = document.getElementById('tn-status');
-  status.textContent = 'Gerando PDF...';
-  try {
-    var jsPDFLib = window.jspdf || window.jsPDF;
-    if (!jsPDFLib) throw new Error('jsPDF não carregado. Recarregue a página.');
-    if (!jsPDFLib.jsPDF) jsPDFLib = { jsPDF: jsPDFLib };
 
-    // Dimensões: 150×100mm paisagem
-    var W = 150, H = 100;
-    var doc = new jsPDFLib.jsPDF({ orientation: 'landscape', unit: 'mm', format: [W, H] });
+  // Monta o HTML da etiqueta e usa html2canvas para converter em PDF
+  // Dimensões: 150x100mm paisagem. Scale 3 = 1701x1134px a 96dpi
+  var W_PX = 1701, H_PX = 1134;
 
-    // Layout
-    var pad   = 3;
-    var divX  = 80;
-    var colDX = divX + 3;
-    var colDW = W - colDX - pad;
-    var tabW  = divX - pad - 2;
+  function nv(v) { return (String(v||'').trim()) || '--'; }
 
-    // Colunas internas da tabela — fixas a partir da direita
-    var c3  = 10; // %VD
-    var c2  = 22; // porção
-    var c1  = 14; // 100g
-    var xR  = pad + tabW;        // borda direita tabela
-    var x3  = xR - c3;           // início %VD
-    var x2  = x3 - c2;           // início porção
-    var x1  = x2 - c1;           // início 100g
-    var xL  = pad;               // início label
+  function buildEtiquetaHTML() {
+    var porção = nv(d.porcao);
+    var qrSrc = (d.url && d.url.trim()) ? d.url.trim() : 'https://costanaturelife.com.br/';
 
-    function nv(v) { v = String(v||'').trim(); return v||'--'; }
-    function setB(doc) { doc.setFont('helvetica','bold'); }
-    function setN(doc) { doc.setFont('helvetica','normal'); }
-
-    function desenhar(doc, n, total) {
-      // Borda externa
-      doc.setLineWidth(0.8); doc.setDrawColor(0);
-      doc.rect(0.5, 0.5, W-1, H-1);
-      doc.setLineWidth(0.2);
-
-      // Topo: marca
-      setB(doc); doc.setFontSize(10);
-      doc.text('COSTA NATURE LIFE', W/2, 7, { align:'center' });
-      doc.setLineWidth(0.7); doc.line(0.5, 9, W-0.5, 9); doc.setLineWidth(0.2);
-
-      // Divisória vertical
-      doc.setLineWidth(0.6); doc.line(divX, 9, divX, H-8); doc.setLineWidth(0.2);
-
-      // Numeração
-      if (total > 1) {
-        setN(doc); doc.setFontSize(5); doc.setTextColor(140);
-        doc.text(n+'/'+total, pad, 7.5);
-        doc.setTextColor(0);
-      }
-
-      // ── COLUNA ESQUERDA ──────────────────────────────────────
-      var y = 11;
-
-      // Nome + descrição
-      setB(doc); doc.setFontSize(9);
-      var nomeLines = doc.splitTextToSize(d.nome||'Produto', tabW);
-      doc.text(nomeLines, pad + tabW/2, y+3, { align:'center' });
-      y += nomeLines.length * 4 + 1;
-      if (d.descricao) {
-        setN(doc); doc.setFontSize(7);
-        var descL = doc.splitTextToSize(d.descricao, tabW);
-        doc.text(descL, pad + tabW/2, y+2.5, { align:'center' });
-        y += descL.length * 3;
-      }
-      doc.setLineWidth(0.4); doc.line(pad, y+1, xR, y+1); y += 3; doc.setLineWidth(0.2);
-
-      var tabelaTopo = y;
-
-      // Header INFORMAÇÃO NUTRICIONAL
-      doc.setLineWidth(0.8); doc.line(pad, y, xR, y);
-      setB(doc); doc.setFontSize(8);
-      doc.text('INFORMAÇÃO NUTRICIONAL', pad+1, y+5);
-      doc.line(pad, y+6.5, xR, y+6.5);
-      doc.setLineWidth(0.2); y += 7.5;
-
-      // Porções
-      setN(doc); doc.setFontSize(6.5);
-      doc.text('Porções por embalagem: '+nv(d.porcoes), pad+1, y+2.5); y += 3.2;
-      doc.text('Porção: '+nv(d.porcao), pad+1, y+2.5); y += 4;
-
-      // Header colunas
-      doc.setLineWidth(0.6); doc.line(pad, y, xR, y);
-      setB(doc); doc.setFontSize(6);
-      doc.text('100g',        x1 + c1/2,  y+3, { align:'center' });
-      doc.text(nv(d.porcao), x2 + c2/2,  y+3, { align:'center' });
-      doc.text('%VD*',        xR - 0.5,   y+3, { align:'right'  });
-      doc.line(pad, y+4.5, xR, y+4.5);
-      doc.setLineWidth(0.2); y += 4.5;
-
-      // Linhas verticais da tabela (serão desenhadas até o fim)
-      var tabFimY = 0; // definido depois
-
-      function row(label, v1, v2, vd, bold, grosso, indent) {
-        var rh = 3.8;
-        doc.setFontSize(6.2);
-        if (bold) setB(doc); else setN(doc);
-        doc.text(label, pad+(indent||1), y+2.7);
-        setN(doc);
-        doc.text(nv(v1), x1 + c1/2, y+2.7, { align:'center' });
-        doc.text(nv(v2), x2 + c2/2, y+2.7, { align:'center' });
-        if (bold) setB(doc);
-        doc.text(nv(vd), xR - 0.5,  y+2.7, { align:'right'  });
-        setN(doc);
-        y += rh;
-        if (grosso) { doc.setLineWidth(0.5); doc.setDrawColor(0); doc.line(pad,y,xR,y); doc.setLineWidth(0.2); }
-        else { doc.setDrawColor(170); doc.line(pad,y,xR,y); doc.setDrawColor(0); }
-      }
-
-      row('Valor Energético (kcal)', d.kcal100,      d.energia,         d.vce_energia+'%', true,  true,  1);
-      row('Carboidratos (g)',         d.carb100,      d.carboidratos,    d.carboidratos_vd+'%', true, false, 1);
-      row('  Açúcares Totais (g)',    d.acucar100,    d.acucares,        '--',              false, false, 3);
-      row('  Açúcares Adicionados',   d.acucar_ad100, d.acucares_ad,     d.acucar_ad_vd+'%', false,false, 3);
-      row('Proteínas (g)',            d.prot100,      d.proteinas,       d.proteinas_vd+'%', true, false, 1);
-      row('Gorduras Totais (g)',      d.gord100,      d.gorduras_totais, d.gorduras_totais_vd+'%', true, false, 1);
-      row('  Gorduras Saturadas (g)', d.gordsat100,   d.gorduras_sat,    d.gorduras_sat_vd+'%', false,false, 3);
-      row('  Gorduras Trans (g)',     d.gordtrans100, d.gorduras_trans,  '--',              false, false, 3);
-      row('Fibras Alimentares (g)',   d.fibra100,     d.fibras,          d.fibras_vd+'%',   true,  false, 1);
-      row('Sódio (mg)',               d.sodio100,     d.sodio,           d.sodio_vd+'%',    true,  true,  1);
-
-      tabFimY = y;
-
-      // Borda tabela + linhas verticais
-      doc.setLineWidth(0.5);
-      doc.rect(pad, tabelaTopo, tabW, tabFimY - tabelaTopo);
-      doc.setLineWidth(0.3);
-      doc.line(x1, tabelaTopo+4.5, x1, tabFimY);
-      doc.line(x2, tabelaTopo+4.5, x2, tabFimY);
-      doc.line(x3, tabelaTopo+4.5, x3, tabFimY);
-      doc.setLineWidth(0.2);
-
-      // Nota VD — logo abaixo da tabela, só se couber
-      var notaY = tabFimY + 2;
-      var rodapeLimit = H - 8 - 9 - 5; // acima do barcode
-      if (notaY < rodapeLimit) {
-        setN(doc); doc.setFontSize(5);
-        var notaLines = doc.splitTextToSize('*% Valores Diários com base em dieta de 2000kcal.', tabW);
-        doc.text(notaLines, pad, notaY + 2.5);
-      }
-
-      // ── COLUNA DIREITA ────────────────────────────────────────
-      var yr = 11;
-
-      // INGREDIENTES
-      setB(doc); doc.setFontSize(7.5);
-      doc.text('INGREDIENTES', colDX, yr+4);
-      doc.setLineWidth(0.4); doc.line(colDX, yr+5.5, W-pad, yr+5.5); doc.setLineWidth(0.2);
-      yr += 8;
-      if (d.ingredientes) {
-        setN(doc); doc.setFontSize(6.5);
-        var iL = doc.splitTextToSize(d.ingredientes, colDW);
-        doc.text(iL, colDX, yr); yr += iL.length * 3.2 + 2;
-      }
-      doc.setLineWidth(0.4); doc.line(colDX, yr, W-pad, yr); doc.setLineWidth(0.2); yr += 3;
-
-      // ALÉRGENOS
-      setB(doc); doc.setFontSize(7.5);
-      doc.text('ALÉRGENOS', colDX, yr+4);
-      doc.setLineWidth(0.4); doc.line(colDX, yr+5.5, W-pad, yr+5.5); doc.setLineWidth(0.2);
-      yr += 8;
-      if (d.alergicos) {
-        setN(doc); doc.setFontSize(6.5);
-        var aL = doc.splitTextToSize(d.alergicos, colDW);
-        doc.text(aL, colDX, yr); yr += aL.length * 3.2 + 3;
-      }
-      doc.setLineWidth(0.4); doc.line(colDX, yr, W-pad, yr); doc.setLineWidth(0.2); yr += 4;
-
-      // Grid: apenas PESO e VALIDADE
-      var bW = (colDW - 3) / 2;
-      var bH = 14;
-      function box(label, val, bx, by, fsize) {
-        doc.setLineWidth(0.6); doc.rect(bx, by, bW, bH); doc.setLineWidth(0.2);
-        setB(doc); doc.setFontSize(6);
-        doc.text(label, bx+bW/2, by+5, { align:'center' });
-        setB(doc); doc.setFontSize(fsize||10);
-        doc.text(String(val||'--'), bx+bW/2, by+12, { align:'center' });
-      }
-      box('PESO LÍQ.',  d.peso,     colDX,        yr);
-      box('VALIDADE',   d.validade, colDX+bW+3,   yr);
-      yr += bH + 4;
-
-      doc.setLineWidth(0.4); doc.line(colDX, yr, W-pad, yr); doc.setLineWidth(0.2);
-
-      // Espaço reservado para QR + "Saiba mais" (adicionado depois)
+    function row(label, v100, vPorc, vd, bold, indent) {
+      var fw = bold ? 'font-weight:700' : 'font-weight:400';
+      var ind = indent ? 'padding-left:14px' : '';
+      return '<tr style="border-bottom:0.5px solid #aaa">'+
+        '<td style="'+fw+';'+ind+';padding:2px 3px;font-size:10px">'+label+'</td>'+
+        '<td style="'+fw+';text-align:center;padding:2px 3px;font-size:10px">'+nv(v100)+'</td>'+
+        '<td style="'+fw+';text-align:center;padding:2px 3px;font-size:10px">'+nv(vPorc)+'</td>'+
+        '<td style="'+fw+';text-align:right;padding:2px 3px;font-size:10px">'+nv(vd)+'</td>'+
+      '</tr>';
     }
 
-    // Renderiza página 1
-    desenhar(doc, 1, qtdEtiquetas);
+    return '<div style="width:'+W_PX+'px;height:'+H_PX+'px;background:#fff;font-family:helvetica,arial,sans-serif;display:flex;flex-direction:column;border:3px solid #000;box-sizing:border-box;overflow:hidden">'+
 
-    // QR Code
-    var qrDiv = document.createElement('div');
-    qrDiv.style.cssText = 'position:fixed;left:-9999px;top:0';
-    document.body.appendChild(qrDiv);
-    var qrLink = (d.url && d.url.trim()) ? d.url.trim() : 'https://costanaturelife.com.br/';
-    new QRCode(qrDiv, { text: qrLink, width:200, height:200, correctLevel: QRCode.CorrectLevel.M });
+      // TOPO: marca
+      '<div style="border-bottom:3px solid #000;text-align:center;padding:6px 0;font-size:18px;font-weight:700;letter-spacing:3px">COSTA NATURE LIFE</div>'+
 
-    function gerarBarcode(callback) {
-      if (!d.ean || d.ean.length < 8) { callback(null); return; }
+      // CORPO: duas colunas
+      '<div style="display:flex;flex:1;overflow:hidden">'+
+
+        // ── COLUNA ESQUERDA ──
+        '<div style="width:530px;border-right:3px solid #000;display:flex;flex-direction:column;padding:10px 12px 8px 12px;box-sizing:border-box">'+
+
+          // Nome + descrição
+          '<div style="text-align:center;margin-bottom:6px">'+
+            '<div style="font-size:16px;font-weight:700">'+esc(d.nome)+'</div>'+
+            (d.descricao ? '<div style="font-size:11px;color:#444;margin-top:2px">'+esc(d.descricao)+'</div>' : '')+
+          '</div>'+
+          '<div style="border-top:1px solid #000;margin-bottom:4px"></div>'+
+
+          // Tabela nutricional
+          '<div style="border:2px solid #000;flex:1">'+
+            // Header
+            '<div style="border-bottom:2px solid #000;padding:4px 6px;font-size:14px;font-weight:700">INFORMAÇÃO NUTRICIONAL</div>'+
+            '<div style="padding:3px 6px;font-size:10px;border-bottom:1px solid #aaa">Porções por embalagem: '+nv(d.porcoes)+'</div>'+
+            '<div style="padding:3px 6px;font-size:10px;border-bottom:1.5px solid #000">Porção: '+nv(d.porcao)+'</div>'+
+            '<table style="width:100%;border-collapse:collapse">'+
+              '<thead>'+
+                '<tr style="border-bottom:1.5px solid #000">'+
+                  '<th style="text-align:left;padding:2px 6px;font-size:10px;font-weight:400"></th>'+
+                  '<th style="text-align:center;padding:2px 4px;font-size:10px;font-weight:700;width:60px;border-left:1px solid #aaa">100g</th>'+
+                  '<th style="text-align:center;padding:2px 4px;font-size:10px;font-weight:700;width:90px;border-left:1px solid #aaa">'+porção+'</th>'+
+                  '<th style="text-align:right;padding:2px 6px;font-size:10px;font-weight:700;width:50px;border-left:1px solid #aaa">%VD*</th>'+
+                '</tr>'+
+              '</thead>'+
+              '<tbody style="border-left:1px solid #aaa;border-right:1px solid #aaa">'+
+                row('Valor Energético (kcal)', d.kcal100, d.energia, nv(d.vce_energia)+'%', true, false)+
+                row('Carboidratos (g)',         d.carb100, d.carboidratos, nv(d.carboidratos_vd)+'%', true, false)+
+                row('Açúcares Totais (g)',       d.acucar100, d.acucares, '--', false, true)+
+                row('Açúcares Adicionados (g)',  d.acucar_ad100, d.acucares_ad, nv(d.acucar_ad_vd)+'%', false, true)+
+                row('Proteínas (g)',             d.prot100, d.proteinas, nv(d.proteinas_vd)+'%', true, false)+
+                row('Gorduras Totais (g)',        d.gord100, d.gorduras_totais, nv(d.gorduras_totais_vd)+'%', true, false)+
+                row('Gorduras Saturadas (g)',     d.gordsat100, d.gorduras_sat, nv(d.gorduras_sat_vd)+'%', false, true)+
+                row('Gorduras Trans (g)',         d.gordtrans100, d.gorduras_trans, '--', false, true)+
+                row('Fibras Alimentares (g)',     d.fibra100, d.fibras, nv(d.fibras_vd)+'%', true, false)+
+                row('Sódio (mg)',                 d.sodio100, d.sodio, nv(d.sodio_vd)+'%', true, false)+
+              '</tbody>'+
+            '</table>'+
+          '</div>'+
+
+          // Nota %VD
+          '<div style="font-size:8px;color:#555;margin-top:4px">*% Valores Diários com base em dieta de 2000kcal.</div>'+
+
+          // Barcode placeholder (img injetada depois via id)
+          '<div style="text-align:center;margin-top:6px">'+
+            '<img id="tn-bc-img" style="height:50px;max-width:220px;display:block;margin:0 auto">'+
+            (d.ean ? '<div style="font-size:9px;margin-top:2px">'+esc(d.ean)+'</div>' : '')+
+          '</div>'+
+
+        '</div>'+
+
+        // ── COLUNA DIREITA ──
+        '<div style="flex:1;display:flex;flex-direction:column;padding:10px 12px 8px 12px;box-sizing:border-box">'+
+
+          // Ingredientes
+          '<div style="font-size:12px;font-weight:700;margin-bottom:3px">INGREDIENTES</div>'+
+          '<div style="border-bottom:1px solid #000;margin-bottom:6px"></div>'+
+          '<div style="font-size:10px;margin-bottom:8px">'+esc(d.ingredientes||'')+'</div>'+
+
+          '<div style="border-top:1px solid #aaa;margin-bottom:6px"></div>'+
+
+          // Alérgenos
+          '<div style="font-size:12px;font-weight:700;margin-bottom:3px">ALÉRGENOS</div>'+
+          '<div style="border-bottom:1px solid #000;margin-bottom:6px"></div>'+
+          '<div style="font-size:10px;margin-bottom:8px">'+esc(d.alergicos||'')+'</div>'+
+
+          '<div style="border-top:1px solid #aaa;margin-bottom:8px"></div>'+
+
+          // Grid: Peso + Validade
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'+
+            '<div style="border:2px solid #000;border-radius:4px;padding:8px;text-align:center">'+
+              '<div style="font-size:9px;font-weight:700;letter-spacing:1px">PESO LÍQ.</div>'+
+              '<div style="font-size:20px;font-weight:700;margin-top:4px">'+esc(d.peso||'--')+'</div>'+
+            '</div>'+
+            '<div style="border:2px solid #000;border-radius:4px;padding:8px;text-align:center">'+
+              '<div style="font-size:9px;font-weight:700;letter-spacing:1px">VALIDADE</div>'+
+              '<div style="font-size:20px;font-weight:700;margin-top:4px">'+esc(d.validade||'--')+'</div>'+
+            '</div>'+
+          '</div>'+
+
+          '<div style="border-top:1px solid #aaa;margin-bottom:8px"></div>'+
+
+          // QR + "Saiba mais"
+          '<div style="display:flex;align-items:center;gap:10px;flex:1">'+
+            '<div style="font-size:11px;font-weight:700;flex:1;line-height:1.4">Saiba mais sobre o seu produto lendo o QR Code</div>'+
+            '<img id="tn-qr-img" style="width:90px;height:90px">'+
+          '</div>'+
+
+        '</div>'+
+      '</div>'+
+
+      // RODAPÉ
+      '<div style="border-top:2px solid #000;display:flex;justify-content:space-between;padding:4px 12px;font-size:9px">'+
+        '<span>'+(d.cnpj ? 'CNPJ: '+esc(d.cnpj) : '')+'</span>'+
+        '<span>'+(d.sac ? 'SAC: '+esc(d.sac) : '')+'</span>'+
+      '</div>'+
+
+    '</div>';
+  }
+
+  (async function() {
+    try {
+      status.textContent = 'Preparando etiqueta...';
+
+      var jsPDFLib = window.jspdf || window.jsPDF;
+      if (!jsPDFLib) throw new Error('jsPDF não carregado. Recarregue a página.');
+      if (!jsPDFLib.jsPDF) jsPDFLib = { jsPDF: jsPDFLib };
+
+      // Gerar QR Code
+      var qrDataURL = null;
       try {
-        var svgEl = document.createElementNS('http://www.w3.org/2000/svg','svg');
-        document.body.appendChild(svgEl);
-        JsBarcode(svgEl, d.ean, { format: d.ean.length===8?'EAN8':'EAN13', width:2, height:50, displayValue:false, margin:2, background:'#ffffff' });
-        var url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svgEl)],{type:'image/svg+xml;charset=utf-8'}));
-        var img = new Image();
-        img.onload = function() {
+        var qrDiv = document.createElement('div');
+        qrDiv.style.cssText = 'position:fixed;left:-9999px;top:0';
+        document.body.appendChild(qrDiv);
+        var qrLink = (d.url && d.url.trim()) ? d.url.trim() : 'https://costanaturelife.com.br/';
+        new QRCode(qrDiv, { text: qrLink, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M });
+        await new Promise(r => setTimeout(r, 300));
+        var qrImg = qrDiv.querySelector('img');
+        if (qrImg && qrImg.src) {
+          var loader = new Image();
+          await new Promise(function(res) {
+            loader.onload = res; loader.onerror = res;
+            loader.src = qrImg.src;
+          });
+          var qc = document.createElement('canvas'); qc.width = 200; qc.height = 200;
+          var ctx = qc.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0,0,200,200); ctx.drawImage(loader,0,0,200,200);
+          qrDataURL = qc.toDataURL('image/png');
+        }
+        document.body.removeChild(qrDiv);
+      } catch(e) {}
+
+      // Gerar Barcode
+      var bcDataURL = null;
+      if (d.ean && d.ean.length >= 8) {
+        try {
+          var svgEl = document.createElementNS('http://www.w3.org/2000/svg','svg');
+          document.body.appendChild(svgEl);
+          JsBarcode(svgEl, d.ean, { format: d.ean.length===8?'EAN8':'EAN13', width:2, height:60, displayValue:false, margin:2, background:'#ffffff' });
+          var svgURL = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svgEl)], {type:'image/svg+xml;charset=utf-8'}));
+          var bcImg = new Image();
+          await new Promise(function(res) { bcImg.onload = res; bcImg.onerror = res; bcImg.src = svgURL; });
           var bc = document.createElement('canvas');
-          bc.width = svgEl.viewBox.baseVal.width||300; bc.height = svgEl.viewBox.baseVal.height||60;
-          var ctx = bc.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,bc.width,bc.height); ctx.drawImage(img,0,0);
-          document.body.removeChild(svgEl); URL.revokeObjectURL(url);
-          try { callback(bc.toDataURL('image/png')); } catch(e){ callback(null); }
-        };
-        img.onerror = function(){ document.body.removeChild(svgEl); URL.revokeObjectURL(url); callback(null); };
-        img.src = url;
-      } catch(e){ callback(null); }
-    }
-
-    function montarPaginas(qrData, bcData) {
-      var rodapeY = H - 8;
-      // Barcode: col esquerda, fixo acima do rodapé
-      var bcH = 8, bcW = 40;
-      var bcX = pad + (divX - pad - 2 - bcW) / 2; // centralizado na col esquerda
-      var bcY = rodapeY - bcH - 4;
-
-      // QR: canto inf direito
-      var qrSz = 18;
-      var qrX  = W - pad - qrSz;
-      var qrY  = rodapeY - qrSz - 1;
-
-      // Texto "Saiba mais"
-      var txW = qrX - colDX - 2;
-
-      function addImagens(doc2) {
-        if (bcData) {
-          try { doc2.addImage(bcData, 'PNG', bcX, bcY, bcW, bcH); } catch(e){}
-          // número EAN centralizado
-          if (d.ean) {
-            doc2.setFontSize(5.5); setN(doc2);
-            doc2.text(d.ean, bcX + bcW/2, bcY + bcH + 2, { align:'center' });
-          }
-        }
-        if (qrData) {
-          try { doc2.addImage(qrData, 'PNG', qrX, qrY, qrSz, qrSz); } catch(e){}
-          doc2.setFontSize(6); setB(doc2);
-          var linhas = doc2.splitTextToSize('Saiba mais sobre o seu produto lendo o QR Code', txW);
-          var tyStart = qrY + qrSz/2 - linhas.length*3/2 + 2;
-          doc2.text(linhas, colDX, tyStart);
-        }
+          bc.width = svgEl.viewBox.baseVal.width||300; bc.height = svgEl.viewBox.baseVal.height||70;
+          var bctx = bc.getContext('2d'); bctx.fillStyle='#fff'; bctx.fillRect(0,0,bc.width,bc.height); bctx.drawImage(bcImg,0,0);
+          bcDataURL = bc.toDataURL('image/png');
+          document.body.removeChild(svgEl); URL.revokeObjectURL(svgURL);
+        } catch(e) {}
       }
 
-      addImagens(doc);
+      var doc = new jsPDFLib.jsPDF({ orientation: 'landscape', unit: 'mm', format: [150, 100] });
 
-      for (var n = 2; n <= qtdEtiquetas; n++) {
-        doc.addPage([W, H], 'landscape');
-        desenhar(doc, n, qtdEtiquetas);
-        addImagens(doc);
+      for (var n = 1; n <= qtdEtiquetas; n++) {
+        status.textContent = 'Gerando '+n+'/'+qtdEtiquetas+'...';
+        if (n > 1) doc.addPage([150, 100], 'landscape');
+
+        // Montar HTML da etiqueta
+        var container = document.createElement('div');
+        container.style.cssText = 'position:fixed;left:-9999px;top:0;background:#fff;width:'+W_PX+'px';
+        container.innerHTML = buildEtiquetaHTML();
+        document.body.appendChild(container);
+
+        // Injetar QR e barcode nas imagens do HTML
+        if (qrDataURL) { var qrEl = container.querySelector('#tn-qr-img'); if(qrEl) qrEl.src = qrDataURL; }
+        if (bcDataURL) { var bcEl = container.querySelector('#tn-bc-img'); if(bcEl) bcEl.src = bcDataURL; }
+
+        await new Promise(r => setTimeout(r, 80));
+
+        try {
+          var canvas = await html2canvas(container.firstChild, {
+            scale: 1,
+            backgroundColor: '#fff',
+            logging: false,
+            width:  W_PX,
+            height: H_PX,
+            windowWidth: W_PX,
+          });
+          var imgData = canvas.toDataURL('image/jpeg', 0.95);
+          doc.addImage(imgData, 'JPEG', 0, 0, 150, 100);
+        } catch(e) {
+          console.error('html2canvas erro:', e);
+          status.textContent = 'Erro: '+e.message;
+          document.body.removeChild(container);
+          return;
+        }
+        document.body.removeChild(container);
       }
 
       doc.save('etiqueta-'+(d.nome||'produto').replace(/\s+/g,'-').toLowerCase()+'.pdf');
       addLog('PDF tabela nutricional: "'+d.nome+'" ('+qtdEtiquetas+'x)');
       status.textContent = '\u2713 '+qtdEtiquetas+' etiqueta(s) gerada(s)!';
       setTimeout(function(){ status.textContent=''; }, 4000);
+
+    } catch(err) {
+      console.error('Erro PDF:', err);
+      status.textContent = 'Erro: '+err.message;
     }
-
-    setTimeout(function() {
-      var qrImgEl = qrDiv.querySelector('img');
-      if (qrImgEl && qrImgEl.src) {
-        var loader = new Image();
-        loader.onload = function() {
-          var qc = document.createElement('canvas'); qc.width=200; qc.height=200;
-          var ctx = qc.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,200,200); ctx.drawImage(loader,0,0,200,200);
-          var qrData = null; try { qrData = qc.toDataURL('image/png'); } catch(e){}
-          document.body.removeChild(qrDiv);
-          gerarBarcode(function(bcData){ montarPaginas(qrData, bcData); });
-        };
-        loader.onerror = function(){ document.body.removeChild(qrDiv); gerarBarcode(function(bcData){ montarPaginas(null, bcData); }); };
-        loader.src = qrImgEl.src;
-      } else {
-        document.body.removeChild(qrDiv);
-        gerarBarcode(function(bcData){ montarPaginas(null, bcData); });
-      }
-    }, 300);
-
-  } catch(err) {
-    console.error('Erro PDF:', err);
-    document.getElementById('tn-status').textContent = 'Erro: '+err.message;
-  }
+  })();
 }
 
 

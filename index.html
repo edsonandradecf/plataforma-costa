@@ -2537,8 +2537,11 @@ function tnGeneratePDF(qtdEtiquetas) {
     }
 
 
-    // Renderiza página 1 e coleta codeY
-    var codeY = desenharPagina(doc, 1, qtdEtiquetas);
+    // Criar documento PDF paisagem 15×10cm
+    var doc = new jsPDFLib.jsPDF({ orientation: 'landscape', unit: 'mm', format: [W, H] });
+
+    // Renderiza página 1
+    desenharPagina(doc, 1, qtdEtiquetas);
 
     // -- QR Code fixo ------------------------------------------
     var qrDiv = document.createElement('div');

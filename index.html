@@ -2357,7 +2357,7 @@ function tnGeneratePDF(qtdEtiquetas) {
       '</tr>';
     }
 
-    return '<div style="width:'+W_PX+'px;height:'+H_PX+'px;background:#fff;font-family:helvetica,arial,sans-serif;display:flex;flex-direction:column;border:3px solid #000;box-sizing:border-box;overflow:hidden">'+
+    return '<div style="width:'+W_PX+'px;height:'+H_PX+'px;background:#fff;font-family:helvetica,arial,sans-serif;display:flex;flex-direction:column;border:3px solid #000;box-sizing:border-box;overflow:hidden;position:relative">'+
 
       // TOPO: marca
       '<div style="border-bottom:3px solid #000;text-align:center;padding:6px 0;font-size:18px;font-weight:700;letter-spacing:3px">COSTA NATURE LIFE</div>'+
@@ -2522,7 +2522,7 @@ function tnGeneratePDF(qtdEtiquetas) {
 
         // Montar HTML da etiqueta
         var container = document.createElement('div');
-        container.style.cssText = 'position:fixed;left:-9999px;top:0;background:#fff;width:'+W_PX+'px';
+        container.style.cssText = 'position:fixed;left:-9999px;top:0;width:'+W_PX+'px;height:'+H_PX+'px;overflow:hidden;background:#fff';
         container.innerHTML = buildEtiquetaHTML();
         document.body.appendChild(container);
 
@@ -2530,7 +2530,7 @@ function tnGeneratePDF(qtdEtiquetas) {
         if (qrDataURL) { var qrEl = container.querySelector('#tn-qr-img'); if(qrEl) qrEl.src = qrDataURL; }
         if (bcDataURL) { var bcEl = container.querySelector('#tn-bc-img'); if(bcEl) bcEl.src = bcDataURL; }
 
-        await new Promise(r => setTimeout(r, 80));
+        await new Promise(r => setTimeout(r, 150));
 
         try {
           var canvas = await html2canvas(container.firstChild, {
@@ -2539,7 +2539,13 @@ function tnGeneratePDF(qtdEtiquetas) {
             logging: false,
             width:  W_PX,
             height: H_PX,
-            windowWidth: W_PX,
+            windowWidth:  W_PX,
+            windowHeight: H_PX,
+            x: 0,
+            y: 0,
+            scrollX: 0,
+            scrollY: 0,
+            useCORS: true,
           });
           var imgData = canvas.toDataURL('image/jpeg', 0.95);
           doc.addImage(imgData, 'JPEG', 0, 0, 150, 100);

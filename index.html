@@ -7709,6 +7709,7 @@ var _mgvLoading = false;
 var _mgvDados = null;       // { sku: { ml: preco|null, shopee: preco|null, tiktok: preco|null } }
 var _mgvErro = '';
 var _mgvAtualizadoEm = null;
+var _mgvDebug = [];
 
 function mgvAplicaImposto() { return 10; } // 10% fixo, conforme solicitado
 
@@ -7727,6 +7728,8 @@ async function mgvBuscarPrecosML() {
     offset += limit;
     if (!r.results || !r.results.length) break;
   }
+  _mgvDebug.push('ML: ' + ids.length + ' anúncios ativos encontrados na conta.');
+  var semSku = 0;
   // Busca detalhes em lotes de 20 (limite da API multiget)
   for (var i = 0; i < ids.length; i += 20) {
     var batch = ids.slice(i, i+20);
@@ -7736,6 +7739,7 @@ async function mgvBuscarPrecosML() {
       if (!item) return;
       var sku = (item.seller_custom_field || '').toString().trim().toLowerCase();
       var preco = item.price;
+      if (!sku && !(item.variations && item.variations.length)) semSku++;
       // Se tiver variações com SKU próprio, usa o preço da variação
       if (item.variations && item.variations.length) {
         item.variations.forEach(function(v) {
@@ -7746,6 +7750,9 @@ async function mgvBuscarPrecosML() {
       if (sku && preco) out[sku] = preco;
     });
   }
+  if (semSku > 0) _mgvDebug.push('ML: ' + semSku + ' anúncio(s) sem SKU preenchido no ML — não entram no cálculo.');
+  var noCatalogo = Object.keys(out).filter(function(s){ return !PRODUTOS_CUSTO.some(function(p){ return p.sku===s; }); });
+  if (noCatalogo.length) _mgvDebug.push('ML: SKUs encontrados mas fora do catálogo: ' + noCatalogo.join(', '));
   return out;
 }
 
@@ -7765,6 +7772,8 @@ async function mgvBuscarPrecosShopee() {
     offset += pageSize;
     if (!resp.item || !resp.item.length) break;
   }
+  _mgvDebug.push('Shopee: ' + itemIds.length + ' anúncios ativos encontrados na conta.');
+  var semSkuSp = 0;
   for (var i = 0; i < itemIds.length; i += 50) {
     var batch = itemIds.slice(i, i+50);
     var det = await shopeeGet('/api/v2/product/get_item_base_info', { item_id_list: batch.join(',') });
@@ -7773,6 +7782,7 @@ async function mgvBuscarPrecosShopee() {
       var sku = (item.item_sku || '').toString().trim().toLowerCase();
       var preco = null;
       if (item.price_info && item.price_info.length) preco = item.price_info[0].current_price;
+      if (!sku && !(item.model_list && item.model_list.length)) semSkuSp++;
       // Variações (modelos) com SKU próprio
       if (item.model_list && item.model_list.length) {
         item.model_list.forEach(function(m) {
@@ -7784,6 +7794,9 @@ async function mgvBuscarPrecosShopee() {
       if (sku && preco) out[sku] = preco;
     });
   }
+  if (semSkuSp > 0) _mgvDebug.push('Shopee: ' + semSkuSp + ' anúncio(s) sem SKU preenchido na Shopee — não entram no cálculo.');
+  var noCatalogoSp = Object.keys(out).filter(function(s){ return !PRODUTOS_CUSTO.some(function(p){ return p.sku===s; }); });
+  if (noCatalogoSp.length) _mgvDebug.push('Shopee: SKUs encontrados mas fora do catálogo: ' + noCatalogoSp.join(', '));
   return out;
 }
 
@@ -7791,16 +7804,27 @@ async function mgvAtualizarPrecos() {
   if (_mgvLoading) return;
   _mgvLoading = true;
   _mgvErro = '';
+  _mgvDebug = [];
   var c = document.getElementById('page-content');
   if (c && state.currentPage === 'margemviva') c.innerHTML = renderMargemViva();
 
   var precosMl = {}, precosSp = {};
   try {
-    if (mlTokenValid()) precosMl = await mgvBuscarPrecosML();
+    if (mlTokenValid()) {
+      precosMl = await mgvBuscarPrecosML();
+      _mgvDebug.push('ML: ' + Object.keys(precosMl).length + ' SKUs com preço encontrados.');
+    } else {
+      _mgvDebug.push('ML: token não conectado/inválido (vá em Vendas e conecte).');
+    }
   } catch(e) { _mgvErro += 'Mercado Livre: ' + e.message + '. '; }
 
   try {
-    if (shopeeTokenValid()) precosSp = await mgvBuscarPrecosShopee();
+    if (shopeeTokenValid()) {
+      precosSp = await mgvBuscarPrecosShopee();
+      _mgvDebug.push('Shopee: ' + Object.keys(precosSp).length + ' SKUs com preço encontrados.');
+    } else {
+      _mgvDebug.push('Shopee: token não conectado/inválido (vá em Vendas e conecte).');
+    }
   } catch(e) { _mgvErro += 'Shopee: ' + e.message + '. '; }
 
   // TikTok: usa preço médio do último mês importado no Financeiro
@@ -7841,6 +7865,12 @@ function renderMargemViva() {
     html += '<div style="background:rgba(220,38,38,0.08);border:0.5px solid rgba(220,38,38,0.25);border-radius:8px;padding:10px 14px;margin-bottom:1.25rem;font-size:0.83rem;color:var(--red)">⚠ ' + esc(_mgvErro) + '</div>';
   }
 
+  if (_mgvDebug && _mgvDebug.length) {
+    html += '<div style="background:var(--bg3);border:0.5px solid var(--border2);border-radius:8px;padding:10px 14px;margin-bottom:1.25rem;font-size:0.78rem;color:var(--text2);font-family:monospace">' +
+      _mgvDebug.map(function(d){ return esc(d); }).join('<br>') +
+    '</div>';
+  }
+
   if (!mlTokenValid() && !shopeeTokenValid()) {
     html += '<div class="empty-state">' + iconEmpty() + '<p>Conecte o Mercado Livre e/ou a Shopee na página Vendas para usar a margem em tempo real.</p></div>';
     return html;
@@ -7854,7 +7884,7 @@ function renderMargemViva() {
   function calcMargem(sku, preco, plat) {
     if (!preco) return null;
     var c = custos[sku];
-    if (!c || c.custoFinal === undefined) return null;
+    if (!c || c.custoFinal === undefined) return { semCusto: true };
     var custoUnit = c.custoFinal;
     var t = tarifas[sku] && tarifas[sku][plat] ? tarifas[sku][plat] : null;
     var tarifaValor = t ? (preco * ((t.pctVenda||0)/100) + (t.envio||0)) : 0;
@@ -7903,6 +7933,7 @@ function renderMargemViva() {
     linhas.map(function(l) {
       function cel(m) {
         if (!m) return '<span style="color:var(--text3)">—</span>';
+        if (m.semCusto) return '<span style="color:var(--text3)">—</span><div style="font-size:0.65rem;color:var(--red)">sem custo cadastrado</div>';
         return '<span style="font-weight:700;color:' + corMargem(m.margem) + '">' + fmtPct(m.margem) + '</span>' +
           (!m.temTarifa ? '<div style="font-size:0.65rem;color:var(--text3)">sem tarifa cadastrada</div>' : '');
       }

@@ -811,9 +811,9 @@ function doLogin() {
     setTimeout(async function() {
       try {
         await mlExchangeCode(pendingCode);
-        navigate('vendas');
+        navigate('margemviva');
       } catch(e) {
-        navigate('vendas');
+        navigate('margemviva');
       }
     }, 500);
   }
@@ -902,8 +902,8 @@ function togglePassVis() {
               } else if (mlCode) {
                 await mlExchangeCode(mlCode);
               }
-              navigate('vendas');
-            } catch(e) { navigate('vendas'); }
+              navigate('margemviva');
+            } catch(e) { navigate('margemviva'); }
           }, 500);
           return;
         }
@@ -938,7 +938,7 @@ function getPagesAdmin() {
     { id: '__sep__',      label: '',                      icon: '' },
     { id: 'produtos',     label: 'Produtos',              icon: iconProdutos() },
     { id: 'marketplaces', label: 'Marketplaces',          icon: iconMkts() },
-    { id: 'margemviva',   label: 'Margem em Tempo Real',  icon: iconMargem() },
+    { id: 'margemviva',   label: 'Radar',                 icon: iconMargem() },
     { id: 'financeiro',   label: 'Financeiro',            icon: iconFinanceiro() },
     { id: 'logs',         label: 'Logs',                  icon: iconLog() },
   ];
@@ -1051,7 +1051,7 @@ async function renovarTokens() {
 
 function renderPage() {
   if (!state.currentUser) return;
-  var titles = { inicio:'Início', expedicao:'Expedição', producao:'Produção', compras:'Compras', estoque:'Estoque', ponto:'Ponto Virtual', mural:'Mural', etiquetas:'Gerador de Etiquetas', tabnutri:'Tabela Nutricional', produtos:'Produtos', marketplaces:'Marketplaces', margemviva:'Margem em Tempo Real', logs:'Logs', financeiro:'Financeiro' };
+  var titles = { inicio:'Início', expedicao:'Expedição', producao:'Produção', compras:'Compras', estoque:'Estoque', ponto:'Ponto Virtual', mural:'Mural', etiquetas:'Gerador de Etiquetas', tabnutri:'Tabela Nutricional', produtos:'Produtos', marketplaces:'Marketplaces', margemviva:'Radar', logs:'Logs', financeiro:'Financeiro' };
   var titleEl = document.getElementById('page-title');
   if (titleEl) titleEl.textContent = titles[state.currentPage] || '';
   var c = document.getElementById('page-content');
@@ -6230,7 +6230,7 @@ function shopeeDesconectar() {
   state.shopeeToken = null;
   localStorage.removeItem('shopee_token');
   saveState();
-  navigate('vendas');
+  navigate('margemviva');
 }
 
 function shopeeAuthHtml() {
@@ -6851,7 +6851,7 @@ function mlDesconectar() {
   _mlToken = null;
   state.mlToken = null;
   saveState();
-  navigate('vendas');
+  navigate('margemviva');
 }
 
 // --- VENDAS RESUMO (para funcionários na tela Início) ------------------------
@@ -7713,6 +7713,26 @@ var _mgvDebug = [];
 
 function mgvAplicaImposto() { return 10; } // 10% fixo, conforme solicitado
 
+function mgvSalvarFirebase() {
+  fetch(FIREBASE_URL + '/radar.json', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dados: _mgvDados, atualizadoEm: _mgvAtualizadoEm ? _mgvAtualizadoEm.toISOString() : null })
+  }).catch(function(){});
+}
+
+function mgvCarregarFirebase() {
+  return fetch(FIREBASE_URL + '/radar.json')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if (data && data.dados) {
+        _mgvDados = data.dados;
+        _mgvAtualizadoEm = data.atualizadoEm ? new Date(data.atualizadoEm) : null;
+      }
+    })
+    .catch(function(){});
+}
+
 // Busca todos os preços ativos no Mercado Livre (paginado) e retorna { sku: preco }
 async function mgvBuscarPrecosML() {
   var out = {};
@@ -7842,17 +7862,43 @@ async function mgvAtualizarPrecos() {
   _mgvDados = { ml: precosMl, shopee: precosSp, tiktok: precosTt };
   _mgvAtualizadoEm = new Date();
   _mgvLoading = false;
+  mgvSalvarFirebase();
 
   var c2 = document.getElementById('page-content');
   if (c2 && state.currentPage === 'margemviva') c2.innerHTML = renderMargemViva();
 }
 
+var _mgvCarregado = false;
+
 function renderMargemViva() {
+  if (!_mgvCarregado && !_mgvDados) {
+    _mgvCarregado = true;
+    mgvCarregarFirebase().then(function() {
+      var c = document.getElementById('page-content');
+      if (c && state.currentPage === 'margemviva') c.innerHTML = renderMargemViva();
+    });
+  }
   var tarifas = state.financeiro.tarifasSku || {};
   var custos  = state.financeiro.custoProdutos || {};
   var imposto = mgvAplicaImposto();
 
-  var html = '<div style="margin-bottom:1.25rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">' +
+  var mlOk = mlTokenValid();
+  var spOk = shopeeTokenValid();
+
+  var html = '<div class="card" style="padding:1rem 1.25rem;margin-bottom:1.25rem;display:flex;gap:24px;flex-wrap:wrap;align-items:center">' +
+    '<div style="display:flex;align-items:center;gap:8px;font-size:0.85rem">' +
+      '<span style="width:9px;height:9px;border-radius:50%;background:' + (mlOk?'var(--green)':'var(--red)') + '"></span>' +
+      '<span>Mercado Livre: ' + (mlOk ? 'conectado' : 'desconectado') + '</span>' +
+      (!mlOk ? '<a href="https://auth.mercadolivre.com.br/authorization?response_type=code&client_id=' + ML_CLIENT_ID + '&redirect_uri=' + encodeURIComponent(ML_REDIRECT_URI) + '" class="btn btn-sm" style="padding:4px 10px;font-size:0.75rem;text-decoration:none">Conectar</a>' : '<button onclick="mlDesconectar()" class="btn btn-sm" style="padding:4px 10px;font-size:0.75rem">Desconectar</button>') +
+    '</div>' +
+    '<div style="display:flex;align-items:center;gap:8px;font-size:0.85rem">' +
+      '<span style="width:9px;height:9px;border-radius:50%;background:' + (spOk?'var(--green)':'var(--red)') + '"></span>' +
+      '<span>Shopee: ' + (spOk ? 'conectado' : 'desconectado') + '</span>' +
+      (!spOk ? '<button onclick="shopeeIniciarAuth()" class="btn btn-sm" style="padding:4px 10px;font-size:0.75rem">Conectar</button>' : '<button onclick="shopeeDesconectar()" class="btn btn-sm" style="padding:4px 10px;font-size:0.75rem">Desconectar</button>') +
+    '</div>' +
+  '</div>';
+
+  html += '<div style="margin-bottom:1.25rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">' +
     '<div style="font-size:0.85rem;color:var(--text3)">' +
       (_mgvAtualizadoEm ? 'Última atualização: ' + _mgvAtualizadoEm.toLocaleTimeString('pt-BR') : 'Clique em atualizar para buscar os preços atuais') +
     '</div>' +
@@ -7871,8 +7917,8 @@ function renderMargemViva() {
     '</div>';
   }
 
-  if (!mlTokenValid() && !shopeeTokenValid()) {
-    html += '<div class="empty-state">' + iconEmpty() + '<p>Conecte o Mercado Livre e/ou a Shopee na página Vendas para usar a margem em tempo real.</p></div>';
+  if (!mlOk && !spOk) {
+    html += '<div class="empty-state">' + iconEmpty() + '<p>Conecte o Mercado Livre e/ou a Shopee usando os botões acima.</p></div>';
     return html;
   }
 

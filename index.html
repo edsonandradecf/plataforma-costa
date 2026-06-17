@@ -931,22 +931,19 @@ function getPagesAdmin() {
     { id: 'producao',   label: 'Produção',              icon: iconFactory() },
     { id: 'compras',    label: 'Compras',               icon: iconCart() },
     { id: 'estoque',    label: 'Estoque',               icon: iconEstoque() },
-    { id: 'devolucao',  label: 'Devolução',             icon: iconDevolucao() },
     { id: 'ponto',      label: 'Ponto Virtual',         icon: iconPonto() },
     { id: 'mural',      label: 'Mural',                 icon: iconMural() },
     { id: 'etiquetas',  label: 'Gerador de Etiquetas',  icon: iconLabel() },
-    { id: 'agenda',     label: 'Agenda',                icon: iconCal() },
     { id: 'tabnutri',   label: 'Tabela Nutricional',    icon: iconTabNutri() },
     { id: '__sep__',      label: '',                      icon: '' },
     { id: 'produtos',     label: 'Produtos',              icon: iconProdutos() },
     { id: 'marketplaces', label: 'Marketplaces',          icon: iconMkts() },
-    { id: 'vendas',       label: 'Vendas',                icon: iconVendas() },
     { id: 'financeiro',   label: 'Financeiro',            icon: iconFinanceiro() },
     { id: 'logs',         label: 'Logs',                  icon: iconLog() },
   ];
 }
 function getPagesLimited() {
-  return getPagesAdmin().filter(p => p.id !== 'logs' && p.id !== 'vendas' && p.id !== 'financeiro' && p.id !== 'produtos' && p.id !== 'marketplaces' && p.id !== '__sep__');
+  return getPagesAdmin().filter(p => p.id !== 'logs' && p.id !== 'financeiro' && p.id !== 'produtos' && p.id !== 'marketplaces' && p.id !== '__sep__');
 }
 
 function buildSidebar() {
@@ -1053,7 +1050,7 @@ async function renovarTokens() {
 
 function renderPage() {
   if (!state.currentUser) return;
-  var titles = { inicio:'Início', expedicao:'Expedição', producao:'Produção', compras:'Compras', estoque:'Estoque', devolucao:'Devolução', ponto:'Ponto Virtual', mural:'Mural', etiquetas:'Gerador de Etiquetas', agenda:'Agenda', tabnutri:'Tabela Nutricional', produtos:'Produtos', marketplaces:'Marketplaces', vendas:'Vendas', logs:'Logs', financeiro:'Financeiro' };
+  var titles = { inicio:'Início', expedicao:'Expedição', producao:'Produção', compras:'Compras', estoque:'Estoque', ponto:'Ponto Virtual', mural:'Mural', etiquetas:'Gerador de Etiquetas', tabnutri:'Tabela Nutricional', produtos:'Produtos', marketplaces:'Marketplaces', logs:'Logs', financeiro:'Financeiro' };
   var titleEl = document.getElementById('page-title');
   if (titleEl) titleEl.textContent = titles[state.currentPage] || '';
   var c = document.getElementById('page-content');
@@ -1065,14 +1062,11 @@ function renderPage() {
   if (pg === 'compras')   { c.innerHTML = renderCompras(); setupCompras(); return; }
   if (pg === 'mural')     { c.innerHTML = renderMural(); setupMural(); return; }
   if (pg === 'etiquetas') { c.innerHTML = renderEtiquetas(); return; }
-  if (pg === 'agenda')    { c.innerHTML = renderAgenda(); return; }
   if (pg === 'tabnutri')  { c.innerHTML = renderTabNutri(); setupTabNutri(); return; }
   if (pg === 'estoque')   { c.innerHTML = renderEstoque(); setupEstoque(); return; }
   if (pg === 'produtos')      { c.innerHTML = renderProdutos(); return; }
   if (pg === 'marketplaces')  { c.innerHTML = renderMarketplaces(); return; }
-  if (pg === 'devolucao') { c.innerHTML = renderDevolucao(); setupDevolucao(); return; }
   if (pg === 'ponto')     { c.innerHTML = renderPonto(); return; }
-  if (pg === 'vendas')    { c.innerHTML = renderVendas(); bindVendas(); return; }
   if (pg === 'logs')      { c.innerHTML = renderLogs(); return; }
   if (pg === 'financeiro') { c.innerHTML = renderFinanceiro(); bindFinanceiro(); return; }
 }
@@ -1089,15 +1083,6 @@ function safeRenderPage() {
   if (!state.currentUser) return;
   var active = document.activeElement;
   if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) return;
-  // If on inicio, just refresh vendas slots without full re-render
-  if (state.currentPage === 'inicio') {
-    var chartEl = document.getElementById('inicio-chart-content');
-    if (chartEl) {
-      // DOM is ready, just reload vendas data
-      setTimeout(function() { mlLoadInicio(); }, 100);
-      return;
-    }
-  }
   renderPage();
 }
 
@@ -1106,7 +1091,6 @@ function renderInicio() {
   const today = new Date();
   today.setHours(0,0,0,0);
   const todayStr = today.toISOString().slice(0,10);
-  const now = new Date();
 
   function countTasks(area) {
     return state.tasks[area].filter(t => !t.done && t.date <= todayStr).length;
@@ -1115,23 +1099,6 @@ function renderInicio() {
   const prodPendente = countTasks('producao');
   const comprasPendente = state.compras.filter(t => !t.done).length;
   const muralTotal = state.mural.length;
-  const dateLabel = now.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
-
-  // Agenda hoje
-  const todayEvents = state.agenda.filter(e => e.date === todayStr).sort((a,b) => (a.time||'').localeCompare(b.time||''));
-  let agendaHtml = '';
-  if (!todayEvents.length) {
-    agendaHtml = '<p style="color:var(--text3);font-size:0.875rem;padding:1rem 0;text-align:center">Nenhum compromisso para hoje</p>';
-  } else {
-    agendaHtml = todayEvents.map(e => {
-      const hora = e.time ? '<span style="font-size:0.75rem;background:var(--bg3);padding:2px 8px;border-radius:99px;margin-right:8px;color:var(--text3)">' + e.time + '</span>' : '';
-      return '<div style="display:flex;align-items:center;padding:0.6rem 0;border-bottom:1px solid var(--border)">' +
-        '<span style="width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;margin-right:10px"></span>' +
-        hora + '<span style="font-size:0.9rem;flex:1">' + esc(e.title) + '</span>' +
-        (e.desc ? '<span style="font-size:0.75rem;color:var(--text3)">' + esc(e.desc) + '</span>' : '') +
-      '</div>';
-    }).join('');
-  }
 
   // Mural -- post-its estilo original
   let muralHtml = '';
@@ -1148,14 +1115,42 @@ function renderInicio() {
     '</div>';
   }
 
-  // Dispara carregamento dos dados de vendas após renderizar o HTML
-  // Aguarda Firebase sincronizar antes de buscar dados de vendas
-  setTimeout(function() {
-    mlLoadInicio().catch(function() {
-      // Retry after 3 more seconds if first attempt fails
-      setTimeout(function() { mlLoadInicio(); }, 3000);
-    });
-  }, 1500);
+  // Helper: lista de tarefas somente-visualização (sem checkbox, sem excluir)
+  function tarefasViewOnly(area) {
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+    const tomorrowStr = tomorrow.toISOString().slice(0,10);
+
+    const tasks = [...state.tasks[area]]
+      .filter(t => !t.done)
+      .sort((a, b) => {
+        const dateA = a.date + (a.time || '');
+        const dateB = b.date + (b.time || '');
+        return dateA.localeCompare(dateB);
+      })
+      .slice(0, 8);
+
+    if (!tasks.length) {
+      return '<p style="color:var(--text3);font-size:0.875rem;padding:1rem 0;text-align:center">Nenhuma tarefa pendente</p>';
+    }
+
+    return '<div class="task-list">' + tasks.map(t => {
+      const isLate     = t.date < todayStr;
+      const isToday    = t.date === todayStr;
+      const isTomorrow = t.date === tomorrowStr;
+      const dateStr = new Date(t.date + 'T12:00:00').toLocaleDateString('pt-BR') + (t.time ? ' ' + t.time : ' . Sem horário');
+
+      let badge = '';
+      if (isLate)     badge = '<span class="task-badge">⚠ Atraso</span>';
+      else if (isToday)    badge = '<span class="task-badge" style="background:var(--green);color:#fff;border:none">Hoje</span>';
+      else if (isTomorrow) badge = '<span class="task-badge" style="background:#1a8a4a;color:#fff;border:none">Amanhã</span>';
+
+      return `<div class="task-item" style="cursor:default">
+        <div class="task-text">${esc(t.text)}</div>
+        <span class="task-meta">${dateStr}</span>
+        ${badge}
+      </div>`;
+    }).join('') + '</div>';
+  }
 
   return `
   <!-- Linha 1: 4 cards de métricas -->
@@ -1166,15 +1161,8 @@ function renderInicio() {
     <div class="stat-card"><div class="stat-icon">📌</div><div class="stat-label">Recados no Mural</div><div class="stat-value">${muralTotal}</div></div>
   </div>
 
-  <!-- Linha 2: Agenda + Mural -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
-    <div class="card" style="min-height:200px">
-      <div class="card-header" style="margin-bottom:0.75rem">
-        <span class="card-title">📅 Agenda</span>
-        <span style="font-size:0.8rem;color:var(--text3)">${dateLabel}</span>
-      </div>
-      ${agendaHtml}
-    </div>
+  <!-- Linha 2: Mural -->
+  <div style="margin-bottom:1rem">
     <div class="card" style="min-height:200px">
       <div class="card-header" style="margin-bottom:0.5rem">
         <span class="card-title">📌 Mural de Recados</span>
@@ -1183,41 +1171,19 @@ function renderInicio() {
     </div>
   </div>
 
-  <!-- Linha 3: Gráfico (esquerda) + Contadores + Ranking (direita, alinhado com mural) -->
+  <!-- Linha 3: Tarefas Produção + Tarefas Expedição (somente visualização) -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
-    <div class="card" style="min-height:220px" id="inicio-chart-card">
+    <div class="card" style="min-height:200px">
       <div class="card-header" style="margin-bottom:0.75rem">
-        <span class="card-title">📈 Pedidos por Dia</span>
+        <span class="card-title">🏭 Tarefas da Produção</span>
       </div>
-      <div id="inicio-progress" style="margin-bottom:0.5rem"></div>
-      <div id="inicio-chart-content" style="color:var(--text3);font-size:0.85rem;text-align:center;padding-top:1.5rem">Carregando...</div>
+      ${tarefasViewOnly('producao')}
     </div>
-    <div style="display:grid;grid-template-columns:160px 1fr;gap:1rem">
-      <div class="card" style="min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:1.25rem 1rem">
-        <div style="text-align:center">
-          <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:4px">
-            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#FFE600;margin-right:3px"></span>ML Hoje
-          </div>
-          <div id="inicio-pedidos-dia" style="font-size:2rem;font-weight:800;color:var(--green);line-height:1">--</div>
-        </div>
-        <div style="text-align:center">
-          <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:4px">
-            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#f4630a;margin-right:3px"></span>Shopee Hoje
-          </div>
-          <div id="inicio-pedidos-shopee-dia" style="font-size:2rem;font-weight:800;color:#f4630a;line-height:1">--</div>
-        </div>
-        <div style="width:50px;height:1px;background:var(--border)"></div>
-        <div style="text-align:center">
-          <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:4px">Total no Mês</div>
-          <div id="inicio-pedidos-mes" style="font-size:2rem;font-weight:800;color:var(--text);line-height:1">--</div>
-        </div>
+    <div class="card" style="min-height:200px">
+      <div class="card-header" style="margin-bottom:0.75rem">
+        <span class="card-title">📦 Tarefas da Expedição</span>
       </div>
-      <div class="card" style="min-height:220px;overflow:hidden">
-        <div class="card-header" style="margin-bottom:0.75rem">
-          <span class="card-title">🏆 Top 10 do Mês</span>
-        </div>
-        <div id="inicio-ranking-content" style="color:var(--text3);font-size:0.85rem;text-align:center;padding-top:1rem">Carregando...</div>
-      </div>
+      ${tarefasViewOnly('expedicao')}
     </div>
   </div>`;
 }

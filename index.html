@@ -7885,6 +7885,35 @@ async function mgvAtualizarPrecos() {
 
 var _mgvCarregado = false;
 
+// Calcula o custo unitário atual de um produto SEMPRE com base na compra mais recente
+// registrada no estoque (não depende do botão "Salvar" em Produtos ter sido clicado de novo).
+// Se houver custo manual cadastrado (custoManual !== undefined), esse tem prioridade.
+function mgvCustoAtual(sku) {
+  var c = (state.financeiro.custoProdutos || {})[sku];
+  if (c && c.custoManual !== undefined) {
+    return c.custoManual; // custo manual sempre tem prioridade, não recalcula
+  }
+  var prod = PRODUTOS_CUSTO.find(function(p){ return p.sku === sku; });
+  if (!prod) return null;
+  var emb   = c ? (c.embalagem || 0) : 0;
+  var caixa = c ? (c.caixa || 0) : 0;
+
+  var hist = (state.estoque.historicoManual||[]).concat(
+    (state.estoque.movimentacoes||[]).filter(function(m){ return m.tipo==='entrada' && m.totalKg>0; })
+  );
+  var maisRecente = null;
+  hist.forEach(function(r){
+    if (!r.totalKg) return;
+    var nomeLow = (r.produto||'').toLowerCase();
+    if (skuMatchHist(sku, nomeLow) && (!maisRecente || (r.dataISO||'') > (maisRecente.dataISO||''))) maisRecente = r;
+  });
+  if (maisRecente) {
+    return round4(maisRecente.totalKg * prod.peso / 1000 + emb + caixa);
+  }
+  // Sem histórico de compra: usa o custoFinal salvo, se existir, como último recurso
+  return c && c.custoFinal !== undefined ? c.custoFinal : null;
+}
+
 function renderMargemViva() {
   if (!_mgvCarregado && !_mgvDados) {
     _mgvCarregado = true;
@@ -7955,9 +7984,8 @@ function renderMargemViva() {
 
   function calcMargem(sku, preco, plat) {
     if (!preco) return null;
-    var c = custos[sku];
-    if (!c || c.custoFinal === undefined) return { semCusto: true };
-    var custoUnit = c.custoFinal;
+    var custoUnit = mgvCustoAtual(sku);
+    if (custoUnit === null || custoUnit === undefined) return { semCusto: true };
     var t = tarifas[sku] && tarifas[sku][plat] ? tarifas[sku][plat] : null;
     var tarifaValor = t ? (preco * ((t.pctVenda||0)/100) + (t.envio||0)) : 0;
     var impostoValor = preco * (imposto/100);

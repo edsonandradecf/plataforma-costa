@@ -5602,7 +5602,8 @@ function renderEstoqueCusto() {
           }
           if (meta.aliquota !== undefined) state.financeiro.aliquota = meta.aliquota;
           var c = document.getElementById('page-content');
-          if (c && _estoqueTab === 'custo') c.innerHTML = renderEstoque();
+          if (c && state.currentPage === 'produtos') c.innerHTML = renderProdutos();
+          else if (c && _estoqueTab === 'custo') c.innerHTML = renderEstoque();
         }
       })
       .catch(function(){ _estoqueCustoCarregando = false; });
@@ -5638,7 +5639,7 @@ function renderEstoqueCusto() {
         (ultimoKg ? ((ultimoKg * prod.peso / 1000) + (parseFloat(c.embalagem)||0) + (parseFloat(c.caixa)||0)) : '');
 
       return '' +
-        '<button onclick="_estoqueCustoProdSel=null;var el=document.getElementById(\'page-content\');if(el)el.innerHTML=renderEstoque();" ' +
+        '<button onclick="_estoqueCustoProdSel=null;var el=document.getElementById(\'page-content\');if(el)el.innerHTML=(state.currentPage===\'produtos\'?renderProdutos():renderEstoque());" ' +
           'style="display:inline-flex;align-items:center;gap:6px;margin-bottom:1.25rem;background:none;border:0.5px solid var(--border2);border-radius:8px;padding:6px 14px;color:var(--text2);cursor:pointer;font-size:0.85rem">← Voltar</button>' +
         '<div class="card" style="padding:1.5rem;max-width:520px">' +
           '<div style="font-size:1rem;font-weight:700;margin-bottom:1.5rem">' + esc(prod.nome) + ' <span style="font-size:0.75rem;color:var(--text3);font-weight:400">SKU: '+prod.sku+'</span></div>' +
@@ -5695,7 +5696,7 @@ function renderEstoqueCusto() {
     var c = custos[p.sku] || {};
     var temCusto = c.custoFinal !== undefined;
     html += '<tr style="border-bottom:0.5px solid var(--border);cursor:pointer;transition:background 0.12s" '+
-      'onclick="_estoqueCustoProdSel=\''+p.sku+'\';var el=document.getElementById(\'page-content\');if(el)el.innerHTML=renderEstoque();" '+
+      'onclick="_estoqueCustoProdSel=\''+p.sku+'\';var el=document.getElementById(\'page-content\');if(el)el.innerHTML=(state.currentPage===\'produtos\'?renderProdutos():renderEstoque());" '+
       'onmouseover="this.style.background=\'var(--bg3)\'" onmouseout="this.style.background=\'\'">'+
       '<td style="padding:11px 16px;font-weight:500">'+esc(p.nome)+'</td>'+
       '<td style="padding:11px 16px;text-align:center;font-size:0.78rem;color:var(--text3);font-family:monospace">'+p.sku+'</td>'+

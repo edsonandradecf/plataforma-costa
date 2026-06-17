@@ -7750,28 +7750,43 @@ async function mgvBuscarPrecosML() {
   }
   _mgvDebug.push('ML: ' + ids.length + ' anúncios ativos encontrados na conta.');
   var semSku = 0;
-  // Busca detalhes em lotes de 20 (limite da API multiget)
+
+  // Busca o valor do atributo SELLER_SKU dentro de um array de attributes
+  function getSellerSkuAttr(attrs) {
+    if (!attrs || !attrs.length) return '';
+    var found = attrs.find(function(a){ return a.id === 'SELLER_SKU'; });
+    return found && found.value_name ? found.value_name.toString().trim().toLowerCase() : '';
+  }
+
+  // Busca detalhes em lotes de 20 (limite da API multiget) -- pede attributes e variations completos
   for (var i = 0; i < ids.length; i += 20) {
     var batch = ids.slice(i, i+20);
-    var multi = await mlGet('/items?ids=' + batch.join(',') + '&attributes=id,price,seller_custom_field,variations');
+    var multi = await mlGet('/items?ids=' + batch.join(',') + '&attributes=id,price,attributes,seller_custom_field,variations');
     multi.forEach(function(entry) {
       var item = entry.body || entry;
       if (!item) return;
-      var sku = (item.seller_custom_field || '').toString().trim().toLowerCase();
+      // 1) Tenta achar SKU no atributo SELLER_SKU do item
+      var sku = getSellerSkuAttr(item.attributes);
+      // 2) Fallback: campo legado seller_custom_field
+      if (!sku) sku = (item.seller_custom_field || '').toString().trim().toLowerCase();
       var preco = item.price;
-      if (!sku && !(item.variations && item.variations.length)) semSku++;
-      // Se tiver variações com SKU próprio, usa o preço da variação
+
+      var achouVariacao = false;
       if (item.variations && item.variations.length) {
         item.variations.forEach(function(v) {
-          var vsku = (v.seller_custom_field || v.seller_sku || '').toString().trim().toLowerCase();
-          if (vsku && v.price) out[vsku] = v.price;
+          var vsku = getSellerSkuAttr(v.attributes) || (v.seller_custom_field || v.seller_sku || '').toString().trim().toLowerCase();
+          if (vsku && v.price) { out[vsku] = v.price; achouVariacao = true; }
         });
       }
+
+      if (!sku && !achouVariacao) semSku++;
       if (sku && preco) out[sku] = preco;
     });
   }
   if (semSku > 0) _mgvDebug.push('ML: ' + semSku + ' anúncio(s) sem SKU preenchido no ML — não entram no cálculo.');
-  var noCatalogo = Object.keys(out).filter(function(s){ return !PRODUTOS_CUSTO.some(function(p){ return p.sku===s; }); });
+  var skusEncontrados = Object.keys(out);
+  if (skusEncontrados.length) _mgvDebug.push('ML: SKUs lidos: ' + skusEncontrados.join(', '));
+  var noCatalogo = skusEncontrados.filter(function(s){ return !PRODUTOS_CUSTO.some(function(p){ return p.sku===s; }); });
   if (noCatalogo.length) _mgvDebug.push('ML: SKUs encontrados mas fora do catálogo: ' + noCatalogo.join(', '));
   return out;
 }

@@ -7750,6 +7750,7 @@ async function mgvBuscarPrecosML() {
     if (!r.results || !r.results.length) break;
   }
   _mgvDebug.push('ML: ' + ids.length + ' anúncios ativos encontrados na conta.');
+  _mgvDebug.push('ML: usando preço de venda real (sale_price), já considerando promoções ativas.');
   var semSku = 0;
 
   // Busca o valor do atributo SELLER_SKU dentro de um array de attributes
@@ -7759,31 +7760,59 @@ async function mgvBuscarPrecosML() {
     return found && found.value_name ? found.value_name.toString().trim().toLowerCase() : '';
   }
 
-  // Busca detalhes em lotes de 20 (limite da API multiget) -- pede attributes e variations completos
+  // 1ª etapa: descobre o SKU de cada item/variação (sem se importar com o preço ainda)
+  var itemsParaPreco = []; // [{ sku, itemId, variationId|null }]
   for (var i = 0; i < ids.length; i += 20) {
     var batch = ids.slice(i, i+20);
     var multi = await mlGet('/items?ids=' + batch.join(',') + '&attributes=id,price,attributes,seller_custom_field,variations');
     multi.forEach(function(entry) {
       var item = entry.body || entry;
       if (!item) return;
-      // 1) Tenta achar SKU no atributo SELLER_SKU do item
       var sku = getSellerSkuAttr(item.attributes);
-      // 2) Fallback: campo legado seller_custom_field
       if (!sku) sku = (item.seller_custom_field || '').toString().trim().toLowerCase();
-      var preco = item.price;
 
       var achouVariacao = false;
       if (item.variations && item.variations.length) {
         item.variations.forEach(function(v) {
           var vsku = getSellerSkuAttr(v.attributes) || (v.seller_custom_field || v.seller_sku || '').toString().trim().toLowerCase();
-          if (vsku && v.price) { out[vsku] = v.price; achouVariacao = true; }
+          if (vsku) { itemsParaPreco.push({ sku: vsku, itemId: item.id, variationId: v.id, fallbackPrice: v.price }); achouVariacao = true; }
         });
       }
-
       if (!sku && !achouVariacao) semSku++;
-      if (sku && preco) out[sku] = preco;
+      if (sku) itemsParaPreco.push({ sku: sku, itemId: item.id, variationId: null, fallbackPrice: item.price });
     });
   }
+
+  // 2ª etapa: busca o preço REAL de venda (já considerando promoções) via /items/{id}/sale_price
+  // Processa em lotes pequenos para não sobrecarregar o proxy
+  var skuParaItems = {}; // diagnóstico: sku -> [{id, price}]
+  var loteSize = 8;
+  for (var j = 0; j < itemsParaPreco.length; j += loteSize) {
+    var lote = itemsParaPreco.slice(j, j+loteSize);
+    await Promise.all(lote.map(async function(entry) {
+      var precoFinal = entry.fallbackPrice;
+      try {
+        var sp = await mlGet('/items/' + entry.itemId + '/sale_price?context=channel_marketplace');
+        if (sp && typeof sp.amount === 'number') precoFinal = sp.amount;
+      } catch(e) {
+        // se a chamada falhar (ex: item sem sale_price disponível), mantém o fallback (price normal)
+      }
+      if (precoFinal) {
+        out[entry.sku] = precoFinal;
+        if (!skuParaItems[entry.sku]) skuParaItems[entry.sku] = [];
+        skuParaItems[entry.sku].push({ id: entry.itemId, price: precoFinal });
+      }
+    }));
+  }
+
+  // Diagnóstico: alerta se o mesmo SKU aparecer em mais de um anúncio (preço pode estar sendo sobrescrito)
+  Object.keys(skuParaItems).forEach(function(sku){
+    var lista = skuParaItems[sku];
+    if (lista.length > 1) {
+      var detalhe = lista.map(function(x){ return x.id + ' (R$ ' + x.price.toFixed(2) + ')'; }).join(', ');
+      _mgvDebug.push('⚠ ML: SKU "' + sku + '" aparece em ' + lista.length + ' anúncios diferentes: ' + detalhe + ' — usando o último: R$ ' + out[sku].toFixed(2));
+    }
+  });
   if (semSku > 0) _mgvDebug.push('ML: ' + semSku + ' anúncio(s) sem SKU preenchido no ML — não entram no cálculo.');
   var skusEncontrados = Object.keys(out);
   if (skusEncontrados.length) _mgvDebug.push('ML: SKUs lidos: ' + skusEncontrados.join(', '));

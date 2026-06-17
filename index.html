@@ -7709,6 +7709,7 @@ var _mgvLoading = false;
 var _mgvDados = null;       // { sku: { ml: preco|null, shopee: preco|null, tiktok: preco|null } }
 var _mgvErro = '';
 var _mgvAtualizadoEm = null;
+var _mgvTab = 'resumo'; // 'resumo' | 'ml' | 'shopee' | 'tiktok'
 var _mgvDebug = [];
 
 function mgvAplicaImposto() { return 10; } // 10% fixo, conforme solicitado
@@ -7982,6 +7983,18 @@ function renderMargemViva() {
     return html;
   }
 
+  // Navegação por abas
+  function tabBtn(id, label) {
+    var active = _mgvTab === id;
+    return '<button class="fin-tab' + (active?' active':'') + '" onclick="_mgvTab=\'' + id + '\';var c=document.getElementById(\'page-content\');if(c)c.innerHTML=renderMargemViva();" style="font-size:0.88rem">' + label + '</button>';
+  }
+  html += '<div class="fin-tabs" style="margin-bottom:1.25rem">' +
+    tabBtn('resumo', '📊 Resumo') +
+    tabBtn('ml', '🟡 Mercado Livre') +
+    tabBtn('shopee', '🟠 Shopee') +
+    tabBtn('tiktok', '⚫ TikTok') +
+  '</div>';
+
   function calcMargem(sku, preco, plat) {
     if (!preco) return null;
     var custoUnit = mgvCustoAtual(sku);
@@ -8016,6 +8029,68 @@ function renderMargemViva() {
 
   if (!linhas.length) {
     html += '<div class="empty-state">' + iconEmpty() + '<p>Nenhum produto com preço encontrado. Verifique se os SKUs cadastrados nos anúncios coincidem com os SKUs da plataforma.</p></div>';
+    return html;
+  }
+
+  // Abas detalhadas por plataforma (Valor de venda, Taxa, Tarifa de envio, Imposto, Custo, Lucro líquido, Margem)
+  if (_mgvTab !== 'resumo') {
+    var platMap = { ml: { key:'ml', precoField:'precoMl', mField:'mMl', emoji:'🟡', nome:'Mercado Livre' },
+                    shopee: { key:'sp', precoField:'precoSp', mField:'mSp', emoji:'🟠', nome:'Shopee' },
+                    tiktok: { key:'tt', precoField:'precoTt', mField:'mTt', emoji:'⚫', nome:'TikTok' } };
+    var pm = platMap[_mgvTab];
+    var linhasPlat = linhas.filter(function(l){ return l[pm.precoField]; });
+
+    if (!linhasPlat.length) {
+      html += '<div class="empty-state">' + iconEmpty() + '<p>Nenhum produto com preço encontrado em ' + pm.nome + '.</p></div>';
+      return html;
+    }
+
+    html += '<div class="card" style="padding:0;overflow:auto">' +
+      '<table style="width:100%;border-collapse:collapse;font-size:0.85rem">' +
+        '<thead><tr style="border-bottom:1.5px solid var(--border)">' +
+          '<th style="text-align:left;padding:10px 14px">Produto</th>' +
+          '<th style="text-align:right;padding:10px 10px">Valor de Venda</th>' +
+          '<th style="text-align:right;padding:10px 10px">Taxa de Venda</th>' +
+          '<th style="text-align:right;padding:10px 10px">Tarifa de Envio</th>' +
+          '<th style="text-align:right;padding:10px 10px">Imposto (' + imposto + '%)</th>' +
+          '<th style="text-align:right;padding:10px 10px">Custo do Produto</th>' +
+          '<th style="text-align:right;padding:10px 10px">Lucro Líquido</th>' +
+          '<th style="text-align:right;padding:10px 14px">Margem Líquida</th>' +
+        '</tr></thead><tbody>' +
+      linhasPlat.map(function(l) {
+        var preco = l[pm.precoField];
+        var m = l[pm.mField];
+        if (!m || m.semCusto) {
+          return '<tr style="border-bottom:0.5px solid var(--border)">' +
+            '<td style="padding:10px 14px;font-weight:500">' + esc(l.p.nome) + '<div style="font-size:0.7rem;color:var(--text3);font-family:monospace">' + l.p.sku + '</div></td>' +
+            '<td style="text-align:right;padding:10px 10px">' + fmtR$(preco) + '</td>' +
+            '<td colspan="6" style="text-align:center;padding:10px 10px;color:var(--red);font-size:0.78rem">sem custo cadastrado — não foi possível calcular</td>' +
+          '</tr>';
+        }
+        // Tarifa cadastrada (separar % de venda e envio fixo)
+        var t = tarifas[l.p.sku] && tarifas[l.p.sku][pm.key] ? tarifas[l.p.sku][pm.key] : null;
+        var taxaVenda = t ? preco * ((t.pctVenda||0)/100) : 0;
+        var tarifaEnvio = t ? (t.envio||0) : 0;
+        return '<tr style="border-bottom:0.5px solid var(--border)">' +
+          '<td style="padding:10px 14px;font-weight:500">' + esc(l.p.nome) + '<div style="font-size:0.7rem;color:var(--text3);font-family:monospace">' + l.p.sku + '</div></td>' +
+          '<td style="text-align:right;padding:10px 10px">' + fmtR$(preco) + '</td>' +
+          '<td style="text-align:right;padding:10px 10px;color:var(--red)">' + (t ? '−'+fmtR$(taxaVenda) : '<span style="color:var(--text3);font-size:0.75rem">sem tarifa</span>') + '</td>' +
+          '<td style="text-align:right;padding:10px 10px;color:var(--red)">' + (t ? '−'+fmtR$(tarifaEnvio) : '—') + '</td>' +
+          '<td style="text-align:right;padding:10px 10px;color:var(--red)">−' + fmtR$(m.impostoValor) + '</td>' +
+          '<td style="text-align:right;padding:10px 10px;color:var(--red)">−' + fmtR$(m.custoUnit) + '</td>' +
+          '<td style="text-align:right;padding:10px 10px;font-weight:700;color:' + (m.lucro>=0?'var(--green)':'var(--red)') + '">' + fmtR$(m.lucro) + '</td>' +
+          '<td style="text-align:right;padding:10px 14px;font-weight:700;color:' + corMargem(m.margem) + '">' + fmtPct(m.margem) + '</td>' +
+        '</tr>';
+      }).join('') +
+      '</tbody></table>' +
+    '</div>' +
+    '<div style="margin-top:1rem;font-size:0.78rem;color:var(--text3)">' +
+      'Lucro Líquido = Valor de Venda − Taxa de Venda − Tarifa de Envio − Imposto − Custo do Produto. ' +
+      'Margem Líquida = (Lucro Líquido / Valor de Venda) × 100. ' +
+      (pm.key === 'tt' ? 'TikTok usa o preço médio do último mês importado no Financeiro. ' : '') +
+      '<span style="color:var(--green)">●</span> ≥15% boa · <span style="color:#3b82f6">●</span> ≥10% ok · <span style="color:var(--red)">●</span> &lt;10% atenção' +
+    '</div>';
+
     return html;
   }
 

@@ -5637,16 +5637,18 @@ function renderEstoqueCusto() {
       if (maisRecente) ultimoKg = maisRecente.totalKg;
 
       // Custo calculado automaticamente se preço/kg disponível
-      var custoProduto = c.custoManual !== undefined ? c.custoManual :
-        (ultimoKg ? ((ultimoKg * prod.peso / 1000) + (parseFloat(c.embalagem)||0) + (parseFloat(c.caixa)||0)) : '');
+      var ultimoKgNum = parseFloat(ultimoKg) || 0;
+      var custoProduto = c.custoManual !== undefined ? parseFloat(c.custoManual) :
+        (ultimoKgNum ? round4((ultimoKgNum * prod.peso / 1000) + (parseFloat(c.embalagem)||0) + (parseFloat(c.caixa)||0)) : '');
 
       return '' +
         '<button onclick="_estoqueCustoProdSel=null;var el=document.getElementById(\'page-content\');if(el)el.innerHTML=(state.currentPage===\'produtos\'?renderProdutos():renderEstoque());" ' +
           'style="display:inline-flex;align-items:center;gap:6px;margin-bottom:1.25rem;background:none;border:0.5px solid var(--border2);border-radius:8px;padding:6px 14px;color:var(--text2);cursor:pointer;font-size:0.85rem">← Voltar</button>' +
         '<div class="card" style="padding:1.5rem;max-width:520px">' +
           '<div style="font-size:1rem;font-weight:700;margin-bottom:1.5rem">' + esc(prod.nome) + ' <span style="font-size:0.75rem;color:var(--text3);font-weight:400">SKU: '+prod.sku+'</span></div>' +
-          (ultimoKg ? '<div style="background:rgba(26,138,74,0.08);border:0.5px solid rgba(26,138,74,0.2);border-radius:8px;padding:10px 14px;margin-bottom:1.25rem;font-size:0.83rem;color:var(--text2)">'+
-            '📈 Último preço/kg no histórico: <strong style="color:var(--green)">'+finFmt(parseFloat(ultimoKg))+'/kg</strong> → custo ingrediente: <strong>'+finFmt(ultimoKg*prod.peso/1000)+'</strong> ('+prod.peso+'g)'+
+          (ultimoKgNum ? '<div style="background:rgba(26,138,74,0.08);border:0.5px solid rgba(26,138,74,0.2);border-radius:8px;padding:10px 14px;margin-bottom:1.25rem;font-size:0.83rem;color:var(--text2)">'+
+            '📈 Último preço/kg no histórico: <strong style="color:var(--green)">'+finFmt(ultimoKgNum)+'/kg</strong> → custo ingrediente: <strong>'+finFmt(ultimoKgNum*prod.peso/1000)+'</strong> ('+prod.peso+'g)'+
+            (custoProduto !== '' ? '<br>💰 Custo final do produto (ingrediente + embalagem + caixa): <strong style="color:var(--green);font-size:0.95rem">'+finFmt(custoProduto)+'</strong>' : '') +
           '</div>' : '<div style="background:rgba(186,117,23,0.08);border:0.5px solid rgba(186,117,23,0.2);border-radius:8px;padding:10px 14px;margin-bottom:1.25rem;font-size:0.83rem;color:var(--text2)">'+
             '⚠️ Nenhum preço/kg encontrado no Histórico de Preços para este produto. Informe o custo manualmente.'+
           '</div>') +
@@ -5675,8 +5677,8 @@ function renderEstoqueCusto() {
   var custoProdTotal = 0;
   var comCusto = 0;
   PRODUTOS_CUSTO.forEach(function(p){
-    var c = custos[p.sku];
-    if (c && c.custoFinal !== undefined) { custoProdTotal += c.custoFinal; comCusto++; }
+    var custoDin = mgvCustoAtual(p.sku);
+    if (custoDin !== null) { custoProdTotal += custoDin; comCusto++; }
   });
 
   var html =
@@ -5696,7 +5698,7 @@ function renderEstoqueCusto() {
 
   PRODUTOS_CUSTO.forEach(function(p) {
     var c = custos[p.sku] || {};
-    var temCusto = c.custoFinal !== undefined;
+    var custoDinamico = mgvCustoAtual(p.sku);
     html += '<tr style="border-bottom:0.5px solid var(--border);cursor:pointer;transition:background 0.12s" '+
       'onclick="_estoqueCustoProdSel=\''+p.sku+'\';var el=document.getElementById(\'page-content\');if(el)el.innerHTML=(state.currentPage===\'produtos\'?renderProdutos():renderEstoque());" '+
       'onmouseover="this.style.background=\'var(--bg3)\'" onmouseout="this.style.background=\'\'">'+
@@ -5704,7 +5706,7 @@ function renderEstoqueCusto() {
       '<td style="padding:11px 16px;text-align:center;font-size:0.78rem;color:var(--text3);font-family:monospace">'+p.sku+'</td>'+
       '<td style="padding:11px 16px;text-align:right;color:var(--text2)">'+(c.embalagem !== undefined ? 'R$ '+parseFloat(c.embalagem).toFixed(2) : '—')+'</td>'+
       '<td style="padding:11px 16px;text-align:right;color:var(--text2)">'+(c.caixa !== undefined ? 'R$ '+parseFloat(c.caixa).toFixed(2) : '—')+'</td>'+
-      '<td style="padding:11px 16px;text-align:right;font-weight:700;color:'+(temCusto?'var(--green)':'var(--text3)')+'">'+(temCusto ? finFmt(c.custoFinal) : '—')+'</td>'+
+      '<td style="padding:11px 16px;text-align:right;font-weight:700;color:'+(custoDinamico!==null?'var(--green)':'var(--text3)')+'">'+(custoDinamico!==null ? finFmt(custoDinamico) : '—')+'</td>'+
       '<td style="padding:11px 16px;text-align:right;color:var(--text3);font-size:0.8rem">→</td>'+
     '</tr>';
   });
@@ -7973,13 +7975,13 @@ var _mgvCarregado = false;
 // Se houver custo manual cadastrado (custoManual !== undefined), esse tem prioridade.
 function mgvCustoAtual(sku) {
   var c = (state.financeiro.custoProdutos || {})[sku];
-  if (c && c.custoManual !== undefined) {
-    return c.custoManual; // custo manual sempre tem prioridade, não recalcula
+  if (c && c.custoManual !== undefined && c.custoManual !== null && c.custoManual !== '') {
+    return parseFloat(c.custoManual) || 0; // custo manual sempre tem prioridade, não recalcula
   }
   var prod = PRODUTOS_CUSTO.find(function(p){ return p.sku === sku; });
   if (!prod) return null;
-  var emb   = c ? (c.embalagem || 0) : 0;
-  var caixa = c ? (c.caixa || 0) : 0;
+  var emb   = c ? (parseFloat(c.embalagem) || 0) : 0;
+  var caixa = c ? (parseFloat(c.caixa) || 0) : 0;
 
   var hist = (state.estoque.historicoManual||[]).concat(
     (state.estoque.movimentacoes||[]).filter(function(m){ return m.tipo==='entrada' && m.totalKg>0; })
@@ -7991,10 +7993,11 @@ function mgvCustoAtual(sku) {
     if (skuMatchHist(sku, nomeLow) && (!maisRecente || (r.dataISO||'') > (maisRecente.dataISO||''))) maisRecente = r;
   });
   if (maisRecente) {
-    return round4(maisRecente.totalKg * prod.peso / 1000 + emb + caixa);
+    var precoKg = parseFloat(maisRecente.totalKg) || 0;
+    return round4((precoKg * prod.peso / 1000) + emb + caixa);
   }
   // Sem histórico de compra: usa o custoFinal salvo, se existir, como último recurso
-  return c && c.custoFinal !== undefined ? c.custoFinal : null;
+  return c && c.custoFinal !== undefined ? (parseFloat(c.custoFinal) || 0) : null;
 }
 
 function renderMargemViva() {

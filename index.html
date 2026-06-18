@@ -944,7 +944,7 @@ function getPagesAdmin() {
   ];
 }
 function getPagesLimited() {
-  return getPagesAdmin().filter(p => p.id !== 'logs' && p.id !== 'financeiro' && p.id !== 'produtos' && p.id !== 'marketplaces' && p.id !== '__sep__');
+  return getPagesAdmin().filter(p => p.id !== 'logs' && p.id !== 'financeiro' && p.id !== 'produtos' && p.id !== 'marketplaces' && p.id !== 'margemviva' && p.id !== '__sep__');
 }
 
 function buildSidebar() {
@@ -1067,7 +1067,7 @@ function renderPage() {
   if (pg === 'estoque')   { c.innerHTML = renderEstoque(); setupEstoque(); return; }
   if (pg === 'produtos')      { c.innerHTML = renderProdutos(); return; }
   if (pg === 'marketplaces')  { c.innerHTML = renderMarketplaces(); return; }
-  if (pg === 'margemviva')    { c.innerHTML = renderMargemViva(); return; }
+  if (pg === 'margemviva')    { c.innerHTML = (state.currentUser.role === 'admin' ? renderMargemViva() : '<div class="empty-state">' + iconEmpty() + '<p>Acesso restrito a administradores.</p></div>'); return; }
   if (pg === 'ponto')     { c.innerHTML = renderPonto(); return; }
   if (pg === 'logs')      { c.innerHTML = renderLogs(); return; }
   if (pg === 'financeiro') { c.innerHTML = renderFinanceiro(); bindFinanceiro(); return; }
@@ -7839,6 +7839,16 @@ async function mgvBuscarPrecosShopee() {
   }
   _mgvDebug.push('Shopee: ' + itemIds.length + ' anúncios ativos encontrados na conta.');
   var semSkuSp = 0;
+  var itemsComVariacaoSemPreco = []; // item_id dos que precisam de get_model_list separado
+  var skuParaItemsSp = {}; // diagnóstico: sku -> [{id, price}]
+
+  function registrarPreco(sku, preco, itemId) {
+    if (!sku || !preco) return;
+    out[sku] = preco;
+    if (!skuParaItemsSp[sku]) skuParaItemsSp[sku] = [];
+    skuParaItemsSp[sku].push({ id: itemId, price: preco });
+  }
+
   for (var i = 0; i < itemIds.length; i += 50) {
     var batch = itemIds.slice(i, i+50);
     var det = await shopeeGet('/api/v2/product/get_item_base_info', { item_id_list: batch.join(',') });
@@ -7846,19 +7856,60 @@ async function mgvBuscarPrecosShopee() {
     lista.forEach(function(item) {
       var sku = (item.item_sku || '').toString().trim().toLowerCase();
       var preco = null;
+      // current_price já é o preço COM desconto ativo (preço real de venda)
       if (item.price_info && item.price_info.length) preco = item.price_info[0].current_price;
-      if (!sku && !(item.model_list && item.model_list.length)) semSkuSp++;
-      // Variações (modelos) com SKU próprio
-      if (item.model_list && item.model_list.length) {
+
+      var temModelos = item.model_list && item.model_list.length;
+      if (temModelos) {
+        var algumSemPreco = false;
         item.model_list.forEach(function(m) {
           var msku = (m.model_sku || '').toString().trim().toLowerCase();
-          var mpreco = m.price_info && m.price_info.length ? m.price_info[0].current_price : null;
-          if (msku && mpreco) out[msku] = mpreco;
+          var mpreco = (m.price_info && m.price_info.length) ? m.price_info[0].current_price : null;
+          if (msku && mpreco) {
+            registrarPreco(msku, mpreco, item.item_id);
+          } else if (msku) {
+            algumSemPreco = true; // tem SKU mas sem preço no base_info -- precisa do get_model_list
+          }
         });
+        if (algumSemPreco) itemsComVariacaoSemPreco.push(item.item_id);
       }
-      if (sku && preco) out[sku] = preco;
+
+      if (!sku && !temModelos) semSkuSp++;
+      if (sku && preco) registrarPreco(sku, preco, item.item_id);
     });
   }
+
+  // Para itens com variação cujo preço não veio no get_item_base_info,
+  // busca via get_model_list (endpoint dedicado a preço/estoque por variação)
+  if (itemsComVariacaoSemPreco.length) {
+    _mgvDebug.push('Shopee: ' + itemsComVariacaoSemPreco.length + ' produto(s) com variação exigiram consulta extra (get_model_list).');
+    for (var k = 0; k < itemsComVariacaoSemPreco.length; k++) {
+      var itemId = itemsComVariacaoSemPreco[k];
+      try {
+        var modelResp = await shopeeGet('/api/v2/product/get_model_list', { item_id: itemId });
+        var modelos = (modelResp.response || {}).model || [];
+        modelos.forEach(function(m) {
+          var msku = (m.model_sku || '').toString().trim().toLowerCase();
+          var mpreco = null;
+          if (m.price_info && m.price_info.length) mpreco = m.price_info[0].current_price;
+          else if (m.price !== undefined) mpreco = m.price; // fallback para formatos alternativos da API
+          if (msku && mpreco) registrarPreco(msku, mpreco, itemId);
+        });
+      } catch(e) {
+        _mgvDebug.push('Shopee: erro ao buscar variações do item ' + itemId + ': ' + e.message);
+      }
+    }
+  }
+
+  // Diagnóstico: alerta se o mesmo SKU aparecer em mais de um anúncio
+  Object.keys(skuParaItemsSp).forEach(function(sku){
+    var listaSp = skuParaItemsSp[sku];
+    if (listaSp.length > 1) {
+      var detalheSp = listaSp.map(function(x){ return x.id + ' (R$ ' + x.price.toFixed(2) + ')'; }).join(', ');
+      _mgvDebug.push('⚠ Shopee: SKU "' + sku + '" aparece em ' + listaSp.length + ' anúncios/variações diferentes: ' + detalheSp + ' — usando o último: R$ ' + out[sku].toFixed(2));
+    }
+  });
+
   if (semSkuSp > 0) _mgvDebug.push('Shopee: ' + semSkuSp + ' anúncio(s) sem SKU preenchido na Shopee — não entram no cálculo.');
   var noCatalogoSp = Object.keys(out).filter(function(s){ return !PRODUTOS_CUSTO.some(function(p){ return p.sku===s; }); });
   if (noCatalogoSp.length) _mgvDebug.push('Shopee: SKUs encontrados mas fora do catálogo: ' + noCatalogoSp.join(', '));

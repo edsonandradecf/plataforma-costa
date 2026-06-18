@@ -7839,7 +7839,7 @@ async function mgvBuscarPrecosShopee() {
   }
   _mgvDebug.push('Shopee: ' + itemIds.length + ' anúncios ativos encontrados na conta.');
   var semSkuSp = 0;
-  var itemsComVariacaoSemPreco = []; // item_id dos que precisam de get_model_list separado
+  var itemsComVariacao = []; // TODOS os item_id que têm model_list (variações) -- sempre vão para get_model_list
   var skuParaItemsSp = {}; // diagnóstico: sku -> [{id, price}]
 
   function registrarPreco(sku, preco, itemId) {
@@ -7854,45 +7854,39 @@ async function mgvBuscarPrecosShopee() {
     var det = await shopeeGet('/api/v2/product/get_item_base_info', { item_id_list: batch.join(',') });
     var lista = (det.response || {}).item_list || [];
     lista.forEach(function(item) {
+      var temModelos = item.has_model || (item.model_list && item.model_list.length);
+      // Item COM variações: o preço de cada variação NUNCA vem completo aqui.
+      // Sempre buscar via get_model_list, que é o endpoint correto para isso.
+      if (temModelos) {
+        itemsComVariacao.push(item.item_id);
+        return;
+      }
+      // Item SEM variações: usa o preço simples do item (já com desconto, se houver)
       var sku = (item.item_sku || '').toString().trim().toLowerCase();
       var preco = null;
-      // current_price já é o preço COM desconto ativo (preço real de venda)
       if (item.price_info && item.price_info.length) preco = item.price_info[0].current_price;
-
-      var temModelos = item.model_list && item.model_list.length;
-      if (temModelos) {
-        var algumSemPreco = false;
-        item.model_list.forEach(function(m) {
-          var msku = (m.model_sku || '').toString().trim().toLowerCase();
-          var mpreco = (m.price_info && m.price_info.length) ? m.price_info[0].current_price : null;
-          if (msku && mpreco) {
-            registrarPreco(msku, mpreco, item.item_id);
-          } else if (msku) {
-            algumSemPreco = true; // tem SKU mas sem preço no base_info -- precisa do get_model_list
-          }
-        });
-        if (algumSemPreco) itemsComVariacaoSemPreco.push(item.item_id);
-      }
-
-      if (!sku && !temModelos) semSkuSp++;
+      if (!sku) semSkuSp++;
       if (sku && preco) registrarPreco(sku, preco, item.item_id);
     });
   }
 
-  // Para itens com variação cujo preço não veio no get_item_base_info,
-  // busca via get_model_list (endpoint dedicado a preço/estoque por variação)
-  if (itemsComVariacaoSemPreco.length) {
-    _mgvDebug.push('Shopee: ' + itemsComVariacaoSemPreco.length + ' produto(s) com variação exigiram consulta extra (get_model_list).');
-    for (var k = 0; k < itemsComVariacaoSemPreco.length; k++) {
-      var itemId = itemsComVariacaoSemPreco[k];
+  // Busca o preço real de cada variação via get_model_list (endpoint dedicado)
+  if (itemsComVariacao.length) {
+    _mgvDebug.push('Shopee: ' + itemsComVariacao.length + ' produto(s) com variação -- buscando preços via get_model_list.');
+    for (var k = 0; k < itemsComVariacao.length; k++) {
+      var itemId = itemsComVariacao[k];
       try {
         var modelResp = await shopeeGet('/api/v2/product/get_model_list', { item_id: itemId });
         var modelos = (modelResp.response || {}).model || [];
+        if (!modelos.length) {
+          _mgvDebug.push('Shopee: item ' + itemId + ' marcado com variação mas get_model_list não retornou modelos.');
+        }
         modelos.forEach(function(m) {
           var msku = (m.model_sku || '').toString().trim().toLowerCase();
           var mpreco = null;
           if (m.price_info && m.price_info.length) mpreco = m.price_info[0].current_price;
-          else if (m.price !== undefined) mpreco = m.price; // fallback para formatos alternativos da API
+          else if (m.price !== undefined && m.price !== null) mpreco = m.price;
+          if (!msku) semSkuSp++;
           if (msku && mpreco) registrarPreco(msku, mpreco, itemId);
         });
       } catch(e) {
@@ -7910,7 +7904,7 @@ async function mgvBuscarPrecosShopee() {
     }
   });
 
-  if (semSkuSp > 0) _mgvDebug.push('Shopee: ' + semSkuSp + ' anúncio(s) sem SKU preenchido na Shopee — não entram no cálculo.');
+  if (semSkuSp > 0) _mgvDebug.push('Shopee: ' + semSkuSp + ' variação/anúncio sem SKU preenchido na Shopee — não entram no cálculo.');
   var noCatalogoSp = Object.keys(out).filter(function(s){ return !PRODUTOS_CUSTO.some(function(p){ return p.sku===s; }); });
   if (noCatalogoSp.length) _mgvDebug.push('Shopee: SKUs encontrados mas fora do catálogo: ' + noCatalogoSp.join(', '));
   return out;

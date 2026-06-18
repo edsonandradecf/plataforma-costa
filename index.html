@@ -8083,6 +8083,7 @@ function renderMargemViva() {
 
   function corMargem(m) {
     if (m === null) return 'var(--text3)';
+    if (m > 17) return '#8b5cf6';
     if (m >= 15) return 'var(--green)';
     if (m >= 10) return '#3b82f6';
     return 'var(--red)';
@@ -8162,7 +8163,7 @@ function renderMargemViva() {
       'Lucro Líquido = Valor de Venda − Taxa de Venda − Tarifa de Envio − Imposto − Custo do Produto. ' +
       'Margem Líquida = (Lucro Líquido / Valor de Venda) × 100. ' +
       (pm.key === 'tt' ? 'TikTok usa o preço médio do último mês importado no Financeiro. ' : '') +
-      '<span style="color:var(--green)">●</span> ≥15% boa · <span style="color:#3b82f6">●</span> ≥10% ok · <span style="color:var(--red)">●</span> &lt;10% atenção' +
+      '<span style="color:#8b5cf6">●</span> &gt;17% excelente · <span style="color:var(--green)">●</span> ≥15% boa · <span style="color:#3b82f6">●</span> ≥10% ok · <span style="color:var(--red)">●</span> &lt;10% atenção' +
     '</div>';
 
     return html;
@@ -8201,7 +8202,7 @@ function renderMargemViva() {
   '<div style="margin-top:1rem;font-size:0.78rem;color:var(--text3)">' +
     'Margem = Preço − Tarifa (cadastrada em Marketplaces → Tarifas) − Custo do produto − ' + imposto + '% de imposto. ' +
     'TikTok usa o preço médio do último mês importado no Financeiro (sem API de tempo real disponível). ' +
-    '<span style="color:var(--green)">●</span> ≥15% boa · <span style="color:#3b82f6">●</span> ≥10% ok · <span style="color:var(--red)">●</span> &lt;10% atenção' +
+    '<span style="color:#8b5cf6">●</span> &gt;17% excelente · <span style="color:var(--green)">●</span> ≥15% boa · <span style="color:#3b82f6">●</span> ≥10% ok · <span style="color:var(--red)">●</span> &lt;10% atenção' +
   '</div>';
 
   return html;
@@ -8343,7 +8344,7 @@ function renderMarketplaces() {
 
   function fmtN(v){ if(v===null||v===undefined) return '<span style="color:var(--text3)">—</span>'; return (v>=0?'':'− ')+'R$ '+Math.abs(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
   function fmtPct(v){ if(v===null||v===undefined) return '<span style="color:var(--text3)">—</span>'; return (v>=0?'':'− ')+Math.abs(v).toFixed(1)+'%'; }
-  function corMargem(v){ if(v===null||v===undefined) return ''; if(v>=15) return 'color:var(--green)'; if(v>=10) return 'color:#3b82f6'; return 'color:var(--red)'; }
+  function corMargem(v){ if(v===null||v===undefined) return ''; if(v>17) return 'color:#8b5cf6'; if(v>=15) return 'color:var(--green)'; if(v>=10) return 'color:#3b82f6'; return 'color:var(--red)'; }
   function cor(v){ return v===null?'':(v>=0?'color:var(--green)':'color:var(--red)'); }
 
   // Filtrar SKUs com venda na plataforma atual (ou todos)

@@ -7918,6 +7918,14 @@ async function mgvAtualizarPrecos() {
   var c = document.getElementById('page-content');
   if (c && state.currentPage === 'margemviva') c.innerHTML = renderMargemViva();
 
+  // Força recarregar custos e tarifas atualizadas (não usa cache da primeira carga da página)
+  try {
+    await finLoadFirebase();
+    _mgvDebug.push('Custos e tarifas recarregados do Firebase.');
+  } catch(e) {
+    _mgvDebug.push('⚠ Não foi possível recarregar custos/tarifas: ' + e.message);
+  }
+
   var precosMl = {}, precosSp = {};
   try {
     if (mlTokenValid()) {

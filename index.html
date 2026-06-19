@@ -8073,6 +8073,14 @@ function renderMargemViva() {
   var custos  = state.financeiro.custoProdutos || {};
   var imposto = mgvAplicaImposto();
 
+  // Diagnóstico: mostra quantas tarifas estão carregadas
+  if (_mgvDados && Object.keys(tarifas).length === 0) {
+    _mgvDebug.push('⚠ Tarifas manuais: nenhuma encontrada em state.financeiro.tarifasSku — verifique se o Financeiro carregou.');
+  } else if (_mgvDados) {
+    var comEnvio = Object.keys(tarifas).filter(function(s){ return tarifas[s] && tarifas[s]['ml'] && tarifas[s]['ml'].envio > 0; }).length;
+    _mgvDebug.push('Tarifas carregadas: ' + Object.keys(tarifas).length + ' SKUs (' + comEnvio + ' com envio ML cadastrado).');
+  }
+
   var mlOk = mlTokenValid();
   var spOk = shopeeTokenValid();
 
@@ -8138,16 +8146,17 @@ function renderMargemViva() {
     var taxaVendaPct = 0, envioFixo = 0, tarifaAuto = false;
 
     if (plat === 'ml') {
-      // Tarifa via API do ML (buscada no Atualizar Preços)
+      // Taxa de venda: via API (automática) ou fallback manual
       var pctML = _mgvDados && _mgvDados.tarifasMl ? _mgvDados.tarifasMl[sku] : null;
+      var tManualML = tarifas[sku] && tarifas[sku]['ml'] ? tarifas[sku]['ml'] : null;
       if (pctML !== undefined && pctML !== null) {
         taxaVendaPct = pctML;
         tarifaAuto = true;
-      } else {
-        // Fallback: tarifa cadastrada manualmente
-        var tManual = tarifas[sku] && tarifas[sku]['ml'] ? tarifas[sku]['ml'] : null;
-        if (tManual) { taxaVendaPct = tManual.pctVenda || 0; envioFixo = tManual.envio || 0; }
+      } else if (tManualML) {
+        taxaVendaPct = tManualML.pctVenda || 0;
       }
+      // Tarifa de envio: sempre da configuração manual (API não retorna esse valor)
+      envioFixo = tManualML ? (tManualML.envio || 0) : 0;
     } else if (plat === 'sp') {
       // Tarifa via tabela de faixas Shopee (CNPJ, vigente 28/02/2026)
       var faixaSp = mgvTarifaShopee(preco);

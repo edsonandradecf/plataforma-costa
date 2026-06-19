@@ -7820,8 +7820,56 @@ async function mgvBuscarPrecosML() {
   if (skusEncontrados.length) _mgvDebug.push('ML: SKUs lidos: ' + skusEncontrados.join(', '));
   var noCatalogo = skusEncontrados.filter(function(s){ return !PRODUTOS_CUSTO.some(function(p){ return p.sku===s; }); });
   if (noCatalogo.length) _mgvDebug.push('ML: SKUs encontrados mas fora do catálogo: ' + noCatalogo.join(', '));
-  return out;
+
+  // 3ª etapa: busca a tarifa de venda (% comissão) para cada item via listing_prices
+  // Usamos listing_type_id e category_id de cada item, que já vieram na 1ª etapa
+  var tarifasML = {}; // { sku: pctComissao }
+  var itemsMeta = {}; // { itemId: { listing_type_id, category_id, price } }
+  for (var i2 = 0; i2 < ids.length; i2 += 20) {
+    var batch2 = ids.slice(i2, i2+20);
+    var multi2 = await mlGet('/items?ids=' + batch2.join(',') + '&attributes=id,listing_type_id,category_id,price,attributes,seller_custom_field,variations');
+    multi2.forEach(function(entry) {
+      var item = entry.body || entry;
+      if (!item) return;
+      itemsMeta[item.id] = { listing_type_id: item.listing_type_id, category_id: item.category_id, price: item.price };
+    });
+  }
+
+  // Para cada SKU, busca a taxa usando o listing_type_id e category_id do anúncio correspondente
+  for (var j2 = 0; j2 < itemsParaPreco.length; j2++) {
+    var entry2 = itemsParaPreco[j2];
+    var meta = itemsMeta[entry2.itemId];
+    if (!meta || !entry2.sku || tarifasML[entry2.sku] !== undefined) continue;
+    var precoParaTaxa = out[entry2.sku] || meta.price;
+    if (!precoParaTaxa) continue;
+    try {
+      var fees = await mlGet('/sites/MLB/listing_prices?price=' + precoParaTaxa +
+        '&listing_type_id=' + meta.listing_type_id +
+        '&category_id=' + meta.category_id);
+      var pct = (fees.sale_fee_details && fees.sale_fee_details.percentage_fee !== undefined)
+        ? fees.sale_fee_details.percentage_fee
+        : fees.sale_fee_amount / precoParaTaxa * 100;
+      tarifasML[entry2.sku] = parseFloat(pct) || 0;
+    } catch(e) {
+      _mgvDebug.push('⚠ ML: erro ao buscar tarifa para ' + entry2.sku + ': ' + e.message);
+    }
+    await new Promise(function(r){ setTimeout(r, 100); }); // pequeno delay
+  }
+  _mgvDebug.push('ML: tarifas de venda carregadas para ' + Object.keys(tarifasML).length + ' SKU(s).');
+
+  return { precos: out, tarifas: tarifasML };
 }
+
+// Calcula a tarifa de venda da Shopee pela tabela de faixas (CNPJ, vigente 28/02/2026)
+function mgvTarifaShopee(preco) {
+  if (!preco) return { pct: 0, fixo: 0 };
+  if (preco <= 79.99)  return { pct: 20, fixo: 4  };
+  if (preco <= 99.99)  return { pct: 14, fixo: 16 };
+  if (preco <= 199.99) return { pct: 14, fixo: 20 };
+  if (preco <= 499.99) return { pct: 14, fixo: 26 };
+  return                      { pct: 14, fixo: 26 };
+}
+
 
 // Busca todos os preços ativos na Shopee e retorna { sku: preco }
 async function mgvBuscarPrecosShopee() {
@@ -7928,10 +7976,12 @@ async function mgvAtualizarPrecos() {
     _mgvDebug.push('⚠ Não foi possível recarregar custos/tarifas: ' + e.message);
   }
 
-  var precosMl = {}, precosSp = {};
+  var precosMl = {}, tarifasMl = {}, precosSp = {};
   try {
     if (mlTokenValid()) {
-      precosMl = await mgvBuscarPrecosML();
+      var resultML = await mgvBuscarPrecosML();
+      precosMl = resultML.precos || {};
+      tarifasMl = resultML.tarifas || {};
       _mgvDebug.push('ML: ' + Object.keys(precosMl).length + ' SKUs com preço encontrados.');
     } else {
       _mgvDebug.push('ML: token não conectado/inválido (vá em Vendas e conecte).');
@@ -7959,7 +8009,7 @@ async function mgvAtualizarPrecos() {
     }
   } catch(e) {}
 
-  _mgvDados = { ml: precosMl, shopee: precosSp, tiktok: precosTt };
+  _mgvDados = { ml: precosMl, shopee: precosSp, tiktok: precosTt, tarifasMl: tarifasMl };
   _mgvAtualizadoEm = new Date();
   _mgvLoading = false;
   mgvSalvarFirebase();
@@ -8084,12 +8134,43 @@ function renderMargemViva() {
     if (!preco) return null;
     var custoUnit = mgvCustoAtual(sku);
     if (custoUnit === null || custoUnit === undefined) return { semCusto: true };
-    var t = tarifas[sku] && tarifas[sku][plat] ? tarifas[sku][plat] : null;
-    var tarifaValor = t ? (preco * ((t.pctVenda||0)/100) + (t.envio||0)) : 0;
-    var impostoValor = preco * (imposto/100);
+
+    var taxaVendaPct = 0, envioFixo = 0, tarifaAuto = false;
+
+    if (plat === 'ml') {
+      // Tarifa via API do ML (buscada no Atualizar Preços)
+      var pctML = _mgvDados && _mgvDados.tarifasMl ? _mgvDados.tarifasMl[sku] : null;
+      if (pctML !== undefined && pctML !== null) {
+        taxaVendaPct = pctML;
+        tarifaAuto = true;
+      } else {
+        // Fallback: tarifa cadastrada manualmente
+        var tManual = tarifas[sku] && tarifas[sku]['ml'] ? tarifas[sku]['ml'] : null;
+        if (tManual) { taxaVendaPct = tManual.pctVenda || 0; envioFixo = tManual.envio || 0; }
+      }
+    } else if (plat === 'sp') {
+      // Tarifa via tabela de faixas Shopee (CNPJ, vigente 28/02/2026)
+      var faixaSp = mgvTarifaShopee(preco);
+      taxaVendaPct = faixaSp.pct;
+      envioFixo = faixaSp.fixo;
+      tarifaAuto = true;
+    } else {
+      // TikTok: usa tarifa cadastrada manualmente
+      var tTt = tarifas[sku] && tarifas[sku]['tt'] ? tarifas[sku]['tt'] : null;
+      if (tTt) { taxaVendaPct = tTt.pctVenda || 0; envioFixo = tTt.envio || 0; }
+    }
+
+    var tarifaValor = preco * (taxaVendaPct / 100) + envioFixo;
+    var impostoValor = preco * (imposto / 100);
     var lucro = preco - tarifaValor - custoUnit - impostoValor;
     var margem = preco > 0 ? (lucro / preco) * 100 : 0;
-    return { lucro: lucro, margem: margem, tarifaValor: tarifaValor, impostoValor: impostoValor, custoUnit: custoUnit, temTarifa: !!t };
+    return {
+      lucro: lucro, margem: margem,
+      tarifaValor: tarifaValor, taxaVendaPct: taxaVendaPct, envioFixo: envioFixo,
+      impostoValor: impostoValor, custoUnit: custoUnit,
+      temTarifa: taxaVendaPct > 0 || envioFixo > 0,
+      tarifaAuto: tarifaAuto
+    };
   }
 
   function corMargem(m) {
@@ -8153,15 +8234,14 @@ function renderMargemViva() {
             '<td colspan="6" style="text-align:center;padding:10px 10px;color:var(--red);font-size:0.78rem">sem custo cadastrado — não foi possível calcular</td>' +
           '</tr>';
         }
-        // Tarifa cadastrada (separar % de venda e envio fixo)
-        var t = tarifas[l.p.sku] && tarifas[l.p.sku][pm.key] ? tarifas[l.p.sku][pm.key] : null;
-        var taxaVenda = t ? preco * ((t.pctVenda||0)/100) : 0;
-        var tarifaEnvio = t ? (t.envio||0) : 0;
+        var autoLabel = m.tarifaAuto
+          ? '<div style="font-size:0.62rem;color:var(--green)">automático</div>'
+          : '<div style="font-size:0.62rem;color:var(--text3)">manual</div>';
         return '<tr style="border-bottom:0.5px solid var(--border)">' +
           '<td style="padding:10px 14px;font-weight:500">' + esc(l.p.nome) + '<div style="font-size:0.7rem;color:var(--text3);font-family:monospace">' + l.p.sku + '</div></td>' +
           '<td style="text-align:right;padding:10px 10px">' + fmtR$(preco) + '</td>' +
-          '<td style="text-align:right;padding:10px 10px;color:var(--red)">' + (t ? '−'+fmtR$(taxaVenda) : '<span style="color:var(--text3);font-size:0.75rem">sem tarifa</span>') + '</td>' +
-          '<td style="text-align:right;padding:10px 10px;color:var(--red)">' + (t ? '−'+fmtR$(tarifaEnvio) : '—') + '</td>' +
+          '<td style="text-align:right;padding:10px 10px;color:var(--red)">−' + fmtR$(preco * (m.taxaVendaPct||0) / 100) + autoLabel + '</td>' +
+          '<td style="text-align:right;padding:10px 10px;color:var(--red)">' + (m.envioFixo ? '−'+fmtR$(m.envioFixo) : '—') + '</td>' +
           '<td style="text-align:right;padding:10px 10px;color:var(--red)">−' + fmtR$(m.impostoValor) + '</td>' +
           '<td style="text-align:right;padding:10px 10px;color:var(--red)">−' + fmtR$(m.custoUnit) + '</td>' +
           '<td style="text-align:right;padding:10px 10px;font-weight:700;color:' + (m.lucro>=0?'var(--green)':'var(--red)') + '">' + fmtR$(m.lucro) + '</td>' +
@@ -8172,7 +8252,8 @@ function renderMargemViva() {
     '</div>' +
     '<div style="margin-top:1rem;font-size:0.78rem;color:var(--text3)">' +
       'Lucro Líquido = Valor de Venda − Taxa de Venda − Tarifa de Envio − Imposto − Custo do Produto. ' +
-      'Margem Líquida = (Lucro Líquido / Valor de Venda) × 100. ' +
+      'ML: taxa buscada via API por anúncio (Clássico/Premium/categoria). ' +
+      'Shopee: taxa calculada por faixas de preço (tabela CNPJ vigente 28/02/2026). ' +
       (pm.key === 'tt' ? 'TikTok usa o preço médio do último mês importado no Financeiro. ' : '') +
       '<span style="color:#8b5cf6">●</span> &gt;17% excelente · <span style="color:var(--green)">●</span> ≥15% boa · <span style="color:#3b82f6">●</span> ≥10% ok · <span style="color:var(--red)">●</span> &lt;10% atenção' +
     '</div>';

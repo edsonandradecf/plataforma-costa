@@ -7711,6 +7711,7 @@ var _mgvLoading = false;
 var _mgvDados = null;       // { sku: { ml: preco|null, shopee: preco|null, tiktok: preco|null } }
 var _mgvErro = '';
 var _mgvAtualizadoEm = null;
+var _mgvPrecosTt = {};      // { sku: preco } -- preços manuais TikTok, persistidos no Firebase
 var _mgvTab = 'resumo'; // 'resumo' | 'ml' | 'shopee' | 'tiktok'
 var _mgvDebug = [];
 
@@ -7720,7 +7721,7 @@ function mgvSalvarFirebase() {
   fetch(FIREBASE_URL + '/radar.json', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ dados: _mgvDados, atualizadoEm: _mgvAtualizadoEm ? _mgvAtualizadoEm.toISOString() : null })
+    body: JSON.stringify({ dados: _mgvDados, atualizadoEm: _mgvAtualizadoEm ? _mgvAtualizadoEm.toISOString() : null, precosTt: _mgvPrecosTt })
   }).catch(function(){});
 }
 
@@ -7732,8 +7733,23 @@ function mgvCarregarFirebase() {
         _mgvDados = data.dados;
         _mgvAtualizadoEm = data.atualizadoEm ? new Date(data.atualizadoEm) : null;
       }
+      if (data && data.precosTt) _mgvPrecosTt = data.precosTt;
     })
     .catch(function(){});
+}
+
+function mgvSalvarPrecoTt(sku, valor) {
+  var v = parseFloat(String(valor).replace(',', '.')) || 0;
+  if (v > 0) _mgvPrecosTt[sku] = v;
+  else delete _mgvPrecosTt[sku];
+  mgvSalvarFirebase();
+  // Atualiza também _mgvDados.tiktok para refletir imediatamente
+  if (_mgvDados) {
+    if (v > 0) _mgvDados.tiktok[sku] = v;
+    else delete _mgvDados.tiktok[sku];
+  }
+  var c = document.getElementById('page-content');
+  if (c && state.currentPage === 'margemviva') c.innerHTML = renderMargemViva();
 }
 
 // Busca todos os preços ativos no Mercado Livre (paginado) e retorna { sku: preco }
@@ -7997,30 +8013,12 @@ async function mgvAtualizarPrecos() {
     }
   } catch(e) { _mgvErro += 'Shopee: ' + e.message + '. '; }
 
-  // TikTok: usa preço médio do último mês importado no Financeiro
+  // TikTok: usa preços cadastrados manualmente no Radar
   var precosTt = {};
-  try {
-    // Garante que _finMesSel está setado com o mês mais recente disponível
-    var mesesDisponiveis = Object.keys(state.financeiro.meses || {}).sort().reverse();
-    if (!_finMesSel && mesesDisponiveis.length) _finMesSel = mesesDisponiveis[0];
-    _mgvDebug.push('TikTok: usando mês "' + (_finMesSel || 'nenhum') + '" (' + mesesDisponiveis.length + ' meses disponíveis).');
-
-    if (_finMesSel) {
-      var calc = finCalcMes();
-      if (calc && calc.precoMedioSku) {
-        var ttCount = 0;
-        Object.keys(calc.precoMedioSku).forEach(function(sku) {
-          var v = calc.precoMedioSku[sku].tiktok;
-          if (v) { precosTt[sku] = v; ttCount++; }
-        });
-        _mgvDebug.push('TikTok: ' + ttCount + ' SKUs com preço médio encontrados.');
-      } else {
-        _mgvDebug.push('TikTok: finCalcMes() não retornou precoMedioSku.');
-      }
-    } else {
-      _mgvDebug.push('TikTok: nenhum mês importado no Financeiro — importe uma planilha TikTok primeiro.');
-    }
-  } catch(e) { _mgvDebug.push('TikTok: erro — ' + e.message); }
+  Object.keys(_mgvPrecosTt).forEach(function(sku) {
+    if (_mgvPrecosTt[sku] > 0) precosTt[sku] = _mgvPrecosTt[sku];
+  });
+  _mgvDebug.push('TikTok: ' + Object.keys(precosTt).length + ' SKUs com preço manual cadastrado.');
 
   _mgvDados = { ml: precosMl, shopee: precosSp, tiktok: precosTt, tarifasMl: tarifasMl };
   _mgvAtualizadoEm = new Date();
@@ -8209,7 +8207,7 @@ function renderMargemViva() {
   var linhas = PRODUTOS_CUSTO.map(function(p) {
     var precoMl = (_mgvDados.ml || {})[p.sku] || null;
     var precoSp = (_mgvDados.shopee || {})[p.sku] || null;
-    var precoTt = (_mgvDados.tiktok || {})[p.sku] || null;
+    var precoTt = (_mgvPrecosTt[p.sku] || null);
     var mMl = calcMargem(p.sku, precoMl, 'ml');
     var mSp = calcMargem(p.sku, precoSp, 'sp');
     var mTt = calcMargem(p.sku, precoTt, 'tt');
@@ -8227,6 +8225,80 @@ function renderMargemViva() {
                     shopee: { key:'sp', precoField:'precoSp', mField:'mSp', emoji:'🟠', nome:'Shopee' },
                     tiktok: { key:'tt', precoField:'precoTt', mField:'mTt', emoji:'⚫', nome:'TikTok' } };
     var pm = platMap[_mgvTab];
+
+    // Aba TikTok: mostra campos de edição de preço manual para todos os produtos do catálogo
+    if (_mgvTab === 'tiktok') {
+      html += '<div class="card" style="padding:1.25rem;margin-bottom:1.25rem">' +
+        '<div style="font-size:0.88rem;font-weight:600;margin-bottom:1rem">⚫ Preços de Venda TikTok <span style="font-weight:400;color:var(--text3);font-size:0.8rem">— cadastre o preço atual de cada produto</span></div>' +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">' +
+        PRODUTOS_CUSTO.map(function(p) {
+          var val = _mgvPrecosTt[p.sku] ? _mgvPrecosTt[p.sku].toFixed(2).replace('.', ',') : '';
+          return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg3);border-radius:8px;border:0.5px solid var(--border)">' +
+            '<div style="flex:1;min-width:0">' +
+              '<div style="font-size:0.8rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(p.nome) + '</div>' +
+              '<div style="font-size:0.68rem;color:var(--text3);font-family:monospace">' + p.sku + '</div>' +
+            '</div>' +
+            '<div style="display:flex;align-items:center;gap:4px;flex-shrink:0">' +
+              '<span style="font-size:0.78rem;color:var(--text3)">R$</span>' +
+              '<input type="number" step="0.01" min="0" placeholder="0,00" value="' + esc(val) + '" ' +
+                'style="width:72px;padding:4px 6px;border:0.5px solid var(--border2);border-radius:6px;background:var(--bg);color:var(--text);font-size:0.82rem;text-align:right" ' +
+                'onchange="mgvSalvarPrecoTt(\'' + p.sku + '\',this.value)" ' +
+                'onblur="mgvSalvarPrecoTt(\'' + p.sku + '\',this.value)">' +
+            '</div>' +
+          '</div>';
+        }).join('') +
+        '</div>' +
+      '</div>';
+
+      // Tabela de margem só para quem tem preço cadastrado
+      var linhasPlat = linhas.filter(function(l){ return l.precoTt; });
+      if (!linhasPlat.length) {
+        html += '<div class="empty-state">' + iconEmpty() + '<p>Cadastre os preços de venda acima para calcular a margem do TikTok.</p></div>';
+        return html;
+      }
+
+      html += '<div class="card" style="padding:0;overflow:auto">' +
+        '<table style="width:100%;border-collapse:collapse;font-size:0.85rem">' +
+          '<thead><tr style="border-bottom:1.5px solid var(--border)">' +
+            '<th style="text-align:left;padding:10px 14px">Produto</th>' +
+            '<th style="text-align:right;padding:10px 10px">Valor de Venda</th>' +
+            '<th style="text-align:right;padding:10px 10px">Taxa de Venda</th>' +
+            '<th style="text-align:right;padding:10px 10px">Tarifa de Envio</th>' +
+            '<th style="text-align:right;padding:10px 10px">Imposto (' + imposto + '%)</th>' +
+            '<th style="text-align:right;padding:10px 10px">Custo do Produto</th>' +
+            '<th style="text-align:right;padding:10px 10px">Lucro Líquido</th>' +
+            '<th style="text-align:right;padding:10px 14px">Margem Líquida</th>' +
+          '</tr></thead><tbody>' +
+        linhasPlat.map(function(l) {
+          var preco = l.precoTt;
+          var m = l.mTt;
+          if (!m || m.semCusto) {
+            return '<tr style="border-bottom:0.5px solid var(--border)">' +
+              '<td style="padding:10px 14px;font-weight:500">' + esc(l.p.nome) + '<div style="font-size:0.7rem;color:var(--text3);font-family:monospace">' + l.p.sku + '</div></td>' +
+              '<td style="text-align:right;padding:10px 10px">' + fmtR$(preco) + '</td>' +
+              '<td colspan="6" style="text-align:center;color:var(--red);font-size:0.78rem">sem custo cadastrado</td>' +
+            '</tr>';
+          }
+          return '<tr style="border-bottom:0.5px solid var(--border)">' +
+            '<td style="padding:10px 14px;font-weight:500">' + esc(l.p.nome) + '<div style="font-size:0.7rem;color:var(--text3);font-family:monospace">' + l.p.sku + '</div></td>' +
+            '<td style="text-align:right;padding:10px 10px">' + fmtR$(preco) + '</td>' +
+            '<td style="text-align:right;padding:10px 10px;color:var(--red)">−' + fmtR$(preco * (m.taxaVendaPct||0) / 100) + '<div style="font-size:0.62rem;color:var(--text3)">manual</div></td>' +
+            '<td style="text-align:right;padding:10px 10px;color:var(--red)">' + (m.envioFixo ? '−'+fmtR$(m.envioFixo) : '—') + '</td>' +
+            '<td style="text-align:right;padding:10px 10px;color:var(--red)">−' + fmtR$(m.impostoValor) + '</td>' +
+            '<td style="text-align:right;padding:10px 10px;color:var(--red)">−' + fmtR$(m.custoUnit) + '</td>' +
+            '<td style="text-align:right;padding:10px 10px;font-weight:700;color:' + (m.lucro>=0?'var(--green)':'var(--red)') + '">' + fmtR$(m.lucro) + '</td>' +
+            '<td style="text-align:right;padding:10px 14px;font-weight:700;color:' + corMargem(m.margem) + '">' + fmtPct(m.margem) + '</td>' +
+          '</tr>';
+        }).join('') +
+        '</tbody></table>' +
+      '</div>' +
+      '<div style="margin-top:1rem;font-size:0.78rem;color:var(--text3)">' +
+        'Taxa de venda e tarifa de envio TikTok: use as tarifas cadastradas em Marketplaces → Tarifas. ' +
+        '<span style="color:#8b5cf6">●</span> &gt;17% excelente · <span style="color:var(--green)">●</span> ≥15% boa · <span style="color:#3b82f6">●</span> ≥10% ok · <span style="color:var(--red)">●</span> &lt;10% atenção' +
+      '</div>';
+      return html;
+    }
+
     var linhasPlat = linhas.filter(function(l){ return l[pm.precoField]; });
 
     if (!linhasPlat.length) {

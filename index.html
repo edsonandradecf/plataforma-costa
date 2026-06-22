@@ -7276,8 +7276,8 @@ function finCalcMes() {
         ttSeen[key]=true;
         res.fat_tt   += valVenda;
         res.taxas_tt  = (res.taxas_tt||0) + tarifa;
-        skuTt[sku]=(skuTt[sku]||0)+qty;
-        fatSkuTt[sku]=(fatSkuTt[sku]||0)+valVenda;
+        skuTt[skuLow]=(skuTt[skuLow]||0)+qty;
+        fatSkuTt[skuLow]=(fatSkuTt[skuLow]||0)+valVenda;
       }
     });
   }
@@ -8000,14 +8000,27 @@ async function mgvAtualizarPrecos() {
   // TikTok: usa preço médio do último mês importado no Financeiro
   var precosTt = {};
   try {
-    var calc = finCalcMes();
-    if (calc && calc.precoMedioSku) {
-      Object.keys(calc.precoMedioSku).forEach(function(sku) {
-        var v = calc.precoMedioSku[sku].tiktok;
-        if (v) precosTt[sku] = v;
-      });
+    // Garante que _finMesSel está setado com o mês mais recente disponível
+    var mesesDisponiveis = Object.keys(state.financeiro.meses || {}).sort().reverse();
+    if (!_finMesSel && mesesDisponiveis.length) _finMesSel = mesesDisponiveis[0];
+    _mgvDebug.push('TikTok: usando mês "' + (_finMesSel || 'nenhum') + '" (' + mesesDisponiveis.length + ' meses disponíveis).');
+
+    if (_finMesSel) {
+      var calc = finCalcMes();
+      if (calc && calc.precoMedioSku) {
+        var ttCount = 0;
+        Object.keys(calc.precoMedioSku).forEach(function(sku) {
+          var v = calc.precoMedioSku[sku].tiktok;
+          if (v) { precosTt[sku] = v; ttCount++; }
+        });
+        _mgvDebug.push('TikTok: ' + ttCount + ' SKUs com preço médio encontrados.');
+      } else {
+        _mgvDebug.push('TikTok: finCalcMes() não retornou precoMedioSku.');
+      }
+    } else {
+      _mgvDebug.push('TikTok: nenhum mês importado no Financeiro — importe uma planilha TikTok primeiro.');
     }
-  } catch(e) {}
+  } catch(e) { _mgvDebug.push('TikTok: erro — ' + e.message); }
 
   _mgvDados = { ml: precosMl, shopee: precosSp, tiktok: precosTt, tarifasMl: tarifasMl };
   _mgvAtualizadoEm = new Date();

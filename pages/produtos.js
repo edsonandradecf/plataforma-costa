@@ -5,6 +5,8 @@ var _prodTab     = 'lista';  // 'lista' | 'form' | 'custo' | 'historico'
 var _prodSel     = null;     // SKU do produto sendo editado (null = novo)
 var _prodLoading = false;
 var _prodCarregado = false;
+var _prodOrdem   = 'az';     // 'az' | 'mps'
+var _prodEditSku = false;    // permite editar o SKU mesmo em modo edição
 
 // ── Firebase ────────────────────────────────────────────────────────────────
 
@@ -103,15 +105,34 @@ function prodSetTab(t) {
 
 function renderProdutosLista() {
   var produtos = (state.produtos || []).filter(function(p) { return p.ativo !== false; });
-  produtos.sort(function(a, b) { return a.nome.localeCompare(b.nome); });
+
+  // Ordenação
+  if (_prodOrdem === 'az') {
+    produtos.sort(function(a, b) { return a.nome.localeCompare(b.nome); });
+  } else if (_prodOrdem === 'mps') {
+    produtos.sort(function(a, b) { return (b.materiasPrimas||[]).length - (a.materiasPrimas||[]).length; });
+  }
+
+  function btnOrd(id, label) {
+    var ativo = _prodOrdem === id;
+    return '<button onclick="_prodOrdem=\'' + id + '\';prodSetTab(\'lista\')" ' +
+      'style="padding:4px 10px;border-radius:6px;font-size:0.78rem;cursor:pointer;border:0.5px solid var(--border2);' +
+      (ativo ? 'background:var(--green);color:#fff;border-color:var(--green);font-weight:600' : 'background:none;color:var(--text2)') +
+      '">' + label + '</button>';
+  }
 
   var tabBar =
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:10px">' +
       '<div style="display:flex;gap:4px;border-bottom:1.5px solid var(--border);padding-bottom:0">' +
         '<button class="fin-tab' + (_prodTab === 'lista' || _prodTab === 'form' ? ' active' : '') + '" onclick="prodSetTab(\'lista\')" style="font-size:0.88rem">📦 Produtos</button>' +
         '<button class="fin-tab' + (_prodTab === 'historico' ? ' active' : '') + '" onclick="prodSetTab(\'historico\')" style="font-size:0.88rem">📈 Histórico de Preços</button>' +
       '</div>' +
-      (isAdmin() ? '<button class="btn btn-green" onclick="prodAbrirForm(null)" style="font-size:0.85rem">+ Novo Produto</button>' : '') +
+      '<div style="display:flex;align-items:center;gap:8px">' +
+        '<span style="font-size:0.78rem;color:var(--text3)">Ordenar:</span>' +
+        btnOrd('az', 'A → Z') +
+        btnOrd('mps', 'Qtd. matérias-primas') +
+        (isAdmin() ? '<button class="btn btn-green" onclick="prodAbrirForm(null)" style="font-size:0.85rem;margin-left:6px">+ Novo Produto</button>' : '') +
+      '</div>' +
     '</div>';
 
   if (!produtos.length) {
@@ -120,12 +141,15 @@ function renderProdutosLista() {
 
   var rows = produtos.map(function(p) {
     var custo = prodCustoAtual(p);
-    var mpNomes = (p.materiasPrimas || []).map(function(mp) { return mp.estoqueNome + ' (' + mp.pesoUsado + 'g)'; }).join(', ');
+    var mpNomes = (p.materiasPrimas || []).map(function(mp) { return mp.estoqueNome; }).join(', ');
+    var mpQtd = (p.materiasPrimas || []).length;
     return '<tr style="border-bottom:0.5px solid var(--border);cursor:pointer" onclick="prodAbrirForm(\'' + esc(p.sku) + '\')">' +
       '<td style="padding:10px 14px;font-weight:500">' + esc(p.nome) + '</td>' +
       '<td style="padding:10px 10px;font-family:monospace;font-size:0.8rem;color:var(--text3)">' + esc(p.sku) + '</td>' +
       '<td style="padding:10px 10px;text-align:right">' + p.peso + 'g</td>' +
-      '<td style="padding:10px 10px;font-size:0.8rem;color:var(--text2)">' + esc(mpNomes) + '</td>' +
+      '<td style="padding:10px 10px;font-size:0.8rem;color:var(--text2)">' +
+        (mpQtd ? '<span style="font-size:0.7rem;background:var(--bg3);border-radius:4px;padding:1px 6px;margin-right:5px">' + mpQtd + '</span>' + esc(mpNomes) : '<span style="color:var(--text3)">—</span>') +
+      '</td>' +
       '<td style="padding:10px 10px;text-align:right">' + (custo !== null ? 'R$ ' + custo.toFixed(2).replace('.', ',') : '—') + '</td>' +
       (isAdmin() ?
         '<td style="padding:10px 14px;text-align:right">' +
@@ -154,27 +178,55 @@ function renderProdutosLista() {
 
 function prodAbrirForm(sku) {
   _prodSel = sku;
+  _prodEditSku = false;
   _prodTab = 'form';
   var c = document.getElementById('page-content');
   if (c) c.innerHTML = renderProdutos();
+}
+
+function prodHabilitarEditSku() {
+  _prodEditSku = true;
+  var inp = document.getElementById('prod-sku');
+  if (inp) {
+    inp.removeAttribute('readonly');
+    inp.style.background = 'var(--bg)';
+    inp.style.color = 'var(--text)';
+    inp.focus();
+  }
+  var btn = document.getElementById('prod-sku-edit-btn');
+  if (btn) btn.style.display = 'none';
+  var aviso = document.getElementById('prod-sku-aviso');
+  if (aviso) aviso.textContent = '⚠ Alterar o SKU pode quebrar integrações (Radar, Tarifas, Histórico). Confirme antes de salvar.';
 }
 
 function renderProdutosForm() {
   var isEdit = !!_prodSel;
   var prod = isEdit ? (state.produtos || []).find(function(p) { return p.sku === _prodSel; }) : null;
 
-  // Itens disponíveis no estoque (matérias-primas)
   var itensEstoque = (state.estoque.produtos || []).slice().sort(function(a, b) { return a.nome.localeCompare(b.nome); });
-
-  // Matérias-primas atuais do produto (para edição)
   var mpsAtuais = prod ? (prod.materiasPrimas || []) : [];
 
   var mpRows = mpsAtuais.map(function(mp, i) {
-    return prodMpRow(i, mp.estoqueNome, mp.pesoUsado, itensEstoque);
+    return prodMpRow(i, mp.estoqueNome, itensEstoque);
   }).join('');
+  if (!mpRows) mpRows = prodMpRow(0, '', itensEstoque);
 
-  // Se não tem nenhuma, começa com 1 linha vazia
-  if (!mpRows) mpRows = prodMpRow(0, '', '', itensEstoque);
+  // Campo SKU: readonly por padrão em edição, mas com botão para habilitar edição
+  var skuField = '';
+  if (isEdit && !_prodEditSku) {
+    skuField =
+      '<input id="prod-sku" type="text" value="' + esc(prod.sku) + '" readonly ' +
+        'style="width:100%;padding:8px 10px;border:0.5px solid var(--border2);border-radius:8px;background:var(--bg3);color:var(--text3);font-size:0.88rem;box-sizing:border-box">' +
+      '<div style="display:flex;align-items:center;gap:6px;margin-top:4px">' +
+        '<button id="prod-sku-edit-btn" onclick="prodHabilitarEditSku()" style="background:none;border:none;color:var(--blue);cursor:pointer;font-size:0.72rem;padding:0;text-decoration:underline">✏️ Editar SKU</button>' +
+        '<span id="prod-sku-aviso" style="font-size:0.7rem;color:var(--text3)"></span>' +
+      '</div>';
+  } else {
+    skuField =
+      '<input id="prod-sku" type="text" value="' + esc(prod ? prod.sku : '') + '" placeholder="Ex: beterraba100" ' +
+        'style="width:100%;padding:8px 10px;border:0.5px solid var(--border2);border-radius:8px;background:var(--bg);color:var(--text);font-size:0.88rem;box-sizing:border-box">' +
+      (isEdit ? '<span id="prod-sku-aviso" style="font-size:0.7rem;color:var(--amber)">⚠ Alterar o SKU pode quebrar integrações. Confirme antes de salvar.</span>' : '');
+  }
 
   return '<button onclick="prodSetTab(\'lista\')" style="display:inline-flex;align-items:center;gap:6px;margin-bottom:1.25rem;background:none;border:0.5px solid var(--border2);border-radius:8px;padding:6px 14px;color:var(--text2);cursor:pointer;font-size:0.85rem">← Voltar</button>' +
   '<div class="card" style="max-width:600px;padding:1.5rem">' +
@@ -188,10 +240,7 @@ function renderProdutosForm() {
       '</div>' +
       '<div>' +
         '<label style="display:block;font-size:0.8rem;color:var(--text3);margin-bottom:4px">SKU *</label>' +
-        '<input id="prod-sku" type="text" value="' + esc(prod ? prod.sku : '') + '" placeholder="Ex: beterraba100" ' +
-          (isEdit ? 'readonly style="width:100%;padding:8px 10px;border:0.5px solid var(--border2);border-radius:8px;background:var(--bg3);color:var(--text3);font-size:0.88rem;box-sizing:border-box"' :
-                    'style="width:100%;padding:8px 10px;border:0.5px solid var(--border2);border-radius:8px;background:var(--bg);color:var(--text);font-size:0.88rem;box-sizing:border-box"') + '>' +
-        (isEdit ? '<div style="font-size:0.7rem;color:var(--text3);margin-top:2px">SKU não pode ser alterado após o cadastro</div>' : '') +
+        skuField +
       '</div>' +
     '</div>' +
 
@@ -216,7 +265,7 @@ function renderProdutosForm() {
     '<div style="margin-bottom:1rem">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">' +
         '<label style="font-size:0.8rem;color:var(--text3)">Matéria(s)-prima(s) *</label>' +
-        '<button onclick="prodAdicionarMp(' + JSON.stringify(itensEstoque) + ')" style="background:none;border:0.5px solid var(--border2);border-radius:6px;padding:3px 10px;font-size:0.78rem;color:var(--text2);cursor:pointer">+ Adicionar</button>' +
+        '<button onclick="prodAdicionarMp()" style="background:none;border:0.5px solid var(--border2);border-radius:6px;padding:3px 10px;font-size:0.78rem;color:var(--text2);cursor:pointer">+ Adicionar</button>' +
       '</div>' +
       '<div id="prod-mps">' + mpRows + '</div>' +
     '</div>' +
@@ -229,7 +278,8 @@ function renderProdutosForm() {
   '</div>';
 }
 
-function prodMpRow(idx, estoqueNome, pesoUsado, itensEstoque) {
+// Linha de matéria-prima: só dropdown, sem campo de peso
+function prodMpRow(idx, estoqueNome, itensEstoque) {
   var opts = (itensEstoque || state.estoque.produtos || []).map(function(item) {
     var sel = item.nome === estoqueNome ? ' selected' : '';
     return '<option value="' + esc(item.nome) + '"' + sel + '>' + esc(item.nome) + '</option>';
@@ -239,19 +289,17 @@ function prodMpRow(idx, estoqueNome, pesoUsado, itensEstoque) {
     '<select id="prod-mp-nome-' + idx + '" style="flex:1;padding:7px 10px;border:0.5px solid var(--border2);border-radius:8px;background:var(--bg);color:var(--text);font-size:0.85rem">' +
       '<option value="">Selecione um item do estoque...</option>' + opts +
     '</select>' +
-    '<input id="prod-mp-peso-' + idx + '" type="number" min="1" value="' + (pesoUsado || '') + '" placeholder="Peso (g)" ' +
-      'style="width:100px;padding:7px 10px;border:0.5px solid var(--border2);border-radius:8px;background:var(--bg);color:var(--text);font-size:0.85rem">' +
     '<button onclick="prodRemoverMp(' + idx + ')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:1.1rem;padding:0 4px">×</button>' +
   '</div>';
 }
 
-function prodAdicionarMp(itensEstoque) {
+function prodAdicionarMp() {
   var container = document.getElementById('prod-mps');
   if (!container) return;
   var rows = container.querySelectorAll('[id^="prod-mp-row-"]');
   var idx = rows.length;
   var div = document.createElement('div');
-  div.innerHTML = prodMpRow(idx, '', '', itensEstoque || state.estoque.produtos || []);
+  div.innerHTML = prodMpRow(idx, '', state.estoque.produtos || []);
   container.appendChild(div.firstElementChild);
 }
 
@@ -263,62 +311,66 @@ function prodRemoverMp(idx) {
 // ── Salvar produto ────────────────────────────────────────────────────────────
 
 function prodSalvar() {
-  var nome  = (document.getElementById('prod-nome')  || {}).value || '';
-  var sku   = (document.getElementById('prod-sku')   || {}).value || '';
-  var peso  = parseFloat((document.getElementById('prod-peso')  || {}).value || 0);
-  var emb   = parseFloat((document.getElementById('prod-emb')   || {}).value || 0);
-  var caixa = parseFloat((document.getElementById('prod-caixa') || {}).value || 0);
+  var nome     = (document.getElementById('prod-nome')  || {}).value || '';
+  var skuNovo  = ((document.getElementById('prod-sku')  || {}).value || '').trim().toLowerCase();
+  var peso     = parseFloat((document.getElementById('prod-peso')  || {}).value || 0);
+  var emb      = parseFloat((document.getElementById('prod-emb')   || {}).value || 0);
+  var caixa    = parseFloat((document.getElementById('prod-caixa') || {}).value || 0);
+  var isEdit   = !!_prodSel;
+  var skuAntigo = _prodSel || skuNovo;
 
   var status = document.getElementById('prod-status');
   function setStatus(msg, cor) { if (status) { status.textContent = msg; status.style.color = cor || 'var(--text3)'; } }
 
-  if (!nome.trim()) return setStatus('⚠ Informe o nome do produto.', 'var(--red)');
-  if (!sku.trim())  return setStatus('⚠ Informe o SKU.', 'var(--red)');
-  if (!peso)        return setStatus('⚠ Informe o peso do produto.', 'var(--red)');
+  if (!nome.trim())  return setStatus('⚠ Informe o nome do produto.', 'var(--red)');
+  if (!skuNovo)      return setStatus('⚠ Informe o SKU.', 'var(--red)');
+  if (!peso)         return setStatus('⚠ Informe o peso do produto.', 'var(--red)');
+  if (!/^[a-zA-Z0-9_-]+$/.test(skuNovo)) return setStatus('⚠ SKU só pode ter letras, números, _ ou -.', 'var(--red)');
 
-  // Valida SKU: só letras e números, sem espaço
-  if (!/^[a-zA-Z0-9_-]+$/.test(sku.trim())) return setStatus('⚠ SKU só pode ter letras, números, _ ou -.', 'var(--red)');
-
-  // Verifica duplicidade de SKU ao criar
-  var isEdit = !!_prodSel;
-  if (!isEdit && (state.produtos || []).some(function(p) { return p.sku === sku.trim().toLowerCase(); })) {
+  // Verifica duplicidade só se SKU mudou
+  if (skuNovo !== skuAntigo && (state.produtos || []).some(function(p) { return p.sku === skuNovo; })) {
+    return setStatus('⚠ SKU já existe. Escolha outro.', 'var(--red)');
+  }
+  if (!isEdit && (state.produtos || []).some(function(p) { return p.sku === skuNovo; })) {
     return setStatus('⚠ SKU já existe. Escolha outro.', 'var(--red)');
   }
 
-  // Lê matérias-primas
+  // Lê matérias-primas (sem campo de peso)
   var mps = [];
   var container = document.getElementById('prod-mps');
   if (container) {
-    var rows = container.querySelectorAll('[id^="prod-mp-row-"]');
-    rows.forEach(function(row) {
-      var idxMatch = row.id.match(/prod-mp-row-(\d+)/);
-      if (!idxMatch) return;
-      var i = idxMatch[1];
-      var mpNome = (document.getElementById('prod-mp-nome-' + i) || {}).value || '';
-      var mpPeso = parseFloat((document.getElementById('prod-mp-peso-' + i) || {}).value || 0);
-      if (mpNome && mpPeso > 0) mps.push({ estoqueNome: mpNome, pesoUsado: mpPeso });
+    container.querySelectorAll('[id^="prod-mp-row-"]').forEach(function(row) {
+      var m = row.id.match(/prod-mp-row-(\d+)/);
+      if (!m) return;
+      var mpNome = (document.getElementById('prod-mp-nome-' + m[1]) || {}).value || '';
+      if (mpNome) mps.push({ estoqueNome: mpNome });
     });
   }
-
   if (!mps.length) return setStatus('⚠ Adicione pelo menos uma matéria-prima.', 'var(--red)');
 
-  var skuFinal = sku.trim().toLowerCase();
   var novoProd = {
-    nome:          nome.trim(),
-    sku:           skuFinal,
-    peso:          peso,
-    embalagem:     emb,
-    caixa:         caixa,
+    nome:           nome.trim(),
+    sku:            skuNovo,
+    peso:           peso,
+    embalagem:      emb,
+    caixa:          caixa,
     materiasPrimas: mps,
-    ativo:         true,
-    criadoEm:      isEdit ? ((state.produtos.find(function(p){ return p.sku===skuFinal; }) || {}).criadoEm || new Date().toISOString()) : new Date().toISOString(),
+    ativo:          true,
+    criadoEm:       isEdit ? ((state.produtos.find(function(p){ return p.sku===skuAntigo; }) || {}).criadoEm || new Date().toISOString()) : new Date().toISOString(),
   };
 
   if (!state.produtos) state.produtos = [];
 
   if (isEdit) {
-    var idx = state.produtos.findIndex(function(p) { return p.sku === skuFinal; });
-    if (idx !== -1) state.produtos[idx] = novoProd;
+    var idx = state.produtos.findIndex(function(p) { return p.sku === skuAntigo; });
+    if (idx !== -1) {
+      state.produtos[idx] = novoProd;
+      // Se o SKU mudou, remove o registro antigo
+      if (skuNovo !== skuAntigo) {
+        state.produtos = state.produtos.filter(function(p) { return p.sku !== skuAntigo; });
+        state.produtos.push(novoProd);
+      }
+    }
   } else {
     state.produtos.push(novoProd);
   }
@@ -328,6 +380,7 @@ function prodSalvar() {
     addLog((isEdit ? 'Editou' : 'Cadastrou') + ' produto: ' + novoProd.nome + ' (' + novoProd.sku + ')');
     _prodTab = 'lista';
     _prodSel = null;
+    _prodEditSku = false;
     var c = document.getElementById('page-content');
     if (c) c.innerHTML = renderProdutos();
   });

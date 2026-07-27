@@ -51,7 +51,10 @@ function skuMatchHist(sku, nomeLow) {
 }
 
 // Catálogo fixo de produtos com SKU para custo
-var PRODUTOS_CUSTO = [
+// PRODUTOS_CUSTO agora é gerado dinamicamente a partir de state.produtos
+// Mantém compatibilidade com todo o código existente (Radar, Estoque, etc.)
+// Os 33 produtos originais servem como fallback enquanto o Firebase não carregou
+var PRODUTOS_CUSTO_FALLBACK = [
   {nome:'Óleo de coco - 3 Litros - Full',    sku:'oleo3',       peso:2700},
   {nome:'Óleo de coco - 1000 mL',            sku:'oleo1',       peso:900},
   {nome:'Óleo de coco - 500 mL',             sku:'oleo500',     peso:450},
@@ -86,6 +89,17 @@ var PRODUTOS_CUSTO = [
   {nome:'Chips de Coco (400g)',               sku:'coco400',     peso:400},
   {nome:'Chips de Coco (100g)',               sku:'coco100',     peso:100},
 ];
+
+// Getter dinâmico: usa state.produtos se já carregado, senão usa fallback
+Object.defineProperty(window, 'PRODUTOS_CUSTO', {
+  get: function() {
+    var prods = (typeof state !== 'undefined' && state.produtos && state.produtos.length)
+      ? state.produtos.filter(function(p) { return p.ativo !== false; })
+      : PRODUTOS_CUSTO_FALLBACK;
+    return prods;
+  },
+  configurable: true,
+});
 
 function isAdmin() {
   return state.currentUser && state.currentUser.role === 'admin';

@@ -94,6 +94,9 @@ function renderProdutos() {
     '</div>';
   }
 
+  if (_prodTab === 'form')      return renderProdutosForm();
+  if (_prodTab === 'historico') return renderProdHistorico();
+  // Para a lista, carrega financeiro se precisar do custo
   if (!_finLoaded) {
     _finLoaded = true;
     finLoadFirebase().then(function() {
@@ -101,9 +104,6 @@ function renderProdutos() {
       if (c && state.currentPage === 'produtos') c.innerHTML = renderProdutos();
     });
   }
-
-  if (_prodTab === 'form')      return renderProdutosForm();
-  if (_prodTab === 'historico') return renderProdHistorico();
   return renderProdutosLista();
 }
 

@@ -405,6 +405,7 @@ let state = {
   estoque: { produtos: [], movimentacoes: [], historicoManual: [] },
   ponto: { colaboradores: [], registros: [] },
   devolucoes: [],
+  produtos: [],        // catálogo de produtos finais (salvo separado no Firebase)
   mlToken: null,
   shopeeToken: null,
   currentUser: null,
@@ -1013,10 +1014,11 @@ function startApp() {
     document.querySelector('.main').classList.add('sidebar-collapsed');
   }
   cleanOldTasks();
+  // Carrega catálogo de produtos do Firebase em paralelo
+  prodLoadFirebase();
   // Abre na página do hash se existir, senão vai para início
   var initialPage = pageFromHash() || 'inicio';
   state.currentPage = initialPage;
-  // Garante que o hash está na URL (caso não tenha)
   if (!window.location.hash || window.location.hash === '#') {
     history.replaceState({ page: initialPage }, '', '#' + initialPage);
   } else {
@@ -1025,9 +1027,7 @@ function startApp() {
   buildSidebar();
   renderPage();
   startRealtimeSync();
-  // Carrega histórico de preços do nó separado do Firebase
   setTimeout(estoqueHistLoadFirebase, 2000);
-  // Renova tokens automaticamente a cada 30 minutos
   iniciarRenovacaoAutomatica();
 }
 
@@ -2784,6 +2784,7 @@ var _mktsMesSel  = ''; // mês independente
 <script src="pages/estoque.js"></script>
 <script src="pages/shopee.js"></script>
 <script src="pages/tabnutri.js"></script>
+<script src="pages/produtos.js"></script>
 <script src="pages/radar.js"></script>
 <script>
 if ('serviceWorker' in navigator && location.hostname === 'edsonandradecf.github.io') {

@@ -38,31 +38,44 @@ function prodSaveFirebase() {
 // Calcula custo dinâmico de um produto final
 function prodCustoAtual(prod) {
   if (!prod) return null;
-  var total = 0;
-  var mps = prod.materiasPrimas || [];
-  for (var i = 0; i < mps.length; i++) {
-    var mp = mps[i];
-    // Busca o item no estoque pelo id (nome do item a granel)
-    var item = (state.estoque.produtos || []).find(function(p) { return p.nome === mp.estoqueNome; });
-    if (!item) continue;
-    // Pega o último preço/kg do histórico de compras
-    var hist = (state.estoque.historicoManual || []).concat(
-      (state.estoque.movimentacoes || []).filter(function(m) { return m.tipo === 'entrada' && m.totalKg > 0; })
-    );
+  if (!prod.materiasPrimas || !prod.materiasPrimas.length) return null;
+
+  var hist = (state.estoque.historicoManual || []).concat(
+    (state.estoque.movimentacoes || []).filter(function(m) { return m.tipo === 'entrada' && m.totalKg > 0; })
+  );
+
+  var totalIngrediente = 0;
+  var algumSemHistorico = false;
+
+  for (var i = 0; i < prod.materiasPrimas.length; i++) {
+    var mp = prod.materiasPrimas[i];
+    // Para mix: cada matéria-prima contribui com prod.peso / qtd_mps gramas
+    // Para produto simples (1 MP): contribui com prod.peso inteiro
+    var pesoUsado = prod.peso / prod.materiasPrimas.length;
+
+    // Busca o último preço/kg da matéria-prima no histórico
+    var nomeBusca = (mp.estoqueNome || '').toLowerCase();
     var maisRecente = null;
     hist.forEach(function(r) {
       if (!r.totalKg) return;
       var nomeLow = (r.produto || '').toLowerCase();
-      if (nomeLow.indexOf(item.nome.toLowerCase().substring(0, 6)) !== -1) {
+      // Testa se o nome do histórico contém o nome da MP (ou vice-versa)
+      if (nomeLow.indexOf(nomeBusca.substring(0, Math.min(8, nomeBusca.length))) !== -1 ||
+          nomeBusca.indexOf(nomeLow.substring(0, Math.min(8, nomeLow.length))) !== -1) {
         if (!maisRecente || (r.dataISO || '') > (maisRecente.dataISO || '')) maisRecente = r;
       }
     });
+
     if (maisRecente) {
-      total += parseFloat(maisRecente.totalKg) * mp.pesoUsado / 1000;
+      totalIngrediente += parseFloat(maisRecente.totalKg) * pesoUsado / 1000;
+    } else {
+      algumSemHistorico = true;
     }
   }
-  total += parseFloat(prod.embalagem) || 0;
-  total += parseFloat(prod.caixa) || 0;
+
+  if (algumSemHistorico && totalIngrediente === 0) return null; // nenhuma MP encontrada no histórico
+
+  var total = totalIngrediente + (parseFloat(prod.embalagem) || 0) + (parseFloat(prod.caixa) || 0);
   return round4(total);
 }
 

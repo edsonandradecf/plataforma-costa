@@ -1013,6 +1013,15 @@ function startApp() {
     document.querySelector('.main').classList.add('sidebar-collapsed');
   }
   cleanOldTasks();
+  // Abre na página do hash se existir, senão vai para início
+  var initialPage = pageFromHash() || 'inicio';
+  state.currentPage = initialPage;
+  // Garante que o hash está na URL (caso não tenha)
+  if (!window.location.hash || window.location.hash === '#') {
+    history.replaceState({ page: initialPage }, '', '#' + initialPage);
+  } else {
+    history.replaceState({ page: initialPage }, '', '#' + initialPage);
+  }
   buildSidebar();
   renderPage();
   startRealtimeSync();
@@ -1076,8 +1085,28 @@ function renderPage() {
 function navigate(page) {
   if (!state.currentUser) return;
   state.currentPage = page;
+  // Atualiza a URL com hash — permite botão Voltar e bookmarks
+  if (window.location.hash !== '#' + page) {
+    history.pushState({ page: page }, '', '#' + page);
+  }
   buildSidebar();
   renderPage();
+}
+
+// Botão Voltar/Avançar do navegador
+window.addEventListener('popstate', function(e) {
+  if (!state.currentUser) return;
+  var page = (e.state && e.state.page) || pageFromHash() || 'inicio';
+  state.currentPage = page;
+  buildSidebar();
+  renderPage();
+});
+
+function pageFromHash() {
+  var hash = window.location.hash.replace('#', '').trim();
+  // Lista de páginas válidas
+  var valid = ['inicio','expedicao','producao','compras','estoque','ponto','mural','etiquetas','tabnutri','produtos','marketplaces','margemviva','logs','financeiro'];
+  return valid.indexOf(hash) !== -1 ? hash : 'inicio';
 }
 
 // safeRenderPage: called by SSE sync -- only updates data, never changes page

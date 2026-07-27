@@ -103,8 +103,7 @@ function renderProdutos() {
   }
 
   if (_prodTab === 'form')      return renderProdutosForm();
-  if (_prodTab === 'custo')     return renderProdutosLista() + renderEstoqueCusto();
-  if (_prodTab === 'historico') return renderProdutosLista() + renderEstoqueHistorico();
+  if (_prodTab === 'historico') return renderProdHistorico();
   return renderProdutosLista();
 }
 
@@ -421,4 +420,143 @@ function prodExcluir(sku) {
     var c = document.getElementById('page-content');
     if (c) c.innerHTML = renderProdutos();
   });
+}
+
+// ── Histórico de Preços (por produto final) ────────────────────────────────
+
+var _prodHistSel = null; // nome do produto selecionado no histórico
+
+function renderProdHistorico() {
+  var tabBar =
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:10px">' +
+      '<div style="display:flex;gap:4px;border-bottom:1.5px solid var(--border);padding-bottom:0">' +
+        '<button class="fin-tab" onclick="prodSetTab(\'lista\')" style="font-size:0.88rem">📦 Produtos</button>' +
+        '<button class="fin-tab active" onclick="prodSetTab(\'historico\')" style="font-size:0.88rem">📈 Histórico de Preços</button>' +
+      '</div>' +
+      (isAdmin() ? '<button class="btn btn-green" onclick="prodAbrirForm(null)" style="font-size:0.85rem">+ Novo Produto</button>' : '') +
+    '</div>';
+
+  // Detalhe de um produto selecionado
+  if (_prodHistSel) {
+    var prod = (state.produtos || []).find(function(p) { return p.nome === _prodHistSel; });
+    var mps = prod ? (prod.materiasPrimas || []) : [];
+
+    var btnVoltar = '<button onclick="_prodHistSel=null;prodSetTab(\'historico\')" ' +
+      'style="display:inline-flex;align-items:center;gap:6px;margin-bottom:1.25rem;background:none;border:0.5px solid var(--border2);border-radius:8px;padding:6px 14px;color:var(--text2);cursor:pointer;font-size:0.85rem">← Voltar</button>';
+
+    if (!mps.length) {
+      return tabBar + btnVoltar +
+        '<div class="card" style="padding:1.5rem">' +
+          '<div style="font-weight:700;margin-bottom:1rem">' + esc(_prodHistSel) + '</div>' +
+          '<div style="color:var(--text3);font-size:0.88rem">Nenhuma matéria-prima vinculada. Edite o produto para vincular.</div>' +
+        '</div>';
+    }
+
+    // Para cada matéria-prima do produto, mostra o histórico de compras
+    var hist = (state.estoque.historicoManual || []).concat(
+      (state.estoque.movimentacoes || []).filter(function(m) { return m.tipo === 'entrada' && m.totalKg > 0; })
+    );
+
+    var blocos = mps.map(function(mp) {
+      var nomeBusca = (mp.estoqueNome || '').toLowerCase();
+      var regs = hist.filter(function(r) {
+        var nomeLow = (r.produto || '').toLowerCase();
+        return nomeLow === nomeBusca ||
+          nomeLow.indexOf(nomeBusca) !== -1 ||
+          nomeBusca.indexOf(nomeLow) !== -1;
+      }).sort(function(a, b) {
+        return (b.dataISO || '').localeCompare(a.dataISO || '');
+      });
+
+      var tabela = '';
+      if (!regs.length) {
+        tabela = '<div style="color:var(--text3);font-size:0.85rem;padding:0.75rem 0">Nenhum registro de compra encontrado.</div>';
+      } else {
+        tabela = '<table style="width:100%;border-collapse:collapse;font-size:0.85rem;margin-top:0.5rem">' +
+          '<thead><tr style="border-bottom:1px solid var(--border)">' +
+            '<th style="text-align:left;padding:8px 0">Data</th>' +
+            '<th style="text-align:right;padding:8px 10px">Qtd (kg)</th>' +
+            '<th style="text-align:right;padding:8px 10px">Custo R$/kg</th>' +
+            '<th style="text-align:right;padding:8px 10px">Frete R$/kg</th>' +
+            '<th style="text-align:right;padding:8px 0">Total R$/kg</th>' +
+          '</tr></thead><tbody>' +
+          regs.map(function(r) {
+            var data = r.dataISO ? new Date(r.dataISO + 'T12:00:00').toLocaleDateString('pt-BR') : '—';
+            var custoKg = parseFloat(r.custoKg) || 0;
+            var freteKg = parseFloat(r.freteKg) || 0;
+            var totalKg = parseFloat(r.totalKg) || 0;
+            var isMaisRecente = regs[0] === r;
+            return '<tr style="border-bottom:0.5px solid var(--border)' + (isMaisRecente ? ';background:rgba(26,138,74,0.05)' : '') + '">' +
+              '<td style="padding:8px 0">' + data + (isMaisRecente ? ' <span style="font-size:0.65rem;background:var(--green);color:#fff;border-radius:4px;padding:1px 5px">atual</span>' : '') + '</td>' +
+              '<td style="text-align:right;padding:8px 10px">' + (r.qtd || '—') + '</td>' +
+              '<td style="text-align:right;padding:8px 10px">R$ ' + custoKg.toFixed(2).replace('.',',') + '</td>' +
+              '<td style="text-align:right;padding:8px 10px">R$ ' + freteKg.toFixed(2).replace('.',',') + '</td>' +
+              '<td style="text-align:right;padding:8px 0;font-weight:600;color:var(--green)">R$ ' + totalKg.toFixed(2).replace('.',',') + '</td>' +
+            '</tr>';
+          }).join('') +
+          '</tbody></table>';
+      }
+
+      return '<div class="card" style="padding:1.25rem;margin-bottom:1rem">' +
+        '<div style="font-weight:600;font-size:0.9rem;margin-bottom:0.25rem">' + esc(mp.estoqueNome) + '</div>' +
+        tabela +
+      '</div>';
+    }).join('');
+
+    return tabBar + btnVoltar +
+      '<div style="font-weight:700;font-size:1rem;margin-bottom:1rem">' + esc(_prodHistSel) + '</div>' +
+      blocos;
+  }
+
+  // Lista de produtos para selecionar
+  var produtos = (state.produtos || []).filter(function(p) { return p.ativo !== false; })
+    .sort(function(a, b) { return a.nome.localeCompare(b.nome); });
+
+  if (!produtos.length) {
+    return tabBar + '<div class="empty-state">' + iconEmpty() + '<p>Nenhum produto cadastrado.</p></div>';
+  }
+
+  var hist = (state.estoque.historicoManual || []).concat(
+    (state.estoque.movimentacoes || []).filter(function(m) { return m.tipo === 'entrada' && m.totalKg > 0; })
+  );
+
+  var rows = produtos.map(function(p) {
+    var mps = p.materiasPrimas || [];
+    // Acha o registro mais recente de qualquer matéria-prima do produto
+    var maisRecente = null;
+    mps.forEach(function(mp) {
+      var nomeBusca = (mp.estoqueNome || '').toLowerCase();
+      hist.forEach(function(r) {
+        var nomeLow = (r.produto || '').toLowerCase();
+        if (nomeLow === nomeBusca || nomeLow.indexOf(nomeBusca) !== -1 || nomeBusca.indexOf(nomeLow) !== -1) {
+          if (!maisRecente || (r.dataISO || '') > (maisRecente.dataISO || '')) maisRecente = r;
+        }
+      });
+    });
+
+    var ultimaCompra = maisRecente
+      ? new Date(maisRecente.dataISO + 'T12:00:00').toLocaleDateString('pt-BR')
+      : '—';
+    var totalKg = maisRecente ? 'R$ ' + parseFloat(maisRecente.totalKg).toFixed(2).replace('.',',') + '/kg' : '—';
+
+    return '<tr style="border-bottom:0.5px solid var(--border);cursor:pointer" onclick="_prodHistSel=\'' + esc(p.nome) + '\';prodSetTab(\'historico\')">' +
+      '<td style="padding:10px 14px;font-weight:500">' + esc(p.nome) + '</td>' +
+      '<td style="padding:10px 10px;font-size:0.8rem;color:var(--text2)">' + esc(mps.map(function(m){ return m.estoqueNome; }).join(', ') || '—') + '</td>' +
+      '<td style="padding:10px 10px;text-align:right;font-size:0.85rem">' + ultimaCompra + '</td>' +
+      '<td style="padding:10px 14px;text-align:right;font-weight:600;color:var(--green)">' + totalKg + '</td>' +
+    '</tr>';
+  }).join('');
+
+  return tabBar +
+    '<div class="card" style="padding:0;overflow:auto">' +
+      '<table style="width:100%;border-collapse:collapse;font-size:0.88rem">' +
+        '<thead><tr style="border-bottom:1.5px solid var(--border)">' +
+          '<th style="text-align:left;padding:10px 14px">Produto</th>' +
+          '<th style="text-align:left;padding:10px 10px">Matéria-prima</th>' +
+          '<th style="text-align:right;padding:10px 10px">Última compra</th>' +
+          '<th style="text-align:right;padding:10px 14px">Preço atual/kg</th>' +
+        '</tr></thead>' +
+        '<tbody>' + rows + '</tbody>' +
+      '</table>' +
+    '</div>';
 }

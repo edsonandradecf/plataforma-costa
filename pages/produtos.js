@@ -154,14 +154,24 @@ function renderProdutosLista() {
 
   var rows = produtos.map(function(p) {
     var custo = prodCustoAtual(p);
-    var mpNomes = (p.materiasPrimas || []).map(function(mp) { return mp.estoqueNome; }).join(', ');
-    var mpQtd = (p.materiasPrimas || []).length;
+    var mps = p.materiasPrimas || [];
+
+    // Para cada MP, busca a qtd atual no estoque e monta o texto
+    var mpTexto = mps.map(function(mp) {
+      var itemEstoque = (state.estoque.produtos || []).find(function(e) { return e.nome === mp.estoqueNome; });
+      var qtd = itemEstoque ? (itemEstoque.qtd || 0) : null;
+      var qtdBadge = qtd !== null
+        ? '<span style="font-size:0.7rem;background:' + (qtd > 5 ? 'rgba(26,138,74,0.12)' : 'rgba(220,38,38,0.10)') + ';color:' + (qtd > 5 ? 'var(--green)' : 'var(--red)') + ';border-radius:4px;padding:1px 6px;margin-right:4px">' + qtd + ' un</span>'
+        : '';
+      return qtdBadge + esc(mp.estoqueNome);
+    }).join('<br>');
+
     return '<tr style="border-bottom:0.5px solid var(--border);cursor:pointer" onclick="prodAbrirForm(\'' + esc(p.sku) + '\')">' +
       '<td style="padding:10px 14px;font-weight:500">' + esc(p.nome) + '</td>' +
       '<td style="padding:10px 10px;font-family:monospace;font-size:0.8rem;color:var(--text3)">' + esc(p.sku) + '</td>' +
       '<td style="padding:10px 10px;text-align:right">' + p.peso + 'g</td>' +
-      '<td style="padding:10px 10px;font-size:0.8rem;color:var(--text2)">' +
-        (mpQtd ? '<span style="font-size:0.7rem;background:var(--bg3);border-radius:4px;padding:1px 6px;margin-right:5px">' + mpQtd + '</span>' + esc(mpNomes) : '<span style="color:var(--text3)">—</span>') +
+      '<td style="padding:10px 10px;font-size:0.8rem;color:var(--text2);line-height:1.6">' +
+        (mps.length ? mpTexto : '<span style="color:var(--text3)">—</span>') +
       '</td>' +
       '<td style="padding:10px 10px;text-align:right">' + (custo !== null ? 'R$ ' + custo.toFixed(2).replace('.', ',') : '—') + '</td>' +
       (isAdmin() ?

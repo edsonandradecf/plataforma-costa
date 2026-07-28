@@ -3,6 +3,10 @@ var _mgvLoading = false;
 var _mgvDados = null;       // { sku: { ml: preco|null, shopee: preco|null, tiktok: preco|null } }
 var _mgvErro = '';
 var _mgvAtualizadoEm = null;
+
+// Variáveis globais do Financeiro/Marketplaces (declaradas aqui pois radar.js é carregado antes)
+if (typeof _finLoaded === 'undefined')  window._finLoaded  = false;
+if (typeof _finMesSel === 'undefined')  window._finMesSel  = '';
 var _mgvPrecosTt = {};      // { sku: preco } -- preços manuais TikTok, persistidos no Firebase
 var _mgvTab = 'resumo'; // 'resumo' | 'ml' | 'shopee' | 'tiktok'
 var _mgvDebug = [];
@@ -1877,7 +1881,7 @@ function renderFinanceiro() {
     '';
 }
 
-var _finLoaded = false;
+// _finLoaded é declarado globalmente no index.html — não redeclarar aqui
 function bindFinanceiro() {
   var mesInp = document.getElementById('fin-mes-input');
   if (mesInp && !mesInp.value) {

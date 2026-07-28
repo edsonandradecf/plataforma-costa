@@ -365,13 +365,14 @@ function renderMargemViva() {
       if (c && state.currentPage === 'margemviva') c.innerHTML = renderMargemViva();
     });
   }
-  if (!_finLoaded) {
+  var _tarifasFaltando = Object.keys(state.financeiro.tarifasSku || {}).length === 0;
+  if (!_finLoaded || _tarifasFaltando) {
     _finLoaded = true;
     finLoadFirebase().then(function() {
       var c = document.getElementById('page-content');
       if (c && state.currentPage === 'margemviva') c.innerHTML = renderMargemViva();
     });
-    return '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4rem;gap:1rem">'+
+    if (_tarifasFaltando) return '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4rem;gap:1rem">'+
       '<div style="width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin 0.7s linear infinite"></div>'+
       '<div style="color:var(--text2);font-size:0.9rem">Carregando custos e tarifas...</div>'+
     '</div>';
@@ -696,14 +697,15 @@ function renderMarketplaces() {
   var custos  = state.financeiro.custoProdutos || {};
   var aliq    = parseFloat(state.financeiro.aliquota) || 0;
 
-  // Carregar financeiro se ainda não carregou
-  if (!_finLoaded) {
+  // Carregar financeiro se ainda não carregou OU se dados estão vazios
+  var _mesFaltando = Object.keys(state.financeiro.meses || {}).length === 0;
+  if (!_finLoaded || _mesFaltando) {
     _finLoaded = true;
     finLoadFirebase().then(function(){
       var c = document.getElementById('page-content');
       if (c && state.currentPage === 'marketplaces') c.innerHTML = renderMarketplaces();
     });
-    return '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4rem;gap:1rem">'+
+    if (_mesFaltando) return '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4rem;gap:1rem">'+
       '<div style="width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin 0.7s linear infinite"></div>'+
       '<div style="color:var(--text2);font-size:0.9rem">Carregando dados...</div>'+
     '</div>';
@@ -1890,8 +1892,9 @@ function bindFinanceiro() {
   }
   var btn = document.getElementById('fin-upload-btn');
   if (btn) btn.onclick = finImportar;
-  // Load from Firebase on first open
-  if (!_finLoaded) {
+  // Carrega do Firebase se ainda não carregou OU se os dados estão vazios
+  var mesFaltando = Object.keys(state.financeiro.meses || {}).length === 0;
+  if (!_finLoaded || mesFaltando) {
     _finLoaded = true;
     finLoadFirebase().then(function() {
       if (state.currentPage === 'financeiro') {

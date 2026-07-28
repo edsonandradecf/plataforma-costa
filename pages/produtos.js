@@ -97,8 +97,7 @@ function renderProdutos() {
   if (_prodTab === 'form')      return renderProdutosForm();
   if (_prodTab === 'historico') return renderProdHistorico();
   // Para a lista, carrega financeiro se precisar do custo
-  if (!_finLoaded) {
-    _finLoaded = true;
+  if (Object.keys(state.financeiro.custoProdutos || {}).length === 0) {
     finLoadFirebase().then(function() {
       var c = document.getElementById('page-content');
       if (c && state.currentPage === 'produtos') c.innerHTML = renderProdutos();

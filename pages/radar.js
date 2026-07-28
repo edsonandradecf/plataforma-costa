@@ -697,15 +697,15 @@ function renderMarketplaces() {
   var custos  = state.financeiro.custoProdutos || {};
   var aliq    = parseFloat(state.financeiro.aliquota) || 0;
 
-  // Carregar financeiro se ainda não carregou OU se dados estão vazios
-  var _mesFaltando = Object.keys(state.financeiro.meses || {}).length === 0;
-  if (!_finLoaded || _mesFaltando) {
+  // Carregar financeiro se tarifas ainda não vieram
+  var _tarifasFaltando = Object.keys(tarifas).length === 0;
+  if (!_finLoaded || _tarifasFaltando) {
     _finLoaded = true;
     finLoadFirebase().then(function(){
       var c = document.getElementById('page-content');
       if (c && state.currentPage === 'marketplaces') c.innerHTML = renderMarketplaces();
     });
-    if (_mesFaltando) return '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4rem;gap:1rem">'+
+    if (_tarifasFaltando) return '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4rem;gap:1rem">'+
       '<div style="width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin 0.7s linear infinite"></div>'+
       '<div style="color:var(--text2);font-size:0.9rem">Carregando dados...</div>'+
     '</div>';
@@ -1893,7 +1893,7 @@ function bindFinanceiro() {
   var btn = document.getElementById('fin-upload-btn');
   if (btn) btn.onclick = finImportar;
   // Carrega do Firebase se ainda não carregou OU se os dados estão vazios
-  var mesFaltando = Object.keys(state.financeiro.meses || {}).length === 0;
+  var mesFaltando = Object.keys(state.financeiro.tarifasSku || {}).length === 0;
   if (!_finLoaded || mesFaltando) {
     _finLoaded = true;
     finLoadFirebase().then(function() {
@@ -2291,19 +2291,30 @@ async function finLoadFirebase() {
     // Compatibilidade: se vier array (formato antigo), migra para objeto
     var rawDesp = meta.despesas;
     if (Array.isArray(rawDesp)) {
-      // migra: coloca tudo no mês atual ou sem mês
       var migrado = {};
       if (rawDesp.length) migrado['sem-mes'] = rawDesp;
       state.financeiro.despesas = migrado;
     } else {
       state.financeiro.despesas = rawDesp || {};
     }
-    state.financeiro.aliquota     = meta.aliquota || 0;
+    state.financeiro.aliquota      = meta.aliquota || 0;
     state.financeiro.custoProdutos = meta.custoProdutos || {};
     state.financeiro.tarifasSku    = meta.tarifasSku    || {};
 
-    // 2. Carrega cada mês
+    // 2. Carrega cada mês — usa mesKeys se existir, senão busca /financeiro/meses diretamente
     var mesKeys = meta.mesKeys || [];
+    if (!mesKeys.length) {
+      // Tenta descobrir meses listando o nó /financeiro/meses
+      var rMeses = await fetch(FIREBASE_URL + '/financeiro/meses.json?shallow=true');
+      if (rMeses.ok) {
+        var mesesShallow = await rMeses.json();
+        if (mesesShallow && typeof mesesShallow === 'object') {
+          // chaves são no formato 2025_06, converter para 2025-06
+          mesKeys = Object.keys(mesesShallow).map(function(k){ return k.replace('_','-'); });
+        }
+      }
+    }
+
     state.financeiro.meses = {};
     for (var i = 0; i < mesKeys.length; i++) {
       var k = mesKeys[i];
@@ -2318,7 +2329,7 @@ async function finLoadFirebase() {
         tt: mesData.tt ? finExpandirTT(mesData.tt) : null,
       };
     }
-    console.log('Financeiro carregado do Firebase OK, meses:', Object.keys(state.financeiro.meses));
+    console.log('Financeiro carregado OK. meses:', Object.keys(state.financeiro.meses), '| tarifas:', Object.keys(state.financeiro.tarifasSku).length, 'SKUs');
   } catch(e) {
     console.error('finLoadFirebase error:', e);
   }

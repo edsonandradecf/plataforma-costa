@@ -352,7 +352,210 @@ function renderPontoAdminColabs() {
 function renderPontoAdminHistorico() {
   var registros = state.ponto.registros;
   var cols      = state.ponto.colaboradores;
-  var nomesMes  = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var nomesMes  = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var diasSem   = ['Dom','Seg','Ter','Qua','Qui','Sex','Sab'];
+
+  var filtroColab = (typeof _pontoHistColab !== 'undefined') ? _pontoHistColab : 'todos';
+  var filtroMes   = (typeof _pontoHistMes   !== 'undefined') ? _pontoHistMes   : pontoMesAnoAtual();
+
+  // Meses disponíveis
+  var mesesDisp = {};
+  registros.forEach(function(r) {
+    var p = r.data.split('/');
+    if (p.length < 3) return;
+    var chave = p[2] + '-' + p[1];
+    mesesDisp[chave] = { ano: p[2], mes: p[1], label: nomesMes[parseInt(p[1])-1] + ' ' + p[2] };
+  });
+  var ma = new Date();
+  var chaveAtual = ma.getFullYear() + '-' + String(ma.getMonth()+1).padStart(2,'0');
+  if (!mesesDisp[chaveAtual]) mesesDisp[chaveAtual] = { ano: String(ma.getFullYear()), mes: String(ma.getMonth()+1).padStart(2,'0'), label: nomesMes[ma.getMonth()] + ' ' + ma.getFullYear() };
+  var mesesOrdenados = Object.keys(mesesDisp).sort().reverse();
+
+  // Filtros
+  var html =
+    '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:1.25rem">' +
+      '<div>' +
+        '<label style="font-size:0.75rem;color:var(--text2);display:block;margin-bottom:4px;font-weight:600">📅 Mes</label>' +
+        '<select onchange="pontoSetHistMes(this.value)" style="padding:0.55rem 0.9rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.88rem">' +
+          mesesOrdenados.map(function(k) {
+            return '<option value="' + k + '"' + (filtroMes===k?' selected':'') + '>' + mesesDisp[k].label + '</option>';
+          }).join('') +
+        '</select>' +
+      '</div>' +
+      '<div style="flex:1;min-width:180px">' +
+        '<label style="font-size:0.75rem;color:var(--text2);display:block;margin-bottom:4px;font-weight:600">👤 Colaborador</label>' +
+        '<select onchange="pontoSetHistColab(this.value)" style="width:100%;padding:0.55rem 0.9rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.88rem">' +
+          '<option value="todos"' + (filtroColab==='todos'?' selected':'') + '>Todos os colaboradores</option>' +
+          cols.map(function(c,i){ return '<option value="'+i+'"'+(filtroColab===String(i)?' selected':'')+'>'+esc(c.nome)+'</option>'; }).join('') +
+        '</select>' +
+      '</div>' +
+      '<button class="btn btn-green" onclick="pontoBaixarPDF()" style="display:flex;align-items:center;gap:6px;white-space:nowrap">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>' +
+        'Baixar PDF' +
+      '</button>' +
+      (registros.length ? '<button class="btn btn-sm btn-red" onclick="pontoLimparHistorico()" style="white-space:nowrap">Limpar tudo</button>' : '') +
+    '</div>';
+
+  // Filtra e monta dados
+  var partesMes = filtroMes.split('-');
+  var anoNum = parseInt(partesMes[0]), mesNum = parseInt(partesMes[1]) - 1;
+  var diasNoMes = new Date(anoNum, mesNum+1, 0).getDate();
+
+  var lista = registros.filter(function(r) {
+    var p = r.data.split('/');
+    if (p.length < 3) return false;
+    if (p[2] !== partesMes[0] || p[1].padStart(2,'0') !== partesMes[1]) return false;
+    if (filtroColab !== 'todos' && String(r.colabIdx) !== filtroColab) return false;
+    return true;
+  });
+
+  if (!lista.length) {
+    return html + '<div class="empty-state">' + iconEmpty() + '<p>Nenhum registro para o periodo selecionado.</p></div>';
+  }
+
+  // Determina quais colaboradores mostrar
+  var colabsParaMostrar = filtroColab === 'todos'
+    ? cols.map(function(c,i){ return i; })
+    : [parseInt(filtroColab)];
+
+  // Para cada colaborador, monta o calendário
+  colabsParaMostrar.forEach(function(colabIdx) {
+    var colab = cols[colabIdx];
+    if (!colab) return;
+
+    var regsColab = lista.filter(function(r){ return r.colabIdx === colabIdx; });
+    if (!regsColab.length && filtroColab === 'todos') return;
+
+    // Agrupa por dia
+    var porDia = {};
+    regsColab.forEach(function(r) {
+      var dia = parseInt(r.data.split('/')[0]);
+      if (!porDia[dia]) porDia[dia] = [];
+      porDia[dia].push(r);
+    });
+
+    // Stats do colaborador
+    var stats = pontoCalcStats(colabIdx, mesNum, anoNum);
+
+    // Header do colaborador
+    html += '<div style="background:var(--bg3);border-radius:10px;padding:14px 16px;margin-bottom:12px">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">' +
+        '<div style="font-weight:700;font-size:1rem">' + esc(colab.nome) +
+          (colab.cargo ? '<span style="font-weight:400;color:var(--text3);font-size:0.78rem;margin-left:8px">' + esc(colab.cargo) + '</span>' : '') +
+        '</div>' +
+        '<div style="display:flex;gap:16px;font-size:0.82rem">' +
+          '<span>⏱ <strong>' + stats.horasFormatado + '</strong></span>' +
+          '<span>📅 <strong>' + stats.diasTrabalhados + '</strong> dias</span>' +
+          (stats.faltas > 0 ? '<span style="color:var(--red)">❌ <strong>' + stats.faltas + '</strong> faltas</span>' : '') +
+          (stats.diasFolga > 0 ? '<span style="color:#7c3aed">🏖 <strong>' + stats.diasFolga + '</strong> folgas</span>' : '') +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+
+    // Grid do calendário — 7 colunas
+    '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:20px">';
+
+    for (var d = 1; d <= diasNoMes; d++) {
+      var dt     = new Date(anoNum, mesNum, d);
+      var diaSem = dt.getDay();
+      var fimSem = diaSem === 0 || diaSem === 6;
+      var regs   = porDia[d] || [];
+
+      // Verifica se tem folga registrada
+      var temFolga = regs.some(function(r){ return r.tipo === 'folga'; });
+      var regsNorm = regs.filter(function(r){ return r.tipo !== 'folga'; });
+
+      // Horários do dia
+      var entrada      = regsNorm.find(function(r){ return r.etapa === 0; });
+      var saidaAlmoco  = regsNorm.find(function(r){ return r.etapa === 1; });
+      var voltaAlmoco  = regsNorm.find(function(r){ return r.etapa === 2; });
+      var saida        = regsNorm.find(function(r){ return r.etapa === 3; });
+
+      // Calcula horas trabalhadas do dia
+      var minDia = 0;
+      var manha = 0, tarde = 0;
+      if (entrada && saidaAlmoco) {
+        manha = pontoHoraParaMs(saidaAlmoco.hora) - pontoHoraParaMs(entrada.hora);
+        if (manha > 0) minDia += manha;
+      }
+      if (voltaAlmoco && saida) {
+        tarde = pontoHoraParaMs(saida.hora) - pontoHoraParaMs(voltaAlmoco.hora);
+        if (tarde > 0) minDia += tarde;
+      }
+      var hh = Math.floor(minDia/60), mm2 = minDia%60;
+      var totalDiaStr = minDia > 0 ? hh + 'h' + String(mm2).padStart(2,'0') : null;
+
+      // Verifica se é falta (dia útil sem registro)
+      var hoje = new Date(); hoje.setHours(0,0,0,0);
+      var isFalta = !fimSem && !temFolga && regsNorm.length === 0 && dt <= hoje;
+
+      // Classe do card
+      var borderColor = '#e5e7eb';
+      if (fimSem)    borderColor = '#e5e7eb';
+      else if (temFolga)  borderColor = '#6366f1';
+      else if (isFalta)   borderColor = '#ef4444';
+      else if (totalDiaStr) {
+        // Verifica se tem irregularidade
+        var irregular = pontoHoraIrregular(entrada, 0) || pontoHoraIrregular(saidaAlmoco, 1) || pontoHoraIrregular(voltaAlmoco, 2) || pontoHoraIrregular(saida, 3);
+        borderColor = irregular ? '#f59e0b' : '#22c55e';
+      }
+
+      // Função para badge de hora
+      function horaBadge(reg, etapaIdx) {
+        if (!reg) return '<span style="font-size:0.6rem;font-weight:700;padding:2px 4px;border-radius:4px;text-align:center;background:#f1f5f9;color:#94a3b8">--</span>';
+        var irregular2 = pontoHoraIrregular(reg, etapaIdx);
+        var bg = irregular2 ? '#fef9c3' : '#dcfce7';
+        var cor2 = irregular2 ? '#b45309' : '#16a34a';
+        return '<span style="font-size:0.6rem;font-weight:700;padding:2px 4px;border-radius:4px;text-align:center;background:' + bg + ';color:' + cor2 + '">' + reg.hora + '</span>';
+      }
+
+      html += '<div style="background:var(--card);border-radius:6px;padding:6px 7px;border:1px solid var(--border);border-top:3px solid ' + borderColor + ';' + (fimSem?'opacity:0.5':'') + '">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">' +
+        '<span style="font-size:0.9rem;font-weight:800;color:var(--text)">' + d + '</span>' +
+        '<span style="font-size:0.55rem;color:var(--text3);text-transform:uppercase">' + diasSem[diaSem] + '</span>' +
+      '</div>';
+
+      if (fimSem) {
+        html += '<div style="text-align:center;font-size:0.6rem;color:var(--text3);padding:5px 0">--</div>';
+      } else if (temFolga) {
+        html += '<div style="text-align:center;font-size:0.6rem;color:#7c3aed;font-weight:700;padding:5px 0">🏖 Folga</div>';
+      } else if (isFalta) {
+        html += '<div style="text-align:center;font-size:0.6rem;color:var(--red);font-weight:700;padding:5px 0">Falta</div>';
+      } else {
+        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px">' +
+          horaBadge(entrada, 0) + horaBadge(saidaAlmoco, 1) +
+          horaBadge(voltaAlmoco, 2) + horaBadge(saida, 3) +
+        '</div>';
+        if (totalDiaStr) {
+          html += '<div style="font-size:0.58rem;color:var(--text3);margin-top:4px;border-top:1px solid var(--border);padding-top:3px">Hora trabalhada: <strong style="color:var(--text)">' + totalDiaStr + '</strong></div>';
+        }
+      }
+
+      html += '</div>';
+    }
+
+    html += '</div>'; // grid
+  });
+
+  // Legenda
+  html += '<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:0.72rem;color:var(--text3);margin-top:4px">' +
+    '<span><span style="display:inline-block;width:10px;height:3px;border-radius:1px;background:#22c55e;margin-right:4px;vertical-align:middle"></span>Horario exato</span>' +
+    '<span><span style="display:inline-block;width:10px;height:3px;border-radius:1px;background:#f59e0b;margin-right:4px;vertical-align:middle"></span>Irregularidade</span>' +
+    '<span><span style="display:inline-block;width:10px;height:3px;border-radius:1px;background:#ef4444;margin-right:4px;vertical-align:middle"></span>Falta</span>' +
+    '<span><span style="display:inline-block;width:10px;height:3px;border-radius:1px;background:#6366f1;margin-right:4px;vertical-align:middle"></span>Folga</span>' +
+    '<span style="background:#dcfce7;color:#16a34a;padding:1px 6px;border-radius:3px;font-weight:700">08:00</span> Verde = no horario' +
+    '<span style="background:#fef9c3;color:#b45309;padding:1px 6px;border-radius:3px;font-weight:700;margin-left:8px">08:07</span> Amarelo = fora do horario' +
+  '</div>';
+
+  return html;
+}
+
+// Verifica se um horário está fora do esperado (tolerância zero)
+function pontoHoraIrregular(reg, etapaIdx) {
+  if (!reg || !reg.hora) return false;
+  var esperados = ['08:00', '12:00', '13:00', '17:00'];
+  return reg.hora !== esperados[etapaIdx];
+}
 
   // -- Estado dos filtros ------------------------------------
   var filtroColab = (typeof _pontoHistColab !== 'undefined') ? _pontoHistColab : 'todos';
@@ -744,7 +947,265 @@ function pontoSetHistColab(val) {
 }
 
 function pontoBaixarPDF() {
-  var nomesMes  = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var nomesMes  = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  var diasSem   = ['Dom','Seg','Ter','Qua','Qui','Sex','Sab'];
+  var filtroColab = (typeof _pontoHistColab !== 'undefined') ? _pontoHistColab : 'todos';
+  var filtroMes   = (typeof _pontoHistMes   !== 'undefined' && _pontoHistMes) ? _pontoHistMes : pontoMesAnoAtual();
+  var cols        = state.ponto.colaboradores;
+  var registros   = state.ponto.registros;
+
+  var partesMes = filtroMes.split('-');
+  var anoNum = parseInt(partesMes[0]), mesNum = parseInt(partesMes[1]) - 1;
+  var mesLabel = nomesMes[mesNum] + ' ' + anoNum;
+  var diasNoMes = new Date(anoNum, mesNum+1, 0).getDate();
+
+  var colabsParaMostrar = filtroColab === 'todos'
+    ? cols.map(function(c,i){ return i; })
+    : [parseInt(filtroColab)];
+
+  try {
+    var jsPDFLib = window.jspdf;
+    var doc = new jsPDFLib.jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    var PW = 210, PH = 297, px = 10;
+    var pageNum = 0;
+
+    // Cores
+    var COR_GREEN  = [22,163,74];
+    var COR_YELLOW = [245,158,11];
+    var COR_RED    = [239,68,68];
+    var COR_PURPLE = [99,102,241];
+    var COR_GRAY   = [148,163,184];
+
+    function novaPagina(nome, cargo, mesLabel2) {
+      if (pageNum > 0) doc.addPage();
+      pageNum++;
+
+      // Header verde
+      doc.setFillColor(COR_GREEN[0], COR_GREEN[1], COR_GREEN[2]);
+      doc.rect(0, 0, PW, 24, 'F');
+      doc.setTextColor(255,255,255);
+      doc.setFont('helvetica','bold'); doc.setFontSize(12);
+      doc.text('COSTA NATURE LIFE -- Relatorio de Ponto', px, 10);
+      doc.setFont('helvetica','normal'); doc.setFontSize(8);
+      doc.text(mesLabel2 + '  |  ' + nome + (cargo ? ' -- ' + cargo : ''), px, 16);
+      doc.text('Gerado em ' + new Date().toLocaleString('pt-BR'), PW - px, 16, { align:'right' });
+      doc.setTextColor(0,0,0);
+    }
+
+    function horaBadgePDF(doc2, x, y, hora, etapaIdx) {
+      var w = 17, h = 4.5;
+      var esperados = ['08:00','12:00','13:00','17:00'];
+      if (!hora) {
+        doc2.setFillColor(241,245,249);
+        doc2.roundedRect(x, y, w, h, 1, 1, 'F');
+        doc2.setTextColor(148,163,184); doc2.setFontSize(5.5); doc2.setFont('helvetica','normal');
+        doc2.text('--', x + w/2, y + h - 1, { align:'center' });
+        return;
+      }
+      var irregular = hora !== esperados[etapaIdx];
+      if (irregular) {
+        doc2.setFillColor(254,243,199);
+        doc2.roundedRect(x, y, w, h, 1, 1, 'F');
+        doc2.setTextColor(COR_YELLOW[0],COR_YELLOW[1],COR_YELLOW[2]);
+      } else {
+        doc2.setFillColor(220,252,231);
+        doc2.roundedRect(x, y, w, h, 1, 1, 'F');
+        doc2.setTextColor(COR_GREEN[0],COR_GREEN[1],COR_GREEN[2]);
+      }
+      doc2.setFontSize(5.5); doc2.setFont('helvetica','bold');
+      doc2.text(hora, x + w/2, y + h - 1, { align:'center' });
+      doc2.setTextColor(0,0,0);
+    }
+
+    colabsParaMostrar.forEach(function(colabIdx) {
+      var colab = cols[colabIdx];
+      if (!colab) return;
+
+      var regsColab = registros.filter(function(r) {
+        var p = r.data.split('/');
+        if (p.length < 3) return false;
+        if (p[2] !== partesMes[0] || p[1].padStart(2,'0') !== partesMes[1]) return false;
+        return r.colabIdx === colabIdx;
+      });
+
+      novaPagina(colab.nome, colab.cargo || '', mesLabel);
+
+      // Stats
+      var stats = pontoCalcStats(colabIdx, mesNum, anoNum);
+
+      // Caixas de stats
+      var sboxY = 27, sboxH = 14;
+      var sboxes = [
+        { label:'Horas trabalhadas', val: stats.horasFormatado, cor: COR_GREEN },
+        { label:'Dias trabalhados',  val: String(stats.diasTrabalhados), cor: [37,99,235] },
+        { label:'Faltas',            val: String(stats.faltas),          cor: COR_RED },
+        { label:'Folgas',            val: String(stats.diasFolga || 0),  cor: COR_PURPLE },
+      ];
+      var sboxW = (PW - px*2 - 9) / 4;
+      sboxes.forEach(function(sb, si) {
+        var bx = px + si * (sboxW + 3);
+        doc.setFillColor(sb.cor[0], sb.cor[1], sb.cor[2]);
+        doc.roundedRect(bx, sboxY, sboxW, sboxH, 2, 2, 'F');
+        doc.setTextColor(255,255,255);
+        doc.setFont('helvetica','bold'); doc.setFontSize(11);
+        doc.text(sb.val, bx + sboxW/2, sboxY + 7.5, { align:'center' });
+        doc.setFont('helvetica','normal'); doc.setFontSize(6);
+        doc.text(sb.label, bx + sboxW/2, sboxY + 12, { align:'center' });
+      });
+      doc.setTextColor(0,0,0);
+
+      // Calendário — 7 colunas
+      var calY = sboxY + sboxH + 6;
+      var cardW = (PW - px*2 - 6*2) / 7;
+      var cardH = 22;
+      var col7 = 0;
+
+      // Agrupa registros por dia
+      var porDia = {};
+      regsColab.forEach(function(r) {
+        var dia = parseInt(r.data.split('/')[0]);
+        if (!porDia[dia]) porDia[dia] = [];
+        porDia[dia].push(r);
+      });
+
+      for (var d = 1; d <= diasNoMes; d++) {
+        var dt     = new Date(anoNum, mesNum, d);
+        var diaSem = dt.getDay();
+        var fimSem = diaSem === 0 || diaSem === 6;
+        var regs   = porDia[d] || [];
+
+        var temFolga = regs.some(function(r){ return r.tipo === 'folga'; });
+        var regsNorm = regs.filter(function(r){ return r.tipo !== 'folga'; });
+
+        var entrada     = regsNorm.find(function(r){ return r.etapa === 0; });
+        var saidAlm     = regsNorm.find(function(r){ return r.etapa === 1; });
+        var voltAlm     = regsNorm.find(function(r){ return r.etapa === 2; });
+        var saida       = regsNorm.find(function(r){ return r.etapa === 3; });
+
+        // Horas do dia
+        var minDia2 = 0;
+        if (entrada && saidAlm) { var m1 = pontoHoraParaMs(saidAlm.hora) - pontoHoraParaMs(entrada.hora); if (m1>0) minDia2+=m1; }
+        if (voltAlm && saida)   { var m2 = pontoHoraParaMs(saida.hora)   - pontoHoraParaMs(voltAlm.hora); if (m2>0) minDia2+=m2; }
+        var hhd = Math.floor(minDia2/60), mmd = minDia2%60;
+        var totalDia = minDia2 > 0 ? hhd + 'h' + String(mmd).padStart(2,'0') : null;
+
+        var hoje2 = new Date(); hoje2.setHours(0,0,0,0);
+        var isFalta = !fimSem && !temFolga && regsNorm.length === 0 && dt <= hoje2;
+
+        // Cor da borda topo
+        var borderCor;
+        if (fimSem)      borderCor = COR_GRAY;
+        else if (temFolga)    borderCor = COR_PURPLE;
+        else if (isFalta)     borderCor = COR_RED;
+        else if (totalDia) {
+          var irreg = (entrada && entrada.hora !== '08:00') || (saidAlm && saidAlm.hora !== '12:00') || (voltAlm && voltAlm.hora !== '13:00') || (saida && saida.hora !== '17:00');
+          borderCor = irreg ? COR_YELLOW : COR_GREEN;
+        } else borderCor = COR_GRAY;
+
+        var cx = px + col7 * (cardW + 2);
+        var cy = calY;
+
+        // Verifica se precisa nova linha
+        if (col7 === 7) {
+          col7 = 0;
+          calY += cardH + 2;
+          // Verifica se cabe na página
+          if (calY + cardH > PH - 14) {
+            doc.setFontSize(6); doc.setTextColor(120,120,120);
+            doc.text('Costa Nature Life -- Relatorio de Ponto -- ' + mesLabel, px, PH-5);
+            doc.addPage(); pageNum++;
+            novaPagina(colab.nome, colab.cargo||'', mesLabel);
+            calY = 27 + sboxH + 6;
+          }
+          cx = px; cy = calY;
+        }
+
+        // Fundo do card
+        if (fimSem) {
+          doc.setFillColor(249,250,251);
+        } else {
+          doc.setFillColor(255,255,255);
+        }
+        doc.setDrawColor(229,231,235); doc.setLineWidth(0.2);
+        doc.roundedRect(cx, cy, cardW, cardH, 1.5, 1.5, 'FD');
+
+        // Borda top colorida
+        doc.setFillColor(borderCor[0], borderCor[1], borderCor[2]);
+        doc.roundedRect(cx, cy, cardW, 1.5, 0.5, 0.5, 'F');
+
+        // Dia + dia semana
+        doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(26,26,46);
+        doc.text(String(d), cx + 2, cy + 6);
+        doc.setFont('helvetica','normal'); doc.setFontSize(5); doc.setTextColor(150,150,150);
+        doc.text(diasSem[diaSem], cx + cardW - 2, cy + 5.5, { align:'right' });
+        doc.setTextColor(0,0,0);
+
+        if (fimSem) {
+          doc.setTextColor(180,180,180); doc.setFontSize(6);
+          doc.text('--', cx + cardW/2, cy + 14, { align:'center' });
+        } else if (temFolga) {
+          doc.setTextColor(COR_PURPLE[0], COR_PURPLE[1], COR_PURPLE[2]);
+          doc.setFont('helvetica','bold'); doc.setFontSize(6);
+          doc.text('Folga', cx + cardW/2, cy + 14, { align:'center' });
+        } else if (isFalta) {
+          doc.setTextColor(COR_RED[0], COR_RED[1], COR_RED[2]);
+          doc.setFont('helvetica','bold'); doc.setFontSize(6);
+          doc.text('Falta', cx + cardW/2, cy + 14, { align:'center' });
+        } else {
+          // 4 badges de hora em 2x2
+          var bw = (cardW - 4) / 2, bx1 = cx + 2, bx2 = cx + 2 + bw + 1;
+          horaBadgePDF(doc, bx1, cy + 7.5, entrada ? entrada.hora : null, 0);
+          horaBadgePDF(doc, bx2, cy + 7.5, saidAlm ? saidAlm.hora : null, 1);
+          horaBadgePDF(doc, bx1, cy + 13, voltAlm ? voltAlm.hora : null, 2);
+          horaBadgePDF(doc, bx2, cy + 13, saida ? saida.hora : null, 3);
+
+          // Total horas
+          if (totalDia) {
+            doc.setDrawColor(229,231,235); doc.setLineWidth(0.1);
+            doc.line(cx+2, cy+18.5, cx+cardW-2, cy+18.5);
+            doc.setFont('helvetica','normal'); doc.setFontSize(4.5); doc.setTextColor(120,120,120);
+            doc.text('Hora trabalhada: ', cx + 2, cy + 21);
+            doc.setFont('helvetica','bold'); doc.setTextColor(26,26,46);
+            doc.text(totalDia, cx + cardW - 2, cy + 21, { align:'right' });
+          }
+        }
+
+        doc.setTextColor(0,0,0);
+        col7++;
+      }
+
+      // Legenda
+      var legY = calY + cardH + 5;
+      if (legY > PH - 20) { doc.addPage(); pageNum++; legY = 20; }
+      var items = [
+        { cor: COR_GREEN,  label: 'Horario exato' },
+        { cor: COR_YELLOW, label: 'Fora do horario' },
+        { cor: COR_RED,    label: 'Falta' },
+        { cor: COR_PURPLE, label: 'Folga' },
+      ];
+      var lx = px;
+      doc.setFontSize(6); doc.setFont('helvetica','normal');
+      items.forEach(function(it) {
+        doc.setFillColor(it.cor[0], it.cor[1], it.cor[2]);
+        doc.roundedRect(lx, legY, 8, 2.5, 0.5, 0.5, 'F');
+        doc.setTextColor(80,80,80);
+        doc.text(it.label, lx + 10, legY + 2);
+        lx += 40;
+      });
+    });
+
+    // Rodapé
+    doc.setFontSize(6); doc.setTextColor(120,120,120);
+    doc.text('Costa Nature Life -- CNPJ 44.168.874/0001-28 -- Relatorio de Ponto -- ' + mesLabel, px, PH-5);
+
+    var colabLabel = filtroColab === 'todos' ? 'todos' : (cols[parseInt(filtroColab)] ? cols[parseInt(filtroColab)].nome.replace(/\s+/g,'-').toLowerCase() : '');
+    var nomeArq = 'ponto-' + mesLabel.replace(' ','-').toLowerCase() + (filtroColab!=='todos'?'-'+colabLabel:'') + '.pdf';
+    doc.save(nomeArq);
+    addLog('Baixou relatorio de ponto: ' + mesLabel + ' / ' + (filtroColab==='todos'?'Todos':colabLabel));
+  } catch(err) {
+    alert('Erro ao gerar PDF: ' + err.message);
+  }
+}
   var ETAPA_LABELS = ['Entrada','Saída Almoço','Volta Almoço','Saída'];
   var filtroColab = (typeof _pontoHistColab !== 'undefined') ? _pontoHistColab : 'todos';
   var filtroMes   = (typeof _pontoHistMes   !== 'undefined' && _pontoHistMes) ? _pontoHistMes : pontoMesAnoAtual();

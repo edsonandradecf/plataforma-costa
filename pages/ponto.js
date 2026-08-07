@@ -487,7 +487,7 @@ function renderPontoAdminHistorico() {
 
       // Verifica se é falta (dia útil sem registro)
       var hoje = new Date(); hoje.setHours(0,0,0,0);
-      var isFalta = !fimSem && !temFolga && regsNorm.length === 0 && dt <= hoje;
+      var isFalta = !fimSem && !temFolga && regsNorm.length === 0 && dt < hoje;
 
       // Classe do card
       var borderColor = '#e5e7eb';
@@ -846,8 +846,8 @@ function pontoBaixarPDF() {
       if (!hora) {
         doc2.setFillColor(241,245,249);
         doc2.roundedRect(x, y, w, h, 1, 1, 'F');
-        doc2.setTextColor(148,163,184); doc2.setFontSize(5.5); doc2.setFont('helvetica','normal');
-        doc2.text('--', x + w/2, y + h - 1, { align:'center' });
+        doc2.setTextColor(148,163,184); doc2.setFontSize(5); doc2.setFont('helvetica','normal');
+        doc2.text('--', x + w/2, y + h/2 + 1.5, { align:'center' });
         return;
       }
       var irregular = hora !== esperados[etapaIdx];
@@ -861,7 +861,7 @@ function pontoBaixarPDF() {
         doc2.setTextColor(COR_GREEN[0],COR_GREEN[1],COR_GREEN[2]);
       }
       doc2.setFontSize(5.5); doc2.setFont('helvetica','bold');
-      doc2.text(hora, x + w/2, y + h - 1, { align:'center' });
+      doc2.text(hora, x + w/2, y + h/2 + 1.5, { align:'center' });
       doc2.setTextColor(0,0,0);
     }
 
@@ -938,7 +938,7 @@ function pontoBaixarPDF() {
         var totalDia = minDia2 > 0 ? hhd + 'h' + String(mmd).padStart(2,'0') : null;
 
         var hoje2 = new Date(); hoje2.setHours(0,0,0,0);
-        var isFalta = !fimSem && !temFolga && regsNorm.length === 0 && dt <= hoje2;
+        var isFalta = !fimSem && !temFolga && regsNorm.length === 0 && dt < hoje2;
 
         // Cor da borda topo
         var borderCor;
@@ -1001,11 +1001,11 @@ function pontoBaixarPDF() {
           doc.text('Falta', cx + cardW/2, cy + 14, { align:'center' });
         } else {
           // 4 badges de hora em 2x2
-          var bw = (cardW - 4) / 2, bx1 = cx + 2, bx2 = cx + 2 + bw + 1;
-          horaBadgePDF(doc, bx1, cy + 7.5, entrada ? entrada.hora : null, 0);
-          horaBadgePDF(doc, bx2, cy + 7.5, saidAlm ? saidAlm.hora : null, 1);
-          horaBadgePDF(doc, bx1, cy + 13, voltAlm ? voltAlm.hora : null, 2);
-          horaBadgePDF(doc, bx2, cy + 13, saida ? saida.hora : null, 3);
+          var bw = (cardW - 5) / 2, bx1 = cx + 1.5, bx2 = cx + 1.5 + bw + 2;
+          horaBadgePDF(doc, bx1, cy + 7, entrada ? entrada.hora : null, 0);
+          horaBadgePDF(doc, bx2, cy + 7, saidAlm ? saidAlm.hora : null, 1);
+          horaBadgePDF(doc, bx1, cy + 12.5, voltAlm ? voltAlm.hora : null, 2);
+          horaBadgePDF(doc, bx2, cy + 12.5, saida ? saida.hora : null, 3);
 
           // Total horas
           if (totalDia) {

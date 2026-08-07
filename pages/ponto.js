@@ -626,10 +626,12 @@ function pontoCalcStats(colabIdx, mes, ano) {
     if (minDia > 0) { totalMin += minDia; diasTrabalhados++; }
   });
 
-  // Faltas: dias úteis passados sem registro de ponto E sem folga/feriado
+  // Faltas: dias úteis JÁ PASSADOS sem registro de ponto E sem folga/feriado
+  // Nao conta o dia de hoje (jornada pode estar em andamento)
   var hoje = new Date();
   var diasUteisPassados = 0;
-  var limite = (mes === hoje.getMonth() && ano === hoje.getFullYear()) ? hoje.getDate() : new Date(ano, mes+1, 0).getDate();
+  var ehMesAtual = (mes === hoje.getMonth() && ano === hoje.getFullYear());
+  var limite = ehMesAtual ? hoje.getDate() - 1 : new Date(ano, mes+1, 0).getDate();
   for (var d = 1; d <= limite; d++) {
     var dt = new Date(ano, mes, d);
     var diaSem = dt.getDay();
@@ -637,7 +639,26 @@ function pontoCalcStats(colabIdx, mes, ano) {
     var dataStr = String(d).padStart(2,'0') + '/' + String(mes+1).padStart(2,'0') + '/' + ano;
     if (!diasFolga[dataStr]) diasUteisPassados++;
   }
-  var faltas = Math.max(0, diasUteisPassados - diasTrabalhados);
+  // Conta apenas dias trabalhados ANTERIORES a hoje para o calculo de faltas
+  var diasTrabAnteriores = 0;
+  Object.keys(porDia).forEach(function(dia) {
+    var pd = dia.split('/');
+    if (pd.length < 3) return;
+    var diaNum = parseInt(pd[0]);
+    if (ehMesAtual && diaNum >= hoje.getDate()) return; // ignora hoje e futuro
+    var lista2 = porDia[dia];
+    var ent2 = lista2.filter(function(r){ return r.tipo==='entrada'; });
+    var sai2 = lista2.filter(function(r){ return r.tipo==='saida';   });
+    var p2 = Math.min(ent2.length, sai2.length);
+    var min2 = 0;
+    for (var k2 = 0; k2 < p2; k2++) {
+      var e2 = pontoHoraParaMs(ent2[k2].hora);
+      var s2 = pontoHoraParaMs(sai2[k2].hora);
+      if (s2 > e2) min2 += s2 - e2;
+    }
+    if (min2 > 0) diasTrabAnteriores++;
+  });
+  var faltas = Math.max(0, diasUteisPassados - diasTrabAnteriores);
 
   var h = Math.floor(totalMin / 60);
   var m = totalMin % 60;

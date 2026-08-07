@@ -2787,20 +2787,13 @@ var _mktsMesSel  = ''; // mês independente
 <script src="pages/produtos.js?v=2"></script>
 <script src="pages/radar.js?v=2"></script>
 <script>
-// Limpa cache antigo do Service Worker
+// Remove Service Worker completamente
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then(function(regs) {
     regs.forEach(function(r) { r.unregister(); });
   });
   caches.keys().then(function(names) {
     names.forEach(function(n) { caches.delete(n); });
-  });
-}
-if ('serviceWorker' in navigator && location.hostname === 'edsonandradecf.github.io') {
-  window.addEventListener('load', function() {
-    navigator.serviceWorker.register('sw.js')
-      .then(function(reg) { console.log('[PWA] Service worker registrado:', reg.scope); })
-      .catch(function(err) { console.warn('[PWA] Falha ao registrar service worker:', err); });
   });
 }
 </script>

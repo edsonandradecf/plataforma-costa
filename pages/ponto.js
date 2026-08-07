@@ -17,7 +17,7 @@ function renderPonto() {
   return renderPontoPublico();
 }
 
-// -- VISÃO PÚBLICA (todos os usuários) ----------------------------------------
+// -- VISAO PUBLICA (todos os usuarios) ----------------------------------------
 function renderPontoPublico() {
   var cols = state.ponto.colaboradores;
 
@@ -76,8 +76,8 @@ function renderPontoColabAberto(idx) {
   var nomesMes     = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
   // -- Jornada: 4 etapas ------------------------------------
-  // 0 = Entrada (08h)  1 = Saída Almoço (12h)
-  // 2 = Volta Almoço (13h)  3 = Saída (17h)
+  // 0 = Entrada (08h)  1 = Saida Almoco (12h)
+  // 2 = Volta Almoco (13h)  3 = Saida (17h)
   var JORNADA = [
     { tipo: 'entrada', label: '▶ Entrada',      hora: '08:00', cor: '#16a34a', descricao: 'Entrada às 08h00' },
     { tipo: 'saida',   label: '🍽 Saída Almoço', hora: '12:00', cor: '#ea580c', descricao: 'Saída para almoço às 12h00' },
@@ -87,21 +87,21 @@ function renderPontoColabAberto(idx) {
 
   var hoje = pontoDataHoje();
   var regsHoje = state.ponto.registros.filter(function(r){ return r.colabIdx === idx && r.data === hoje; });
-  var etapaAtual = regsHoje.length; // próxima etapa a registrar (0-4)
+  var etapaAtual = regsHoje.length; // proxima etapa a registrar (0-4)
   if (etapaAtual > 4) etapaAtual = 4;
   var jornadaCompleta = etapaAtual >= 4;
 
-  // Botão habilitado = senha OK e ainda há etapa a registrar
+  // Botao habilitado = senha OK e ainda ha etapa a registrar
   var btnHabilitado = senhaOk && !jornadaCompleta;
   var proximaEtapa  = JORNADA[etapaAtual] || null;
 
-  // Horário atual para exibição inicial no relógio
+  // Horario atual para exibicao inicial no relogio
   var hh = String(now.getHours()).padStart(2,'0');
   var mm = String(now.getMinutes()).padStart(2,'0');
   var ss = String(now.getSeconds()).padStart(2,'0');
 
   var html =
-    // Botão voltar
+    // Botao voltar
     '<button onclick="pontoVoltar()" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:var(--text2);cursor:pointer;font-size:0.88rem;margin-bottom:1.25rem;padding:0">' +
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><polyline points="15 18 9 12 15 6"/></svg> Voltar' +
     '</button>' +
@@ -115,14 +115,14 @@ function renderPontoColabAberto(idx) {
         '<div style="font-size:1.15rem;font-weight:700">' + esc(c.nome) + '</div>' +
         (c.cargo ? '<div style="font-size:0.8rem;color:var(--text3)">' + esc(c.cargo) + '</div>' : '') +
       '</div>' +
-      // Relógio digital
+      // Relogio digital
       '<div style="text-align:right">' +
         '<div id="ponto-relogio" style="font-size:1.9rem;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:1px;color:var(--text);line-height:1">' + hh + ':' + mm + ':' + ss + '</div>' +
         '<div id="ponto-data-str" style="font-size:0.72rem;color:var(--text3);margin-top:2px;text-align:right">' + now.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'}) + '</div>' +
       '</div>' +
     '</div>' +
 
-    // Stats do mês
+    // Stats do mes
     '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:1rem">' +
       pontoStatCard('⏱', 'Horas ' + nomesMes[mesAtual], stats.horasFormatado) +
       pontoStatCard('📅', 'Dias trabalhados', String(stats.diasTrabalhados)) +
@@ -172,7 +172,7 @@ function renderPontoColabAberto(idx) {
         '</div>'
       :
 
-      // Próxima ação
+      // Proxima acao
       '<div style="display:flex;align-items:center;gap:10px;margin-bottom:1.25rem;padding:12px 14px;background:var(--bg3);border-radius:10px;border-left:4px solid ' + (proximaEtapa ? proximaEtapa.cor : 'var(--border)') + '">' +
         '<div>' +
           '<div style="font-size:0.72rem;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Próximo registro</div>' +
@@ -180,7 +180,7 @@ function renderPontoColabAberto(idx) {
         '</div>' +
       '</div>' +
 
-      // Campo de senha -- admin não precisa digitar
+      // Campo de senha -- admin nao precisa digitar
       (isAdmin() ?
         '<div style="margin-bottom:1.25rem;padding:10px 14px;background:var(--bg3);border-radius:8px;font-size:0.85rem;color:var(--text2)">' +
           '🔑 Modo administrador -- senha dispensada' +
@@ -200,7 +200,7 @@ function renderPontoColabAberto(idx) {
         '</div>'
       ) +
 
-      // Botão único -- registra a próxima etapa da jornada
+      // Botao unico -- registra a proxima etapa da jornada
       '<button onclick="pontoRegistrarEtapa(' + idx + ')" ' +
         (!btnHabilitado ? 'disabled ' : '') +
         'style="width:100%;padding:0.9rem;border:none;border-radius:12px;font-size:1rem;font-weight:700;cursor:' + (btnHabilitado?'pointer':'not-allowed') + ';' +
@@ -213,7 +213,7 @@ function renderPontoColabAberto(idx) {
       '<div id="ponto-status" style="font-size:0.85rem;text-align:center;margin-top:10px;min-height:1.2em"></div>' +
     '</div>' + // card registro
 
-    // Registros do dia (visível para admin) com botão de excluir
+    // Registros do dia (visivel para admin) com botao de excluir
     (isAdmin() && regsHoje.length > 0 ?
       '<div class="card" style="padding:1.25rem;margin-top:1rem">' +
         '<div style="font-weight:700;font-size:0.9rem;margin-bottom:1rem">🗂 Registros de hoje -- clique em x para excluir</div>' +
@@ -238,7 +238,7 @@ function renderPontoColabAberto(idx) {
 
     '</div>'; // max-width
 
-  // Inicia o relógio após o render (seguro, sem tags script inline)
+  // Inicia o relogio apos o render (seguro, sem tags script inline)
   setTimeout(function() { pontoIniciarRelogio(); }, 0);
 
   return html;
@@ -264,7 +264,7 @@ function pontoStatCard(icon, label, valor) {
   '</div>';
 }
 
-// -- VISÃO ADMIN ---------------------------------------------------------------
+// -- VISAO ADMIN ---------------------------------------------------------------
 function renderPontoAdmin() {
   if (_pontoColabSel !== null && state.ponto.colaboradores && state.ponto.colaboradores[_pontoColabSel]) {
     return renderPontoColabAberto(_pontoColabSel);
@@ -293,7 +293,7 @@ function renderPontoAdminColabs() {
     return html + '<div class="empty-state">' + iconEmpty() + '<p>Nenhum colaborador cadastrado. Clique em "+ Novo Colaborador" para começar.</p></div>';
   }
 
-  // Resumo geral do mês
+  // Resumo geral do mes
   html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;margin-bottom:1.5rem">';
   cols.forEach(function(c, i) {
     var status = pontoStatusHoje(i);
@@ -358,7 +358,7 @@ function renderPontoAdminHistorico() {
   var filtroColab = (typeof _pontoHistColab !== 'undefined') ? _pontoHistColab : 'todos';
   var filtroMes   = (typeof _pontoHistMes   !== 'undefined') ? _pontoHistMes   : pontoMesAnoAtual();
 
-  // Meses disponíveis
+  // Meses disponiveis
   var mesesDisp = {};
   registros.forEach(function(r) {
     var p = r.data.split('/');
@@ -418,7 +418,7 @@ function renderPontoAdminHistorico() {
     ? cols.map(function(c,i){ return i; })
     : [parseInt(filtroColab)];
 
-  // Para cada colaborador, monta o calendário
+  // Para cada colaborador, monta o calendario
   colabsParaMostrar.forEach(function(colabIdx) {
     var colab = cols[colabIdx];
     if (!colab) return;
@@ -452,7 +452,7 @@ function renderPontoAdminHistorico() {
       '</div>' +
     '</div>' +
 
-    // Grid do calendário — 7 colunas
+    // Grid do calendario -- 7 colunas
     '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:20px">';
 
     for (var d = 1; d <= diasNoMes; d++) {
@@ -465,7 +465,7 @@ function renderPontoAdminHistorico() {
       var temFolga = regs.some(function(r){ return r.tipo === 'folga'; });
       var regsNorm = regs.filter(function(r){ return r.tipo !== 'folga'; });
 
-      // Horários do dia
+      // Horarios do dia
       var entrada      = regsNorm.find(function(r){ return r.etapa === 0; });
       var saidaAlmoco  = regsNorm.find(function(r){ return r.etapa === 1; });
       var voltaAlmoco  = regsNorm.find(function(r){ return r.etapa === 2; });
@@ -485,7 +485,7 @@ function renderPontoAdminHistorico() {
       var hh = Math.floor(minDia/60), mm2 = minDia%60;
       var totalDiaStr = minDia > 0 ? hh + 'h' + String(mm2).padStart(2,'0') : null;
 
-      // Verifica se é falta (dia útil sem registro)
+      // Verifica se e falta (dia util sem registro)
       var hoje = new Date(); hoje.setHours(0,0,0,0);
       var isFalta = !fimSem && !temFolga && regsNorm.length === 0 && dt <= hoje;
 
@@ -500,7 +500,7 @@ function renderPontoAdminHistorico() {
         borderColor = irregular ? '#f59e0b' : '#22c55e';
       }
 
-      // Função para badge de hora
+      // Funcao para badge de hora
       function horaBadge(reg, etapaIdx) {
         if (!reg) return '<span style="font-size:0.6rem;font-weight:700;padding:2px 4px;border-radius:4px;text-align:center;background:#f1f5f9;color:#94a3b8">--</span>';
         var irregular2 = pontoHoraIrregular(reg, etapaIdx);
@@ -550,7 +550,7 @@ function renderPontoAdminHistorico() {
   return html;
 }
 
-// Verifica se um horário está fora do esperado (tolerância zero)
+// Verifica se um horario esta fora do esperado (tolerancia zero)
 function pontoHoraIrregular(reg, etapaIdx) {
   if (!reg || !reg.hora) return false;
   var esperados = ['08:00', '12:00', '13:00', '17:00'];
@@ -561,7 +561,7 @@ function pontoHoraIrregular(reg, etapaIdx) {
   var filtroColab = (typeof _pontoHistColab !== 'undefined') ? _pontoHistColab : 'todos';
   var filtroMes   = (typeof _pontoHistMes   !== 'undefined') ? _pontoHistMes   : pontoMesAnoAtual();
 
-  // Meses disponíveis no histórico
+  // Meses disponiveis no historico
   var mesesDisp = {};
   registros.forEach(function(r) {
     var p = r.data.split('/');
@@ -569,7 +569,7 @@ function pontoHoraIrregular(reg, etapaIdx) {
     var chave = p[2] + '-' + p[1]; // "2025-04"
     mesesDisp[chave] = { ano: p[2], mes: p[1], label: nomesMes[parseInt(p[1])-1] + ' ' + p[2] };
   });
-  // Garante o mês atual sempre disponível
+  // Garante o mes atual sempre disponivel
   var ma = new Date();
   var chaveAtual = ma.getFullYear() + '-' + String(ma.getMonth()+1).padStart(2,'0');
   if (!mesesDisp[chaveAtual]) mesesDisp[chaveAtual] = { ano: String(ma.getFullYear()), mes: String(ma.getMonth()+1).padStart(2,'0'), label: nomesMes[ma.getMonth()] + ' ' + ma.getFullYear() };
@@ -579,7 +579,7 @@ function pontoHoraIrregular(reg, etapaIdx) {
   var html =
     '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:1.25rem">' +
 
-      // Seletor de mês
+      // Seletor de mes
       '<div>' +
         '<label style="font-size:0.75rem;color:var(--text2);display:block;margin-bottom:4px;font-weight:600">📅 Mês</label>' +
         '<select onchange="pontoSetHistMes(this.value)" style="padding:0.55rem 0.9rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.88rem">' +
@@ -600,7 +600,7 @@ function pontoHoraIrregular(reg, etapaIdx) {
         '</select>' +
       '</div>' +
 
-      // Botão PDF
+      // Botao PDF
       '<button class="btn btn-green" onclick="pontoBaixarPDF()" style="display:flex;align-items:center;gap:6px;white-space:nowrap">' +
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>' +
         'Baixar PDF' +
@@ -630,7 +630,7 @@ function pontoHoraIrregular(reg, etapaIdx) {
     return html + '<div class="empty-state">' + iconEmpty() + '<p>Nenhum registro para o período selecionado.</p></div>';
   }
 
-  // -- Totais do período -------------------------------------
+  // -- Totais do periodo -------------------------------------
   var totalMinPeriodo = 0;
   // Agrupa por colab+dia para somar horas
   var porColabDia = {};
@@ -727,7 +727,7 @@ function pontoStatusHoje(colabIdx) {
   var n = regs.length;
   if (n === 0) return 'livre';
   if (n >= 4)  return 'saiu';
-  // etapa 1 = trabalhando, 2 = almoço, 3 = voltou
+  // etapa 1 = trabalhando, 2 = almoco, 3 = voltou
   return n % 2 === 1 ? 'trabalhando' : 'almocando';
 }
 
@@ -749,14 +749,14 @@ function pontoCalcStats(colabIdx, mes, ano) {
     return parseInt(partes[1])-1 === mes && parseInt(partes[2]) === ano;
   });
 
-  // Dias com folga/feriado -- não contam como falta
+  // Dias com folga/feriado -- nao contam como falta
   var diasFolga = {};
   regs.forEach(function(r){ if (r.tipo === 'folga') diasFolga[r.data] = true; });
 
   // Agrupa registros de ponto por dia
   var porDia = {};
   regs.forEach(function(r){
-    if (r.tipo === 'folga') return; // ignora folgas no cálculo de horas
+    if (r.tipo === 'folga') return; // ignora folgas no calculo de horas
     if (!porDia[r.data]) porDia[r.data] = [];
     porDia[r.data].push(r);
   });
@@ -778,7 +778,7 @@ function pontoCalcStats(colabIdx, mes, ano) {
     if (minDia > 0) { totalMin += minDia; diasTrabalhados++; }
   });
 
-  // Faltas: dias úteis passados sem registro de ponto E sem folga/feriado
+  // Faltas: dias uteis passados sem registro de ponto E sem folga/feriado
   var hoje = new Date();
   var diasUteisPassados = 0;
   var limite = (mes === hoje.getMonth() && ano === hoje.getFullYear()) ? hoje.getDate() : new Date(ano, mes+1, 0).getDate();
@@ -807,7 +807,7 @@ function pontoHoraParaMs(hora) {
   return parseInt(p[0]||0)*60 + parseInt(p[1]||0);
 }
 
-// -- AÇÕES ---------------------------------------------------------------------
+// -- ACOES ---------------------------------------------------------------------
 
 function pontoSelecionarColab(idx) {
   _pontoColabSel = idx;
@@ -835,7 +835,7 @@ function pontoVerificarSenha(val, idx) {
 
 function pontoAdminVerColab(idx) {
   _pontoColabSel = idx;
-  _pontoSenhaOk  = true; // Admin não precisa digitar senha
+  _pontoSenhaOk  = true; // Admin nao precisa digitar senha
   navigate('ponto');
 }
 
@@ -873,10 +873,10 @@ function pontoRegistrarEtapa(idx) {
 
   var e = JORNADA[etapa];
 
-  // Calcula horas trabalhadas em etapas de saída
+  // Calcula horas trabalhadas em etapas de saida
   var horasTrabalhadas = null;
   if (e.tipo === 'saida' && regsHoje.length > 0) {
-    // Última entrada antes desta saída
+    // Ultima entrada antes desta saida
     var ultimaEntrada = null;
     for (var k = regsHoje.length - 1; k >= 0; k--) {
       if (regsHoje[k].tipo === 'entrada') { ultimaEntrada = regsHoje[k]; break; }
@@ -1054,7 +1054,7 @@ function pontoBaixarPDF() {
       });
       doc.setTextColor(0,0,0);
 
-      // Calendário — 7 colunas
+      // Calendario -- 7 colunas
       var calY = sboxY + sboxH + 6;
       var cardW = (PW - px*2 - 6*2) / 7;
       var cardH = 22;
@@ -1109,7 +1109,7 @@ function pontoBaixarPDF() {
         if (col7 === 7) {
           col7 = 0;
           calY += cardH + 2;
-          // Verifica se cabe na página
+          // Verifica se cabe na pagina
           if (calY + cardH > PH - 14) {
             doc.setFontSize(6); doc.setTextColor(120,120,120);
             doc.text('Costa Nature Life -- Relatorio de Ponto -- ' + mesLabel, px, PH-5);
@@ -1194,7 +1194,7 @@ function pontoBaixarPDF() {
       });
     });
 
-    // Rodapé
+    // Rodape
     doc.setFontSize(6); doc.setTextColor(120,120,120);
     doc.text('Costa Nature Life -- CNPJ 44.168.874/0001-28 -- Relatorio de Ponto -- ' + mesLabel, px, PH-5);
 
@@ -1254,7 +1254,7 @@ function pontoBaixarPDF() {
       doc.setTextColor(0,0,0);
     }
 
-    // Agrupa por colaborador → por dia para calcular totais
+    // Agrupa por colaborador -> por dia para calcular totais
     var resumoPorColab = {};
     lista.forEach(function(r) {
       if (!resumoPorColab[r.nomeColab]) resumoPorColab[r.nomeColab] = { totalMin: 0, dias: {} };
@@ -1275,7 +1275,7 @@ function pontoBaixarPDF() {
       });
     });
 
-    // -- Página 1: tabela detalhada ------------------------
+    // -- Pagina 1: tabela detalhada ------------------------
     var pageNum = 1;
     cabecalho(pageNum);
 
@@ -1309,7 +1309,7 @@ function pontoBaixarPDF() {
 
     lista.forEach(function(r, ri) {
       if (y + rowH > maxY) {
-        // Rodapé
+        // Rodape
         doc.setFontSize(7); doc.setTextColor(120,120,120);
         doc.text('Costa Nature Life -- Relatório de Ponto -- ' + mesLabel, px, PH - 6);
         doc.addPage();
@@ -1365,7 +1365,7 @@ function pontoBaixarPDF() {
     doc.setDrawColor(150,150,150); doc.setLineWidth(0.4);
     doc.rect(px, headerY, tableW, y - headerY);
 
-    // -- Página de resumo por colaborador -----------------
+    // -- Pagina de resumo por colaborador -----------------
     doc.addPage();
     pageNum++;
     cabecalho(pageNum);
@@ -1404,7 +1404,7 @@ function pontoBaixarPDF() {
       var colabObj = cols.find(function(c){ return c.nome === nome; });
       if (colabObj && colabObj.cargo) doc.text(colabObj.cargo, px + 10, ry + 13.5);
 
-      // Métricas
+      // Metricas
       var mxBase = PW/2;
       doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(0,0,0);
       doc.text(totalHorasStr, mxBase, ry + 10);
@@ -1418,7 +1418,7 @@ function pontoBaixarPDF() {
       ry += boxH + 6;
     });
 
-    // Rodapé última página
+    // Rodape ultima pagina
     doc.setFontSize(7); doc.setTextColor(120,120,120);
     doc.text('Costa Nature Life -- CNPJ 44.168.874/0001-28 -- Relatório de Ponto -- ' + mesLabel, px, PH - 6);
 
@@ -1528,7 +1528,7 @@ function pontoAbrirModalManual(idx) {
         '<div style="font-size:0.72rem;color:var(--text3);margin-top:4px">Formato: DD/MM/AAAA</div>' +
       '</div>' +
 
-      // Campos de ponto (ficam visíveis por padrão)
+      // Campos de ponto (ficam visiveis por padrao)
       '<div id="pm-campos-ponto">' +
         '<div style="margin-bottom:12px">' +
           '<label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:5px;font-weight:600">📋 Etapa</label>' +
@@ -1550,7 +1550,7 @@ function pontoAbrirModalManual(idx) {
         '</div>' +
       '</div>' +
 
-      // Campo de motivo -- aparece só no modo folga
+      // Campo de motivo -- aparece so no modo folga
       '<div id="pm-campos-folga" style="display:none;margin-bottom:1.25rem">' +
         '<label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:5px;font-weight:600">📋 Motivo</label>' +
         '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px">' +
@@ -1648,7 +1648,7 @@ function pontoSalvarManual(idx) {
     var motivoEl = document.querySelector('input[name="pm-motivo"]:checked');
     var motivo   = motivoEl ? motivoEl.value : 'Folga';
 
-    // Verifica se já existe folga neste dia
+    // Verifica se ja existe folga neste dia
     var jaExiste = state.ponto.registros.some(function(r){
       return r.colabIdx === idx && r.data === data && r.tipo === 'folga';
     });
@@ -1738,7 +1738,7 @@ function pontoExcluirColab(idx) {
   if (!confirm('Excluir "' + c.nome + '"? Os registros de ponto serão mantidos.')) return;
   addLog('Removeu colaborador do ponto: "' + c.nome + '"');
   state.ponto.colaboradores.splice(idx, 1);
-  // Ajusta índices nos registros
+  // Ajusta indices nos registros
   state.ponto.registros.forEach(function(r){
     if (r.colabIdx > idx) r.colabIdx--;
   });

@@ -2780,13 +2780,22 @@ var _mktsMesSel  = ''; // mês independente
 
 // [RADAR -- carregado de pages/radar.js]
 </script>
-<script src="pages/ponto.js"></script>
-<script src="pages/estoque.js"></script>
-<script src="pages/shopee.js"></script>
-<script src="pages/tabnutri.js"></script>
-<script src="pages/produtos.js"></script>
-<script src="pages/radar.js"></script>
+<script src="pages/ponto.js?v=2"></script>
+<script src="pages/estoque.js?v=2"></script>
+<script src="pages/shopee.js?v=2"></script>
+<script src="pages/tabnutri.js?v=2"></script>
+<script src="pages/produtos.js?v=2"></script>
+<script src="pages/radar.js?v=2"></script>
 <script>
+// Limpa cache antigo do Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(function(regs) {
+    regs.forEach(function(r) { r.unregister(); });
+  });
+  caches.keys().then(function(names) {
+    names.forEach(function(n) { caches.delete(n); });
+  });
+}
 if ('serviceWorker' in navigator && location.hostname === 'edsonandradecf.github.io') {
   window.addEventListener('load', function() {
     navigator.serviceWorker.register('sw.js')

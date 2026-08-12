@@ -12,6 +12,14 @@ function pontoMesAnoAtual() {
   return n.getFullYear() + '-' + String(n.getMonth()+1).padStart(2,'0');
 }
 
+
+function pontoSetorLabel(c) {
+  var s = (c && (c.setor || c.cargo)) || '';
+  if (s === 'expedicao') return '\u{1F4E6} Expedi\u00e7\u00e3o';
+  if (s === 'producao')  return '\u{1F3ED} Produ\u00e7\u00e3o';
+  return s;
+}
+
 function renderPonto() {
   if (isAdmin()) return renderPontoAdmin();
   return renderPontoPublico();
@@ -56,7 +64,7 @@ function pontoCriarCard(c, i, status) {
     // Nome
     '<div style="font-weight:700;font-size:0.9rem;text-align:center;line-height:1.3;word-break:break-word">' + esc(c.nome) + '</div>' +
     // Cargo
-    (c.cargo ? '<div style="font-size:0.75rem;color:var(--text3);text-align:center">' + esc(c.cargo) + '</div>' : '') +
+    (pontoSetorLabel(c) ? '<div style="font-size:0.75rem;color:var(--text3);text-align:center">' + pontoSetorLabel(c) + '</div>' : '') +
     // Status hoje
     '<div style="font-size:0.72rem;font-weight:600;color:' + corStatus + ';text-align:center">' + labelStatus + '</div>' +
   '</div>';
@@ -113,7 +121,7 @@ function renderPontoColabAberto(idx) {
       '<div style="width:52px;height:52px;border-radius:50%;background:' + corAvatar + ';display:flex;align-items:center;justify-content:center;font-size:1.4rem;font-weight:700;color:#fff;flex-shrink:0">' + inicialLetra + '</div>' +
       '<div style="flex:1">' +
         '<div style="font-size:1.15rem;font-weight:700">' + esc(c.nome) + '</div>' +
-        (c.cargo ? '<div style="font-size:0.8rem;color:var(--text3)">' + esc(c.cargo) + '</div>' : '') +
+        (pontoSetorLabel(c) ? '<div style="font-size:0.8rem;color:var(--text3)">' + pontoSetorLabel(c) + '</div>' : '') +
       '</div>' +
       // Relógio digital
       '<div style="text-align:right">' +
@@ -309,7 +317,7 @@ function renderPontoAdminColabs() {
           '<div style="width:42px;height:42px;border-radius:50%;background:' + corAvatar + ';display:flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:700;color:#fff;flex-shrink:0">' + inicialLetra + '</div>' +
           '<div>' +
             '<div style="font-weight:700;font-size:0.9rem">' + esc(c.nome) + '</div>' +
-            (c.cargo ? '<div style="font-size:0.72rem;color:var(--text3)">' + esc(c.cargo) + '</div>' : '') +
+            (pontoSetorLabel(c) ? '<div style="font-size:0.72rem;color:var(--text3)">' + pontoSetorLabel(c) + '</div>' : '') +
           '</div>' +
         '</div>' +
         '<div style="display:flex;gap:4px" onclick="event.stopPropagation()">' +
@@ -1094,8 +1102,12 @@ function pontoAbrirModalColab(idx) {
       '<div style="font-size:1.1rem;font-weight:700;margin-bottom:1.25rem">' + (c ? '✏️ Editar Colaborador' : '+ Novo Colaborador') + '</div>' +
       '<div style="margin-bottom:10px"><label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:4px">Nome *</label>' +
         '<input id="pt-nome" class="tn-input" placeholder="Nome completo" value="' + esc(c?c.nome:'') + '" style="width:100%;margin:0"></div>' +
-      '<div style="margin-bottom:10px"><label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:4px">Cargo</label>' +
-        '<input id="pt-cargo" class="tn-input" placeholder="Ex: Operador, Expedição..." value="' + esc(c?(c.cargo||''):'') + '" style="width:100%;margin:0"></div>' +
+      '<div style="margin-bottom:10px"><label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:4px">Setor *</label>' +
+        '<select id="pt-cargo" class="tn-input" style="width:100%;margin:0">' +
+          '<option value="expedicao"' + (c && (c.setor||c.cargo)==='expedicao' ? ' selected' : '') + '>📦 Expedição</option>' +
+          '<option value="producao"'  + (c && (c.setor||c.cargo)==='producao'  ? ' selected' : '') + '>🏭 Produção</option>' +
+        '</select>' +
+        '<div style="font-size:0.72rem;color:var(--text3);margin-top:4px">Usado para atribuir tarefas por setor</div></div>' +
       '<div style="margin-bottom:1.25rem"><label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:4px">Senha *</label>' +
         '<input id="pt-senha" type="password" class="tn-input" placeholder="Senha de acesso ao ponto" value="' + esc(c?c.senha:'') + '" style="width:100%;margin:0">' +
         '<div style="font-size:0.72rem;color:var(--text3);margin-top:4px">Esta senha será usada pelo colaborador para registrar o ponto</div></div>' +
@@ -1119,11 +1131,11 @@ function pontoSalvarColab(idx) {
   if (!senha.trim()) { if(st) st.textContent='Informe uma senha.'; return; }
 
   if (idx === null || idx === 'null') {
-    state.ponto.colaboradores.push({ nome: nome.trim(), cargo: cargo.trim(), senha: senha });
+    state.ponto.colaboradores.push({ nome: nome.trim(), cargo: cargo, setor: cargo, senha: senha });
     addLog('Cadastrou colaborador no ponto: "' + nome.trim() + '"');
   } else {
     var c = state.ponto.colaboradores[idx];
-    c.nome = nome.trim(); c.cargo = cargo.trim(); c.senha = senha;
+    c.nome = nome.trim(); c.cargo = cargo; c.setor = cargo; c.senha = senha;
     addLog('Editou colaborador no ponto: "' + nome.trim() + '"');
   }
   saveState();

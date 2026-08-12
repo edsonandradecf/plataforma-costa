@@ -928,8 +928,7 @@ function togglePassVis() {
 function getPagesAdmin() {
   return [
     { id: 'inicio',     label: 'Início',               icon: iconHome() },
-    { id: 'expedicao',  label: 'Expedição',             icon: iconTruck() },
-    { id: 'producao',   label: 'Produção',              icon: iconFactory() },
+    { id: 'tarefas',    label: 'Tarefas',               icon: iconTruck() },
     { id: 'compras',    label: 'Compras',               icon: iconCart() },
     { id: 'estoque',    label: 'Estoque',               icon: iconEstoque() },
     { id: 'ponto',      label: 'Ponto Virtual',         icon: iconPonto() },
@@ -1060,15 +1059,14 @@ async function renovarTokens() {
 
 function renderPage() {
   if (!state.currentUser) return;
-  var titles = { inicio:'Início', expedicao:'Expedição', producao:'Produção', compras:'Compras', estoque:'Estoque', ponto:'Ponto Virtual', mural:'Mural', etiquetas:'Gerador de Etiquetas', tabnutri:'Tabela Nutricional', produtos:'Produtos', marketplaces:'Marketplaces', margemviva:'Radar', logs:'Logs', financeiro:'Financeiro' };
+  var titles = { inicio:'Início', tarefas:'Tarefas', compras:'Compras', estoque:'Estoque', ponto:'Ponto Virtual', mural:'Mural', etiquetas:'Gerador de Etiquetas', tabnutri:'Tabela Nutricional', produtos:'Produtos', marketplaces:'Marketplaces', margemviva:'Radar', logs:'Logs', financeiro:'Financeiro' };
   var titleEl = document.getElementById('page-title');
   if (titleEl) titleEl.textContent = titles[state.currentPage] || '';
   var c = document.getElementById('page-content');
   if (!c) return;
   var pg = state.currentPage;
   if (pg === 'inicio')    { c.innerHTML = renderInicio(); return; }
-  if (pg === 'expedicao') { c.innerHTML = renderTasks('expedicao'); return; }
-  if (pg === 'producao')  { c.innerHTML = renderTasks('producao'); return; }
+  if (pg === 'tarefas')   { c.innerHTML = renderTarefas(); setTimeout(function(){ tarefaSetTipo(_tarefaTipo); }, 30); return; }
   if (pg === 'compras')   { c.innerHTML = renderCompras(); setupCompras(); return; }
   if (pg === 'mural')     { c.innerHTML = renderMural(); setupMural(); return; }
   if (pg === 'etiquetas') { c.innerHTML = renderEtiquetas(); return; }
@@ -1105,7 +1103,7 @@ window.addEventListener('popstate', function(e) {
 function pageFromHash() {
   var hash = window.location.hash.replace('#', '').trim();
   // Lista de páginas válidas
-  var valid = ['inicio','expedicao','producao','compras','estoque','ponto','mural','etiquetas','tabnutri','produtos','marketplaces','margemviva','logs','financeiro'];
+  var valid = ['inicio','tarefas','compras','estoque','ponto','mural','etiquetas','tabnutri','produtos','marketplaces','margemviva','logs','financeiro'];
   return valid.indexOf(hash) !== -1 ? hash : 'inicio';
 }
 
@@ -1150,8 +1148,9 @@ function renderInicio() {
   function tarefasViewOnly(area) {
     const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
     const tomorrowStr = tomorrow.toISOString().slice(0,10);
+    const cols = (state.ponto && state.ponto.colaboradores) || [];
 
-    const tasks = [...state.tasks[area]]
+    const tasks = [...(state.tasks[area]||[])]
       .filter(t => !t.done)
       .sort((a, b) => {
         const dateA = a.date + (a.time || '');
@@ -1168,15 +1167,22 @@ function renderInicio() {
       const isLate     = t.date < todayStr;
       const isToday    = t.date === todayStr;
       const isTomorrow = t.date === tomorrowStr;
-      const dateStr = new Date(t.date + 'T12:00:00').toLocaleDateString('pt-BR') + (t.time ? ' ' + t.time : ' . Sem horário');
+      const dateStr = new Date(t.date + 'T12:00:00').toLocaleDateString('pt-BR') + (t.time ? ' ' + t.time : ' · Sem horário');
 
       let badge = '';
       if (isLate)     badge = '<span class="task-badge">⚠ Atraso</span>';
       else if (isToday)    badge = '<span class="task-badge" style="background:var(--green);color:#fff;border:none">Hoje</span>';
       else if (isTomorrow) badge = '<span class="task-badge" style="background:#1a8a4a;color:#fff;border:none">Amanhã</span>';
 
+      // Badge de pessoa se atribuída
+      let pessoaBadge = '';
+      if (t.colabIdx !== undefined && t.colabIdx !== null && cols[t.colabIdx]) {
+        pessoaBadge = '<span style="padding:2px 8px;border-radius:12px;font-size:0.68rem;font-weight:700;background:#7c3aed18;color:#7c3aed;white-space:nowrap">👤 ' + esc(cols[t.colabIdx].nome.split(' ')[0]) + '</span>';
+      }
+
       return `<div class="task-item" style="cursor:default">
         <div class="task-text">${esc(t.text)}</div>
+        ${pessoaBadge}
         <span class="task-meta">${dateStr}</span>
         ${badge}
       </div>`;
@@ -1220,113 +1226,277 @@ function renderInicio() {
 }
 
 
-// --- TASKS ---------------------------------------------------------------------
-function renderTasks(area) {
+// --- TAREFAS (unificado: Expedição + Produção) ---------------------------------
+var _tarefaFiltro = 'todos'; // 'todos' | 'expedicao' | 'producao' | 'p:<idx>'
+
+var SETORES = [
+  { id: 'expedicao', label: 'Expedição', icon: '📦', cor: '#2563eb' },
+  { id: 'producao',  label: 'Produção',  icon: '🏭', cor: '#ea580c' },
+];
+
+function setorLabel(id) {
+  var s = SETORES.find(function(x){ return x.id === id; });
+  return s ? s.label : id;
+}
+function setorIcon(id) {
+  var s = SETORES.find(function(x){ return x.id === id; });
+  return s ? s.icon : '';
+}
+function setorCor(id) {
+  var s = SETORES.find(function(x){ return x.id === id; });
+  return s ? s.cor : 'var(--text2)';
+}
+
+// Retorna todas as tarefas de todos os setores com metadados
+function tarefasTodas() {
+  var out = [];
+  SETORES.forEach(function(s) {
+    var arr = (state.tasks && state.tasks[s.id]) || [];
+    arr.forEach(function(t, i) {
+      out.push(Object.assign({}, t, { _setor: s.id, _idx: i }));
+    });
+  });
+  return out;
+}
+
+function renderTarefas() {
   if (!state.currentUser) return '';
-  const isAdmin = state.currentUser.role === 'admin';
-  const today = new Date();
-  today.setHours(0,0,0,0);
+  var isAdm = state.currentUser.role === 'admin';
+  var role  = state.currentUser.role;
+  var cols  = (state.ponto && state.ponto.colaboradores) || [];
 
-  // Limpeza feita fora do render -- apenas lê o state, não modifica
+  // Usuário limitado só vê seu setor
+  var setorFixo = null;
+  if (role === 'expedicao') setorFixo = 'expedicao';
+  if (role === 'producao')  setorFixo = 'producao';
+  if (setorFixo) _tarefaFiltro = setorFixo;
 
-  let html = `<div class="card">`;
-  if (isAdmin) {
-    html += `<div class="add-task-form mb-2">
-      <input type="text" id="task-text" placeholder="Descrição da tarefa...">
-      <input type="date" id="task-date" value="${new Date().toISOString().slice(0,10)}">
-      <div style="display:flex;align-items:center;gap:6px">
-        <input type="time" id="task-time" value="08:00" style="flex:1">
-        <label style="display:flex;align-items:center;gap:4px;font-size:0.78rem;color:var(--text2);white-space:nowrap;cursor:pointer">
-          <input type="checkbox" id="task-no-time" onchange="toggleTaskTime()" style="width:auto;margin:0"> Sem horário
-        </label>
-      </div>
-      <button class="btn btn-green" onclick="addTask('${area}')">+ Adicionar</button>
-    </div>`;
+  var today = new Date(); today.setHours(0,0,0,0);
+  var todayStr = today.toISOString().slice(0,10);
+  var tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+  var tomorrowStr = tomorrow.toISOString().slice(0,10);
+
+  var html = '';
+
+  // --- Formulário de adicionar (só admin) ---
+  if (isAdm) {
+    html += '<div class="card" style="margin-bottom:1rem">' +
+      '<div style="font-weight:700;font-size:0.9rem;margin-bottom:0.9rem">+ Nova Tarefa</div>' +
+
+      '<div style="display:grid;grid-template-columns:1fr 130px 120px;gap:8px;margin-bottom:10px">' +
+        '<input type="text" id="task-text" placeholder="Descrição da tarefa..." style="padding:0.6rem 0.9rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem">' +
+        '<input type="date" id="task-date" value="' + todayStr + '" style="padding:0.6rem 0.7rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem">' +
+        '<div style="display:flex;flex-direction:column;gap:3px">' +
+          '<input type="time" id="task-time" value="08:00" style="padding:0.6rem 0.5rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem">' +
+          '<label style="display:flex;align-items:center;gap:4px;font-size:0.7rem;color:var(--text3);cursor:pointer">' +
+            '<input type="checkbox" id="task-no-time" onchange="toggleTaskTime()" style="width:auto;margin:0"> Sem horário' +
+          '</label>' +
+        '</div>' +
+      '</div>' +
+
+      // Atribuição: setor ou pessoa
+      '<div style="margin-bottom:10px">' +
+        '<label style="font-size:0.78rem;color:var(--text2);display:block;margin-bottom:5px;font-weight:600">Atribuir a</label>' +
+        '<div style="display:flex;gap:6px;margin-bottom:8px">' +
+          '<button type="button" id="tk-tipo-setor" onclick="tarefaSetTipo(\'setor\')" ' +
+            'style="flex:1;padding:8px;border:2px solid var(--green);border-radius:8px;background:var(--green);color:#fff;font-weight:700;cursor:pointer;font-size:0.83rem">🏢 Setor inteiro</button>' +
+          '<button type="button" id="tk-tipo-pessoa" onclick="tarefaSetTipo(\'pessoa\')" ' +
+            'style="flex:1;padding:8px;border:2px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text2);font-weight:600;cursor:pointer;font-size:0.83rem">👤 Colaborador</button>' +
+        '</div>' +
+
+        // Select de setor
+        '<div id="tk-campo-setor">' +
+          '<select id="task-setor" style="width:100%;padding:0.6rem 0.9rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem">' +
+            SETORES.map(function(s){ return '<option value="' + s.id + '">' + s.icon + ' ' + s.label + '</option>'; }).join('') +
+          '</select>' +
+        '</div>' +
+
+        // Select de colaborador
+        '<div id="tk-campo-pessoa" style="display:none">' +
+          (cols.length ?
+            '<select id="task-colab" style="width:100%;padding:0.6rem 0.9rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem">' +
+              cols.map(function(c,i){
+                var st = c.setor || c.cargo || '';
+                return '<option value="' + i + '">' + esc(c.nome) + (st ? ' — ' + setorLabel(st) : '') + '</option>';
+              }).join('') +
+            '</select>'
+          : '<div style="padding:10px 12px;background:var(--bg3);border-radius:8px;font-size:0.8rem;color:var(--text3)">Nenhum colaborador cadastrado. Cadastre em Ponto Virtual → Colaboradores.</div>') +
+        '</div>' +
+      '</div>' +
+
+      '<button class="btn btn-green" onclick="addTarefa()" style="width:100%;padding:0.7rem">+ Adicionar Tarefa</button>' +
+    '</div>';
   }
 
-  // Sort: undone+late first (oldest date first), then today, then done -- by date+time
-  const tasks = [...state.tasks[area]].map((t, i) => ({...t, _origIdx: i}))
-    .sort((a, b) => {
-      // Done tasks always go to bottom
-      if (a.done !== b.done) return a.done ? 1 : -1;
-      // Sort by date string (ISO), then by time string
-      const dateA = a.date + (a.time || '');
-      const dateB = b.date + (b.time || '');
-      return dateA.localeCompare(dateB);
-    });
+  // --- Filtros ---
+  if (!setorFixo) {
+    html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem">' +
+      '<button onclick="tarefaSetFiltro(\'todos\')" style="padding:5px 14px;border:1px solid ' + (_tarefaFiltro==='todos'?'var(--green)':'var(--border)') + ';border-radius:20px;background:' + (_tarefaFiltro==='todos'?'var(--green)':'transparent') + ';color:' + (_tarefaFiltro==='todos'?'#fff':'var(--text2)') + ';cursor:pointer;font-size:0.8rem;font-weight:' + (_tarefaFiltro==='todos'?'700':'400') + '">Todas</button>' +
+      SETORES.map(function(s) {
+        var ativo = _tarefaFiltro === s.id;
+        return '<button onclick="tarefaSetFiltro(\'' + s.id + '\')" style="padding:5px 14px;border:1px solid ' + (ativo?s.cor:'var(--border)') + ';border-radius:20px;background:' + (ativo?s.cor:'transparent') + ';color:' + (ativo?'#fff':'var(--text2)') + ';cursor:pointer;font-size:0.8rem;font-weight:' + (ativo?'700':'400') + '">' + s.icon + ' ' + s.label + '</button>';
+      }).join('') +
+      cols.map(function(c, i) {
+        var ativo = _tarefaFiltro === 'p:' + i;
+        return '<button onclick="tarefaSetFiltro(\'p:' + i + '\')" style="padding:5px 14px;border:1px solid ' + (ativo?'#7c3aed':'var(--border)') + ';border-radius:20px;background:' + (ativo?'#7c3aed':'transparent') + ';color:' + (ativo?'#fff':'var(--text2)') + ';cursor:pointer;font-size:0.8rem;font-weight:' + (ativo?'700':'400') + '">👤 ' + esc(c.nome.split(' ')[0]) + '</button>';
+      }).join('') +
+    '</div>';
+  }
 
-  if (!tasks.length) {
-    html += `<div class="empty-state">${iconEmpty()}<p>Nenhuma tarefa cadastrada</p></div>`;
+  // --- Lista de tarefas ---
+  var lista = tarefasTodas();
+
+  // Aplica filtro
+  if (_tarefaFiltro !== 'todos') {
+    if (_tarefaFiltro.indexOf('p:') === 0) {
+      var pIdx = parseInt(_tarefaFiltro.slice(2));
+      lista = lista.filter(function(t){ return t.colabIdx === pIdx; });
+    } else {
+      lista = lista.filter(function(t){ return t._setor === _tarefaFiltro; });
+    }
+  }
+
+  // Ordena: pendentes primeiro (por data), concluídas no fim
+  lista.sort(function(a, b) {
+    if (a.done !== b.done) return a.done ? 1 : -1;
+    return (a.date + (a.time||'')).localeCompare(b.date + (b.time||''));
+  });
+
+  html += '<div class="card">';
+
+  if (!lista.length) {
+    html += '<div class="empty-state">' + iconEmpty() + '<p>Nenhuma tarefa cadastrada</p></div>';
   } else {
-    html += `<div class="task-list">`;
-    const todayStr = today.toISOString().slice(0,10);
-    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
-    const tomorrowStr = tomorrow.toISOString().slice(0,10);
+    html += '<div class="task-list">';
+    lista.forEach(function(t) {
+      var isLate     = !t.done && t.date < todayStr;
+      var isToday    = !t.done && t.date === todayStr;
+      var isTomorrow = !t.done && t.date === tomorrowStr;
+      var dateStr = new Date(t.date + 'T12:00:00').toLocaleDateString('pt-BR') + (t.time ? ' ' + t.time : ' · Sem horário');
 
-    tasks.forEach((t) => {
-      const i = t._origIdx;
-      const isLate     = !t.done && t.date < todayStr;
-      const isToday    = !t.done && t.date === todayStr;
-      const isTomorrow = !t.done && t.date === tomorrowStr;
-      const dateStr = new Date(t.date + 'T12:00:00').toLocaleDateString('pt-BR') + (t.time ? ' ' + t.time : ' . Sem horário');
-
-      let badge = '';
-      if (isLate)     badge = '<span class="task-badge">⚠ Atraso</span>';
+      var badge = '';
+      if (isLate)          badge = '<span class="task-badge">⚠ Atraso</span>';
       else if (isToday)    badge = '<span class="task-badge" style="background:var(--green);color:#fff;border:none">Hoje</span>';
       else if (isTomorrow) badge = '<span class="task-badge" style="background:#1a8a4a;color:#fff;border:none">Amanhã</span>';
 
-      html += `<div class="task-item ${t.done?'done':''}">
-        <div class="task-check ${t.done?'checked':''}" onclick="toggleTask('${area}',${i})"></div>
-        <div class="task-text">${esc(t.text)}</div>
-        <span class="task-meta">${dateStr}</span>
-        ${badge}
-        ${isAdmin ? `<button class="task-delete" onclick="deleteTask('${area}',${i})" title="Excluir">x</button>` : ''}
-      </div>`;
+      // Badge de destino
+      var destBadge;
+      if (t.colabIdx !== undefined && t.colabIdx !== null && cols[t.colabIdx]) {
+        destBadge = '<span style="padding:2px 9px;border-radius:12px;font-size:0.7rem;font-weight:700;background:#7c3aed18;color:#7c3aed;white-space:nowrap">👤 ' + esc(cols[t.colabIdx].nome.split(' ')[0]) + '</span>';
+      } else {
+        var sc = setorCor(t._setor);
+        destBadge = '<span style="padding:2px 9px;border-radius:12px;font-size:0.7rem;font-weight:700;background:' + sc + '18;color:' + sc + ';white-space:nowrap">' + setorIcon(t._setor) + ' ' + setorLabel(t._setor) + '</span>';
+      }
+
+      html += '<div class="task-item ' + (t.done?'done':'') + '">' +
+        '<div class="task-check ' + (t.done?'checked':'') + '" onclick="toggleTarefa(\'' + t._setor + '\',' + t._idx + ')"></div>' +
+        '<div class="task-text">' + esc(t.text) + '</div>' +
+        destBadge +
+        '<span class="task-meta">' + dateStr + '</span>' +
+        badge +
+        (isAdm ? '<button class="task-delete" onclick="deleteTarefa(\'' + t._setor + '\',' + t._idx + ')" title="Excluir">x</button>' : '') +
+      '</div>';
     });
-    html += `</div>`;
+    html += '</div>';
   }
-  html += `</div>`;
+  html += '</div>';
+
   return html;
 }
 
-function bindTasks(area) {
-  // Only re-render if we're still on that area's page
-  if (state.currentPage !== area) return;
-  document.getElementById('page-content').innerHTML = renderTasks(area);
+var _tarefaTipo = 'setor'; // 'setor' | 'pessoa'
+
+function tarefaSetTipo(tipo) {
+  _tarefaTipo = tipo;
+  var cs = document.getElementById('tk-campo-setor');
+  var cp = document.getElementById('tk-campo-pessoa');
+  var bs = document.getElementById('tk-tipo-setor');
+  var bp = document.getElementById('tk-tipo-pessoa');
+  if (!cs || !cp) return;
+  var ehSetor = tipo === 'setor';
+  cs.style.display = ehSetor ? 'block' : 'none';
+  cp.style.display = ehSetor ? 'none'  : 'block';
+  if (bs) { bs.style.background = ehSetor?'var(--green)':'var(--bg2)'; bs.style.color = ehSetor?'#fff':'var(--text2)'; bs.style.borderColor = ehSetor?'var(--green)':'var(--border)'; bs.style.fontWeight = ehSetor?'700':'600'; }
+  if (bp) { bp.style.background = !ehSetor?'#7c3aed':'var(--bg2)'; bp.style.color = !ehSetor?'#fff':'var(--text2)'; bp.style.borderColor = !ehSetor?'#7c3aed':'var(--border)'; bp.style.fontWeight = !ehSetor?'700':'600'; }
+}
+
+function tarefaSetFiltro(f) {
+  _tarefaFiltro = f;
+  var el = document.getElementById('page-content');
+  if (el) el.innerHTML = renderTarefas();
 }
 
 function toggleTaskTime() {
-  const noTime = document.getElementById('task-no-time').checked;
-  document.getElementById('task-time').disabled = noTime;
-  document.getElementById('task-time').style.opacity = noTime ? '0.4' : '1';
+  var noTime = document.getElementById('task-no-time').checked;
+  var tEl = document.getElementById('task-time');
+  tEl.disabled = noTime;
+  tEl.style.opacity = noTime ? '0.4' : '1';
 }
 
-function addTask(area) {
-  const text = document.getElementById('task-text').value.trim();
-  const date = document.getElementById('task-date').value;
-  const noTime = document.getElementById('task-no-time').checked;
-  const time = noTime ? '' : document.getElementById('task-time').value;
-  if (!text || !date) return;
-  state.tasks[area].push({ text, date, time, done: false, id: Date.now() });
+function addTarefa() {
+  var text   = (document.getElementById('task-text')||{}).value || '';
+  var date   = (document.getElementById('task-date')||{}).value || '';
+  var noTime = (document.getElementById('task-no-time')||{}).checked;
+  var time   = noTime ? '' : ((document.getElementById('task-time')||{}).value || '');
+  text = text.trim();
+  if (!text || !date) { alert('Preencha a descrição e a data.'); return; }
+
+  var cols = (state.ponto && state.ponto.colaboradores) || [];
+  var setor, colabIdx = null;
+
+  if (_tarefaTipo === 'pessoa') {
+    var selC = document.getElementById('task-colab');
+    if (!selC) { alert('Cadastre um colaborador primeiro em Ponto Virtual.'); return; }
+    colabIdx = parseInt(selC.value);
+    var colab = cols[colabIdx];
+    setor = (colab && (colab.setor || colab.cargo)) || 'expedicao';
+    // Garante que o setor seja válido
+    if (!SETORES.some(function(s){ return s.id === setor; })) setor = 'expedicao';
+  } else {
+    setor = (document.getElementById('task-setor')||{}).value || 'expedicao';
+  }
+
+  if (!state.tasks) state.tasks = {};
+  if (!Array.isArray(state.tasks[setor])) state.tasks[setor] = [];
+
+  state.tasks[setor].push({
+    text: text, date: date, time: time, done: false, id: Date.now(),
+    colabIdx: colabIdx,
+    colabNome: colabIdx !== null && cols[colabIdx] ? cols[colabIdx].nome : null,
+  });
+
   saveState();
-  addLog(`Adicionou tarefa em ${area}: "${text}"`);
-  bindTasks(area);
+  addLog('Adicionou tarefa (' + (colabIdx !== null ? cols[colabIdx].nome : setorLabel(setor)) + '): "' + text + '"');
+
+  // Limpa o campo de texto
+  var tx = document.getElementById('task-text');
+  if (tx) { tx.value = ''; }
+
+  var el = document.getElementById('page-content');
+  if (el) el.innerHTML = renderTarefas();
+  setTimeout(function(){ tarefaSetTipo(_tarefaTipo); var t2 = document.getElementById('task-text'); if(t2) t2.focus(); }, 30);
 }
 
-function toggleTask(area, i) {
-  state.tasks[area][i].done = !state.tasks[area][i].done;
-  const t = state.tasks[area][i];
-  addLog(`Marcou tarefa como ${t.done?'concluída':'pendente'} em ${area}: "${t.text}"`);
+function toggleTarefa(setor, i) {
+  if (!state.tasks[setor] || !state.tasks[setor][i]) return;
+  state.tasks[setor][i].done = !state.tasks[setor][i].done;
+  var t = state.tasks[setor][i];
+  addLog('Marcou tarefa como ' + (t.done?'concluída':'pendente') + ': "' + t.text + '"');
   saveState();
-  bindTasks(area);
+  var el = document.getElementById('page-content');
+  if (el) el.innerHTML = renderTarefas();
+  setTimeout(function(){ tarefaSetTipo(_tarefaTipo); }, 30);
 }
 
-function deleteTask(area, i) {
-  const t = state.tasks[area][i];
-  state.tasks[area].splice(i, 1);
-  addLog(`Excluiu tarefa em ${area}: "${t.text}"`);
+function deleteTarefa(setor, i) {
+  if (!state.tasks[setor] || !state.tasks[setor][i]) return;
+  var t = state.tasks[setor][i];
+  state.tasks[setor].splice(i, 1);
+  addLog('Excluiu tarefa: "' + t.text + '"');
   saveState();
-  bindTasks(area);
+  var el = document.getElementById('page-content');
+  if (el) el.innerHTML = renderTarefas();
+  setTimeout(function(){ tarefaSetTipo(_tarefaTipo); }, 30);
 }
 
 // --- COMPRAS ------------------------------------------------------------------

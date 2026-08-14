@@ -1248,6 +1248,23 @@ var SETORES = [
   { id: 'producao',  label: 'Produção',  icon: '🏭', cor: '#ea580c' },
 ];
 
+// Normaliza o setor: aceita "Produção", "PRODUCAO", "producao" etc.
+function normalizarSetor(v) {
+  if (!v) return '';
+  var s = String(v).toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // tira acentos
+    .replace(/[^a-z]/g, '');                            // tira espacos e simbolos
+  if (s.indexOf('exped') === 0 || s === 'exp')  return 'expedicao';
+  if (s.indexOf('produ') === 0 || s === 'prod') return 'producao';
+  return '';
+}
+
+// Setor de um colaborador, ja normalizado
+function setorDoColab(c) {
+  if (!c) return '';
+  return normalizarSetor(c.setor) || normalizarSetor(c.cargo) || '';
+}
+
 function setorLabel(id) {
   var s = SETORES.find(function(x){ return x.id === id; });
   return s ? s.label : id;
@@ -1343,8 +1360,8 @@ function renderTarefas() {
           (cols.length ?
             '<select id="task-colab" style="width:100%;padding:0.6rem 0.9rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem">' +
               cols.map(function(c,i){
-                var st = c.setor || c.cargo || '';
-                return '<option value="' + i + '">' + esc(c.nome) + (st ? ' — ' + setorLabel(st) : '') + '</option>';
+                var st = setorDoColab(c);
+                return '<option value="' + i + '">' + esc(c.nome) + (st ? ' — ' + setorLabel(st) : ' — sem setor') + '</option>';
               }).join('') +
             '</select>'
           : '<div style="padding:10px 12px;background:var(--bg3);border-radius:8px;font-size:0.8rem;color:var(--text3)">Nenhum colaborador cadastrado. Cadastre em Ponto Virtual → Colaboradores.</div>') +
@@ -1422,8 +1439,12 @@ function renderTarefas() {
         destBadge = '<span style="padding:2px 9px;border-radius:12px;font-size:0.7rem;font-weight:700;background:' + sc + '18;color:' + sc + ';white-space:nowrap">' + setorIcon(t._setor) + ' ' + setorLabel(t._setor) + '</span>';
       }
 
+      var marcador = t.fixa
+        ? '<div title="Tarefa fixa: nao pode ser concluida" style="width:20px;height:20px;border-radius:5px;background:#d9770618;color:#d97706;display:flex;align-items:center;justify-content:center;font-size:0.8rem;flex-shrink:0;cursor:default">📌</div>'
+        : '<div class="task-check ' + (t.done?'checked':'') + '" onclick="toggleTarefa(\'' + t._setor + '\',' + t._idx + ')"></div>';
+
       html += '<div class="task-item ' + (t.done?'done':'') + '">' +
-        '<div class="task-check ' + (t.done?'checked':'') + '" onclick="toggleTarefa(\'' + t._setor + '\',' + t._idx + ')"></div>' +
+        marcador +
         '<div class="task-text">' + esc(t.text) + '</div>' +
         destBadge +
         '<span class="task-meta">' + dateStr + '</span>' +
@@ -1509,8 +1530,7 @@ function addTarefa() {
     if (!selC) { alert('Cadastre um colaborador primeiro em Ponto Virtual.'); return; }
     colabIdx = parseInt(selC.value);
     var colab = cols[colabIdx];
-    setor = (colab && (colab.setor || colab.cargo)) || 'expedicao';
-    if (!SETORES.some(function(s){ return s.id === setor; })) setor = 'expedicao';
+    setor = setorDoColab(colab) || 'expedicao';
   } else {
     setor = (document.getElementById('task-setor')||{}).value || 'expedicao';
   }
@@ -1538,6 +1558,7 @@ function addTarefa() {
 
 function toggleTarefa(setor, i) {
   if (!state.tasks[setor] || !state.tasks[setor][i]) return;
+  if (state.tasks[setor][i].fixa) return; // tarefa fixa nao se conclui
   state.tasks[setor][i].done = !state.tasks[setor][i].done;
   var t = state.tasks[setor][i];
   addLog('Marcou tarefa como ' + (t.done?'concluída':'pendente') + ': "' + t.text + '"');
@@ -1582,9 +1603,12 @@ function tvMontarSlides() {
 
   // --- Slides de colaboradores, 2 por tela ---
   var comColab = cols.map(function(c, i) {
-    var setor = c.setor || c.cargo || '';
+    var setor = setorDoColab(c);
     var minhas = todas.filter(function(t){ return t.colabIdx === i; });
-    var doSetor = todas.filter(function(t){ return (t.colabIdx === undefined || t.colabIdx === null) && t._setor === setor; });
+    var doSetor = todas.filter(function(t){
+      var semDono = t.colabIdx === undefined || t.colabIdx === null;
+      return semDono && normalizarSetor(t._setor) === setor && setor !== '';
+    });
     var juntas = minhas.concat(doSetor);
     return {
       nome:  c.nome,
@@ -1598,6 +1622,23 @@ function tvMontarSlides() {
 
   for (var i = 0; i < comColab.length; i += 2) {
     slides.push({ tipo: 'colabs', itens: comColab.slice(i, i + 2) });
+  }
+
+  // --- Slide com os dois setores lado a lado ---
+  var porSetor = SETORES.map(function(s) {
+    var doSetor = todas.filter(function(t){
+      var semDono = t.colabIdx === undefined || t.colabIdx === null;
+      return semDono && normalizarSetor(t._setor) === s.id;
+    });
+    return {
+      id: s.id, label: s.label, icon: s.icon, cor: s.cor,
+      fixas: doSetor.filter(function(t){ return t.fixa; }),
+      dia:   doSetor.filter(function(t){ return !t.fixa && t.date <= hojeStr; })
+                    .sort(function(a,b){ return (a.date+(a.time||'')).localeCompare(b.date+(b.time||'')); }),
+    };
+  });
+  if (porSetor.some(function(s){ return s.fixas.length || s.dia.length; })) {
+    slides.push({ tipo: 'setores', itens: porSetor });
   }
 
   // --- Slides de avisos do mural, 1 por tela (texto grande) ---
@@ -1655,6 +1696,44 @@ function tvCardColab(c) {
   '</div>';
 }
 
+function tvCardSetor(s) {
+  function bloco(titulo, itens, corTit, vazio) {
+    var h = '<div style="margin-bottom:2vh">' +
+      '<div style="font-size:2vh;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:' + corTit + ';margin-bottom:1.1vh">' + titulo + '</div>';
+    if (!itens.length) {
+      h += '<div style="font-size:2.4vh;color:#94a3b8;font-style:italic">' + vazio + '</div>';
+    } else {
+      h += itens.slice(0, 5).map(function(t) {
+        var hora = (!t.fixa && t.time) ? '<span style="color:#94a3b8;font-weight:700;margin-left:0.6vw">' + t.time + '</span>' : '';
+        var atras = (!t.fixa && t.date < new Date().toISOString().slice(0,10))
+          ? '<span style="background:#dc2626;color:#fff;font-size:1.7vh;font-weight:800;padding:0.3vh 0.8vw;border-radius:1vh;margin-left:0.7vw;white-space:nowrap">ATRASO</span>' : '';
+        return '<div style="display:flex;align-items:flex-start;gap:0.8vw;font-size:2.9vh;line-height:1.3;margin-bottom:1.1vh;font-weight:600;color:#1e293b">' +
+          '<span style="color:' + corTit + ';font-size:2.2vh;margin-top:0.5vh;flex-shrink:0">●</span>' +
+          '<span style="flex:1">' + esc(t.text) + hora + atras + '</span>' +
+        '</div>';
+      }).join('');
+      if (itens.length > 5) {
+        h += '<div style="font-size:2.2vh;color:#94a3b8;margin-top:0.5vh;font-weight:600">+ ' + (itens.length - 5) + ' tarefa(s)</div>';
+      }
+    }
+    return h + '</div>';
+  }
+
+  return '<div style="flex:1;background:#fff;border-radius:2vh;padding:3vh 2.5vw;display:flex;flex-direction:column;box-shadow:0 0.5vh 3vh rgba(0,0,0,0.13);border-top:1vh solid ' + s.cor + ';min-width:0">' +
+    '<div style="display:flex;align-items:center;gap:1.4vw;margin-bottom:2.4vh;padding-bottom:1.8vh;border-bottom:0.3vh solid #f1f5f9">' +
+      '<div style="width:10vh;height:10vh;border-radius:2vh;background:' + s.cor + ';display:flex;align-items:center;justify-content:center;font-size:5vh;flex-shrink:0">' + s.icon + '</div>' +
+      '<div style="min-width:0">' +
+        '<div style="font-size:4vh;font-weight:800;color:#0f172a;line-height:1.1">' + s.label + '</div>' +
+        '<div style="font-size:2.4vh;color:#64748b;margin-top:0.6vh;font-weight:700">Tarefas do setor</div>' +
+      '</div>' +
+    '</div>' +
+    '<div style="flex:1;overflow:hidden">' +
+      bloco('📌 Tarefas fixas', s.fixas, '#d97706', 'Nenhuma tarefa fixa') +
+      bloco('📅 Tarefas do dia', s.dia, '#16a34a', 'Nenhuma tarefa para hoje') +
+    '</div>' +
+  '</div>';
+}
+
 function tvCardMural(m) {
   return '<div style="flex:1;background:#fffbeb;border-radius:2vh;padding:5vh 4vw;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;box-shadow:0 0.5vh 3vh rgba(0,0,0,0.13);border-top:1vh solid #f59e0b;min-width:0">' +
     '<div style="font-size:8vh;margin-bottom:2.5vh;line-height:1">📌</div>' +
@@ -1676,6 +1755,8 @@ function tvRenderSlide() {
   if (s.tipo === 'colabs') {
     conteudo = s.itens.map(tvCardColab).join('');
     if (s.itens.length === 1) conteudo += '<div style="flex:1"></div>';
+  } else if (s.tipo === 'setores') {
+    conteudo = s.itens.map(tvCardSetor).join('');
   } else if (s.tipo === 'mural') {
     conteudo = s.itens.map(tvCardMural).join('');
   } else {

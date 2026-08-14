@@ -1600,11 +1600,11 @@ function tvMontarSlides() {
     slides.push({ tipo: 'colabs', itens: comColab.slice(i, i + 2) });
   }
 
-  // --- Slides de avisos do mural, 2 por tela ---
+  // --- Slides de avisos do mural, 1 por tela (texto grande) ---
   var mural = (state.mural || []).slice(0, 8);
-  for (var m = 0; m < mural.length; m += 2) {
-    slides.push({ tipo: 'mural', itens: mural.slice(m, m + 2) });
-  }
+  mural.forEach(function(m) {
+    slides.push({ tipo: 'mural', itens: [m] });
+  });
 
   if (!slides.length) slides.push({ tipo: 'vazio' });
   return slides;
@@ -1617,22 +1617,22 @@ function tvCardColab(c) {
   var setorTxt = c.setor === 'expedicao' ? '📦 Expedição' : (c.setor === 'producao' ? '🏭 Produção' : c.setor);
 
   function bloco(titulo, itens, corTit, vazio) {
-    var h = '<div style="margin-bottom:1.6vh">' +
-      '<div style="font-size:1.5vh;font-weight:800;text-transform:uppercase;letter-spacing:0.12em;color:' + corTit + ';margin-bottom:0.8vh">' + titulo + '</div>';
+    var h = '<div style="margin-bottom:2vh">' +
+      '<div style="font-size:2vh;font-weight:800;text-transform:uppercase;letter-spacing:0.1em;color:' + corTit + ';margin-bottom:1.1vh">' + titulo + '</div>';
     if (!itens.length) {
-      h += '<div style="font-size:1.7vh;color:#94a3b8;font-style:italic">' + vazio + '</div>';
+      h += '<div style="font-size:2.4vh;color:#94a3b8;font-style:italic">' + vazio + '</div>';
     } else {
-      h += itens.slice(0, 6).map(function(t) {
-        var hora = (!t.fixa && t.time) ? '<span style="color:#94a3b8;font-weight:600;margin-left:0.6vw">' + t.time + '</span>' : '';
+      h += itens.slice(0, 5).map(function(t) {
+        var hora = (!t.fixa && t.time) ? '<span style="color:#94a3b8;font-weight:700;margin-left:0.6vw">' + t.time + '</span>' : '';
         var atras = (!t.fixa && t.date < new Date().toISOString().slice(0,10))
-          ? '<span style="background:#dc2626;color:#fff;font-size:1.2vh;font-weight:800;padding:0.2vh 0.6vw;border-radius:1vh;margin-left:0.6vw">ATRASO</span>' : '';
-        return '<div style="display:flex;align-items:flex-start;gap:0.7vw;font-size:2vh;line-height:1.35;margin-bottom:0.7vh">' +
-          '<span style="color:' + corTit + ';font-size:1.6vh;margin-top:0.35vh">●</span>' +
+          ? '<span style="background:#dc2626;color:#fff;font-size:1.7vh;font-weight:800;padding:0.3vh 0.8vw;border-radius:1vh;margin-left:0.7vw;white-space:nowrap">ATRASO</span>' : '';
+        return '<div style="display:flex;align-items:flex-start;gap:0.8vw;font-size:2.9vh;line-height:1.3;margin-bottom:1.1vh;font-weight:600;color:#1e293b">' +
+          '<span style="color:' + corTit + ';font-size:2.2vh;margin-top:0.5vh;flex-shrink:0">●</span>' +
           '<span style="flex:1">' + esc(t.text) + hora + atras + '</span>' +
         '</div>';
       }).join('');
-      if (itens.length > 6) {
-        h += '<div style="font-size:1.6vh;color:#94a3b8;margin-top:0.4vh">+ ' + (itens.length - 6) + ' tarefa(s)</div>';
+      if (itens.length > 5) {
+        h += '<div style="font-size:2.2vh;color:#94a3b8;margin-top:0.5vh;font-weight:600">+ ' + (itens.length - 5) + ' tarefa(s)</div>';
       }
     }
     return h + '</div>';
@@ -1641,10 +1641,10 @@ function tvCardColab(c) {
   return '<div style="flex:1;background:#fff;border-radius:2vh;padding:3vh 2.5vw;display:flex;flex-direction:column;box-shadow:0 0.5vh 3vh rgba(0,0,0,0.13);border-top:1vh solid ' + cor + ';min-width:0">' +
     // Cabecalho: avatar + nome + setor
     '<div style="display:flex;align-items:center;gap:1.4vw;margin-bottom:2.4vh;padding-bottom:1.8vh;border-bottom:0.3vh solid #f1f5f9">' +
-      '<div style="width:9vh;height:9vh;border-radius:50%;background:' + cor + ';display:flex;align-items:center;justify-content:center;font-size:4.4vh;font-weight:800;color:#fff;flex-shrink:0">' + inicial + '</div>' +
+      '<div style="width:10vh;height:10vh;border-radius:50%;background:' + cor + ';display:flex;align-items:center;justify-content:center;font-size:5vh;font-weight:800;color:#fff;flex-shrink:0">' + inicial + '</div>' +
       '<div style="min-width:0">' +
-        '<div style="font-size:3.4vh;font-weight:800;color:#0f172a;line-height:1.1;word-break:break-word">' + esc(c.nome) + '</div>' +
-        '<div style="font-size:1.9vh;color:#64748b;margin-top:0.5vh;font-weight:600">' + setorTxt + '</div>' +
+        '<div style="font-size:4vh;font-weight:800;color:#0f172a;line-height:1.1;word-break:break-word">' + esc(c.nome) + '</div>' +
+        '<div style="font-size:2.4vh;color:#64748b;margin-top:0.6vh;font-weight:700">' + setorTxt + '</div>' +
       '</div>' +
     '</div>' +
     // Blocos de tarefas
@@ -1656,10 +1656,10 @@ function tvCardColab(c) {
 }
 
 function tvCardMural(m) {
-  return '<div style="flex:1;background:#fffbeb;border-radius:2vh;padding:3.5vh 2.5vw;display:flex;flex-direction:column;justify-content:center;box-shadow:0 0.5vh 3vh rgba(0,0,0,0.13);border-top:1vh solid #f59e0b;min-width:0">' +
-    '<div style="font-size:5vh;margin-bottom:1.5vh">📌</div>' +
-    '<div style="font-size:2.7vh;line-height:1.45;color:#0f172a;font-weight:600;word-break:break-word">' + esc(m.text) + '</div>' +
-    '<div style="font-size:1.8vh;color:#92400e;margin-top:2vh;font-weight:700">' + esc(m.author || '') + (m.time ? ' · ' + m.time : '') + '</div>' +
+  return '<div style="flex:1;background:#fffbeb;border-radius:2vh;padding:5vh 4vw;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;box-shadow:0 0.5vh 3vh rgba(0,0,0,0.13);border-top:1vh solid #f59e0b;min-width:0">' +
+    '<div style="font-size:8vh;margin-bottom:2.5vh;line-height:1">📌</div>' +
+    '<div style="font-size:5vh;line-height:1.3;color:#0f172a;font-weight:700;word-break:break-word;max-width:90%">' + esc(m.text) + '</div>' +
+    '<div style="font-size:2.6vh;color:#92400e;margin-top:3.5vh;font-weight:700">' + esc(m.author || '') + (m.time ? ' · ' + m.time : '') + '</div>' +
   '</div>';
 }
 
@@ -1678,7 +1678,6 @@ function tvRenderSlide() {
     if (s.itens.length === 1) conteudo += '<div style="flex:1"></div>';
   } else if (s.tipo === 'mural') {
     conteudo = s.itens.map(tvCardMural).join('');
-    if (s.itens.length === 1) conteudo += '<div style="flex:1"></div>';
   } else {
     conteudo = '<div style="flex:1;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:3vh">Nenhum colaborador ou aviso cadastrado</div>';
   }

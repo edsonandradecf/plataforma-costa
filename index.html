@@ -939,7 +939,8 @@ function togglePassVis() {
 function getPagesAdmin() {
   return [
     { id: 'inicio',     label: 'Início',               icon: iconHome() },
-    { id: 'tarefas',    label: 'Tarefas',               icon: iconTruck() },
+    { id: 'tarefas',    label: 'Tarefas',               icon: iconTarefas() },
+    { id: 'tv',         label: 'TV',                    icon: iconTV() },
     { id: 'compras',    label: 'Compras',               icon: iconCart() },
     { id: 'estoque',    label: 'Estoque',               icon: iconEstoque() },
     { id: 'ponto',      label: 'Ponto Virtual',         icon: iconPonto() },
@@ -1008,7 +1009,7 @@ function cleanOldTasks() {
     if (!state.tasks) state.tasks = {};
     if (!Array.isArray(state.tasks[area])) state.tasks[area] = [];
     const before = state.tasks[area].length;
-    state.tasks[area] = state.tasks[area].filter(t => !(t.done && t.date < todayStr));
+    state.tasks[area] = state.tasks[area].filter(t => t.fixa || !(t.done && t.date < todayStr));
     if (state.tasks[area].length !== before) changed = true;
   });
   // Não salva aqui -- evita sobrescrever Firebase com dados locais ainda não sincronizados
@@ -1070,7 +1071,7 @@ async function renovarTokens() {
 
 function renderPage() {
   if (!state.currentUser) return;
-  var titles = { inicio:'Início', tarefas:'Tarefas', compras:'Compras', estoque:'Estoque', ponto:'Ponto Virtual', mural:'Mural', etiquetas:'Gerador de Etiquetas', tabnutri:'Tabela Nutricional', produtos:'Produtos', marketplaces:'Marketplaces', margemviva:'Radar', logs:'Logs', financeiro:'Financeiro' };
+  var titles = { inicio:'Início', tarefas:'Tarefas', tv:'TV', compras:'Compras', estoque:'Estoque', ponto:'Ponto Virtual', mural:'Mural', etiquetas:'Gerador de Etiquetas', tabnutri:'Tabela Nutricional', produtos:'Produtos', marketplaces:'Marketplaces', margemviva:'Radar', logs:'Logs', financeiro:'Financeiro' };
   var titleEl = document.getElementById('page-title');
   if (titleEl) titleEl.textContent = titles[state.currentPage] || '';
   var c = document.getElementById('page-content');
@@ -1078,6 +1079,7 @@ function renderPage() {
   var pg = state.currentPage;
   if (pg === 'inicio')    { c.innerHTML = renderInicio(); return; }
   if (pg === 'tarefas')   { c.innerHTML = renderTarefas(); setTimeout(function(){ tarefaSetTipo(_tarefaTipo); }, 30); return; }
+  if (pg === 'tv')        { c.innerHTML = renderTV(); setTimeout(tvIniciar, 50); return; }
   if (pg === 'compras')   { c.innerHTML = renderCompras(); setupCompras(); return; }
   if (pg === 'mural')     { c.innerHTML = renderMural(); setupMural(); return; }
   if (pg === 'etiquetas') { c.innerHTML = renderEtiquetas(); return; }
@@ -1093,6 +1095,7 @@ function renderPage() {
 
 function navigate(page) {
   if (!state.currentUser) return;
+  if (state.currentPage === 'tv' && page !== 'tv' && typeof tvParar === 'function') tvParar();
   state.currentPage = page;
   // Atualiza a URL com hash — permite botão Voltar e bookmarks
   if (window.location.hash !== '#' + page) {
@@ -1114,7 +1117,7 @@ window.addEventListener('popstate', function(e) {
 function pageFromHash() {
   var hash = window.location.hash.replace('#', '').trim();
   // Lista de páginas válidas
-  var valid = ['inicio','tarefas','compras','estoque','ponto','mural','etiquetas','tabnutri','produtos','marketplaces','margemviva','logs','financeiro'];
+  var valid = ['inicio','tarefas','tv','compras','estoque','ponto','mural','etiquetas','tabnutri','produtos','marketplaces','margemviva','logs','financeiro'];
   return valid.indexOf(hash) !== -1 ? hash : 'inicio';
 }
 
@@ -1294,8 +1297,17 @@ function renderTarefas() {
     html += '<div class="card" style="margin-bottom:1rem">' +
       '<div style="font-weight:700;font-size:0.9rem;margin-bottom:0.9rem">+ Nova Tarefa</div>' +
 
-      '<div style="display:grid;grid-template-columns:1fr 130px 120px;gap:8px;margin-bottom:10px">' +
-        '<input type="text" id="task-text" placeholder="Descrição da tarefa..." style="padding:0.6rem 0.9rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem">' +
+      // Tipo de prazo: data especifica ou fixa (todo dia)
+      '<div style="display:flex;gap:6px;margin-bottom:10px">' +
+        '<button type="button" id="tk-prazo-data" onclick="tarefaSetPrazo(\'data\')" ' +
+          'style="flex:1;padding:8px;border:2px solid var(--green);border-radius:8px;background:var(--green);color:#fff;font-weight:700;cursor:pointer;font-size:0.83rem">📅 Data especifica</button>' +
+        '<button type="button" id="tk-prazo-fixa" onclick="tarefaSetPrazo(\'fixa\')" ' +
+          'style="flex:1;padding:8px;border:2px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text2);font-weight:600;cursor:pointer;font-size:0.83rem">📌 Tarefa fixa (todo dia)</button>' +
+      '</div>' +
+
+      '<input type="text" id="task-text" placeholder="Descrição da tarefa..." style="width:100%;padding:0.6rem 0.9rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem;margin-bottom:10px">' +
+
+      '<div id="tk-campo-data" style="display:grid;grid-template-columns:1fr 130px;gap:8px;margin-bottom:10px">' +
         '<input type="date" id="task-date" value="' + todayStr + '" style="padding:0.6rem 0.7rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem">' +
         '<div style="display:flex;flex-direction:column;gap:3px">' +
           '<input type="time" id="task-time" value="08:00" style="padding:0.6rem 0.5rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem">' +
@@ -1303,6 +1315,10 @@ function renderTarefas() {
             '<input type="checkbox" id="task-no-time" onchange="toggleTaskTime()" style="width:auto;margin:0"> Sem horário' +
           '</label>' +
         '</div>' +
+      '</div>' +
+
+      '<div id="tk-aviso-fixa" style="display:none;padding:10px 12px;background:var(--bg3);border-radius:8px;font-size:0.8rem;color:var(--text2);margin-bottom:10px">' +
+        '📌 Aparece todo dia na TV e na lista, sem data de vencimento. Ideal para rotinas do dia a dia.' +
       '</div>' +
 
       // Atribuição: setor ou pessoa
@@ -1367,9 +1383,11 @@ function renderTarefas() {
     }
   }
 
-  // Ordena: pendentes primeiro (por data), concluídas no fim
+  // Ordena: fixas no topo, depois pendentes por data, concluidas no fim
   lista.sort(function(a, b) {
     if (a.done !== b.done) return a.done ? 1 : -1;
+    if (!!a.fixa !== !!b.fixa) return a.fixa ? -1 : 1;
+    if (a.fixa && b.fixa) return 0;
     return (a.date + (a.time||'')).localeCompare(b.date + (b.time||''));
   });
 
@@ -1380,15 +1398,20 @@ function renderTarefas() {
   } else {
     html += '<div class="task-list">';
     lista.forEach(function(t) {
-      var isLate     = !t.done && t.date < todayStr;
-      var isToday    = !t.done && t.date === todayStr;
-      var isTomorrow = !t.done && t.date === tomorrowStr;
-      var dateStr = new Date(t.date + 'T12:00:00').toLocaleDateString('pt-BR') + (t.time ? ' ' + t.time : ' · Sem horário');
+      var badge = '', dateStr;
 
-      var badge = '';
-      if (isLate)          badge = '<span class="task-badge">⚠ Atraso</span>';
-      else if (isToday)    badge = '<span class="task-badge" style="background:var(--green);color:#fff;border:none">Hoje</span>';
-      else if (isTomorrow) badge = '<span class="task-badge" style="background:#1a8a4a;color:#fff;border:none">Amanhã</span>';
+      if (t.fixa) {
+        dateStr = 'Todo dia';
+        badge = '<span class="task-badge" style="background:#d97706;color:#fff;border:none">📌 Fixa</span>';
+      } else {
+        var isLate     = !t.done && t.date < todayStr;
+        var isToday    = !t.done && t.date === todayStr;
+        var isTomorrow = !t.done && t.date === tomorrowStr;
+        dateStr = new Date(t.date + 'T12:00:00').toLocaleDateString('pt-BR') + (t.time ? ' ' + t.time : ' · Sem horário');
+        if (isLate)          badge = '<span class="task-badge">⚠ Atraso</span>';
+        else if (isToday)    badge = '<span class="task-badge" style="background:var(--green);color:#fff;border:none">Hoje</span>';
+        else if (isTomorrow) badge = '<span class="task-badge" style="background:#1a8a4a;color:#fff;border:none">Amanhã</span>';
+      }
 
       // Badge de destino
       var destBadge;
@@ -1415,7 +1438,22 @@ function renderTarefas() {
   return html;
 }
 
-var _tarefaTipo = 'setor'; // 'setor' | 'pessoa'
+var _tarefaTipo  = 'setor'; // 'setor' | 'pessoa'
+var _tarefaPrazo = 'data';  // 'data'  | 'fixa'
+
+function tarefaSetPrazo(p) {
+  _tarefaPrazo = p;
+  var cd = document.getElementById('tk-campo-data');
+  var av = document.getElementById('tk-aviso-fixa');
+  var bd = document.getElementById('tk-prazo-data');
+  var bf = document.getElementById('tk-prazo-fixa');
+  if (!cd) return;
+  var ehData = p === 'data';
+  cd.style.display = ehData ? 'grid' : 'none';
+  if (av) av.style.display = ehData ? 'none' : 'block';
+  if (bd) { bd.style.background = ehData?'var(--green)':'var(--bg2)'; bd.style.color = ehData?'#fff':'var(--text2)'; bd.style.borderColor = ehData?'var(--green)':'var(--border)'; bd.style.fontWeight = ehData?'700':'600'; }
+  if (bf) { bf.style.background = !ehData?'#d97706':'var(--bg2)'; bf.style.color = !ehData?'#fff':'var(--text2)'; bf.style.borderColor = !ehData?'#d97706':'var(--border)'; bf.style.fontWeight = !ehData?'700':'600'; }
+}
 
 function tarefaSetTipo(tipo) {
   _tarefaTipo = tipo;
@@ -1435,6 +1473,12 @@ function tarefaSetFiltro(f) {
   _tarefaFiltro = f;
   var el = document.getElementById('page-content');
   if (el) el.innerHTML = renderTarefas();
+  setTimeout(tarefaRestaurarBotoes, 30);
+}
+
+function tarefaRestaurarBotoes() {
+  tarefaSetTipo(_tarefaTipo);
+  tarefaSetPrazo(_tarefaPrazo);
 }
 
 function toggleTaskTime() {
@@ -1445,12 +1489,17 @@ function toggleTaskTime() {
 }
 
 function addTarefa() {
-  var text   = (document.getElementById('task-text')||{}).value || '';
-  var date   = (document.getElementById('task-date')||{}).value || '';
-  var noTime = (document.getElementById('task-no-time')||{}).checked;
-  var time   = noTime ? '' : ((document.getElementById('task-time')||{}).value || '');
-  text = text.trim();
-  if (!text || !date) { alert('Preencha a descrição e a data.'); return; }
+  var text = ((document.getElementById('task-text')||{}).value || '').trim();
+  if (!text) { alert('Preencha a descrição da tarefa.'); return; }
+
+  var fixa = _tarefaPrazo === 'fixa';
+  var date = '', time = '';
+  if (!fixa) {
+    date = (document.getElementById('task-date')||{}).value || '';
+    var noTime = (document.getElementById('task-no-time')||{}).checked;
+    time = noTime ? '' : ((document.getElementById('task-time')||{}).value || '');
+    if (!date) { alert('Informe a data da tarefa.'); return; }
+  }
 
   var cols = (state.ponto && state.ponto.colaboradores) || [];
   var setor, colabIdx = null;
@@ -1461,7 +1510,6 @@ function addTarefa() {
     colabIdx = parseInt(selC.value);
     var colab = cols[colabIdx];
     setor = (colab && (colab.setor || colab.cargo)) || 'expedicao';
-    // Garante que o setor seja válido
     if (!SETORES.some(function(s){ return s.id === setor; })) setor = 'expedicao';
   } else {
     setor = (document.getElementById('task-setor')||{}).value || 'expedicao';
@@ -1472,20 +1520,20 @@ function addTarefa() {
 
   state.tasks[setor].push({
     text: text, date: date, time: time, done: false, id: Date.now(),
+    fixa: fixa,
     colabIdx: colabIdx,
     colabNome: colabIdx !== null && cols[colabIdx] ? cols[colabIdx].nome : null,
   });
 
   saveState();
-  addLog('Adicionou tarefa (' + (colabIdx !== null ? cols[colabIdx].nome : setorLabel(setor)) + '): "' + text + '"');
+  addLog('Adicionou tarefa' + (fixa?' fixa':'') + ' (' + (colabIdx !== null ? cols[colabIdx].nome : setorLabel(setor)) + '): "' + text + '"');
 
-  // Limpa o campo de texto
   var tx = document.getElementById('task-text');
-  if (tx) { tx.value = ''; }
+  if (tx) tx.value = '';
 
   var el = document.getElementById('page-content');
   if (el) el.innerHTML = renderTarefas();
-  setTimeout(function(){ tarefaSetTipo(_tarefaTipo); var t2 = document.getElementById('task-text'); if(t2) t2.focus(); }, 30);
+  setTimeout(function(){ tarefaRestaurarBotoes(); var t2 = document.getElementById('task-text'); if(t2) t2.focus(); }, 30);
 }
 
 function toggleTarefa(setor, i) {
@@ -1496,7 +1544,7 @@ function toggleTarefa(setor, i) {
   saveState();
   var el = document.getElementById('page-content');
   if (el) el.innerHTML = renderTarefas();
-  setTimeout(function(){ tarefaSetTipo(_tarefaTipo); }, 30);
+  setTimeout(tarefaRestaurarBotoes, 30);
 }
 
 function deleteTarefa(setor, i) {
@@ -1507,10 +1555,217 @@ function deleteTarefa(setor, i) {
   saveState();
   var el = document.getElementById('page-content');
   if (el) el.innerHTML = renderTarefas();
-  setTimeout(function(){ tarefaSetTipo(_tarefaTipo); }, 30);
+  setTimeout(tarefaRestaurarBotoes, 30);
 }
 
-// --- COMPRAS ------------------------------------------------------------------
+// --- TV (carrossel para a televisao da operacao) -------------------------------
+var _tvTimer   = null;
+var _tvRelogio = null;
+var _tvSlide   = 0;
+var _tvSlides  = [];
+var TV_SEGUNDOS = 12;
+
+function tvMontarSlides() {
+  var slides = [];
+  var cols = (state.ponto && state.ponto.colaboradores) || [];
+  var hoje = new Date(); hoje.setHours(0,0,0,0);
+  var hojeStr = hoje.toISOString().slice(0,10);
+
+  // Junta todas as tarefas pendentes
+  var todas = [];
+  SETORES.forEach(function(s) {
+    ((state.tasks && state.tasks[s.id]) || []).forEach(function(t) {
+      if (t.done) return;
+      todas.push(Object.assign({}, t, { _setor: s.id }));
+    });
+  });
+
+  // --- Slides de colaboradores, 2 por tela ---
+  var comColab = cols.map(function(c, i) {
+    var setor = c.setor || c.cargo || '';
+    var minhas = todas.filter(function(t){ return t.colabIdx === i; });
+    var doSetor = todas.filter(function(t){ return (t.colabIdx === undefined || t.colabIdx === null) && t._setor === setor; });
+    var juntas = minhas.concat(doSetor);
+    return {
+      nome:  c.nome,
+      setor: setor,
+      idx:   i,
+      fixas: juntas.filter(function(t){ return t.fixa; }),
+      dia:   juntas.filter(function(t){ return !t.fixa && t.date <= hojeStr; })
+                   .sort(function(a,b){ return (a.date+(a.time||'')).localeCompare(b.date+(b.time||'')); }),
+    };
+  });
+
+  for (var i = 0; i < comColab.length; i += 2) {
+    slides.push({ tipo: 'colabs', itens: comColab.slice(i, i + 2) });
+  }
+
+  // --- Slides de avisos do mural, 2 por tela ---
+  var mural = (state.mural || []).slice(0, 8);
+  for (var m = 0; m < mural.length; m += 2) {
+    slides.push({ tipo: 'mural', itens: mural.slice(m, m + 2) });
+  }
+
+  if (!slides.length) slides.push({ tipo: 'vazio' });
+  return slides;
+}
+
+function tvCardColab(c) {
+  var CORES = ['#16a34a','#2563eb','#9333ea','#ea580c','#0891b2','#be185d'];
+  var cor = CORES[c.idx % 6];
+  var inicial = (c.nome || '?')[0].toUpperCase();
+  var setorTxt = c.setor === 'expedicao' ? '📦 Expedição' : (c.setor === 'producao' ? '🏭 Produção' : c.setor);
+
+  function bloco(titulo, itens, corTit, vazio) {
+    var h = '<div style="margin-bottom:1.6vh">' +
+      '<div style="font-size:1.5vh;font-weight:800;text-transform:uppercase;letter-spacing:0.12em;color:' + corTit + ';margin-bottom:0.8vh">' + titulo + '</div>';
+    if (!itens.length) {
+      h += '<div style="font-size:1.7vh;color:#94a3b8;font-style:italic">' + vazio + '</div>';
+    } else {
+      h += itens.slice(0, 6).map(function(t) {
+        var hora = (!t.fixa && t.time) ? '<span style="color:#94a3b8;font-weight:600;margin-left:0.6vw">' + t.time + '</span>' : '';
+        var atras = (!t.fixa && t.date < new Date().toISOString().slice(0,10))
+          ? '<span style="background:#dc2626;color:#fff;font-size:1.2vh;font-weight:800;padding:0.2vh 0.6vw;border-radius:1vh;margin-left:0.6vw">ATRASO</span>' : '';
+        return '<div style="display:flex;align-items:flex-start;gap:0.7vw;font-size:2vh;line-height:1.35;margin-bottom:0.7vh">' +
+          '<span style="color:' + corTit + ';font-size:1.6vh;margin-top:0.35vh">●</span>' +
+          '<span style="flex:1">' + esc(t.text) + hora + atras + '</span>' +
+        '</div>';
+      }).join('');
+      if (itens.length > 6) {
+        h += '<div style="font-size:1.6vh;color:#94a3b8;margin-top:0.4vh">+ ' + (itens.length - 6) + ' tarefa(s)</div>';
+      }
+    }
+    return h + '</div>';
+  }
+
+  return '<div style="flex:1;background:#fff;border-radius:2vh;padding:3vh 2.5vw;display:flex;flex-direction:column;box-shadow:0 0.5vh 3vh rgba(0,0,0,0.13);border-top:1vh solid ' + cor + ';min-width:0">' +
+    // Cabecalho: avatar + nome + setor
+    '<div style="display:flex;align-items:center;gap:1.4vw;margin-bottom:2.4vh;padding-bottom:1.8vh;border-bottom:0.3vh solid #f1f5f9">' +
+      '<div style="width:9vh;height:9vh;border-radius:50%;background:' + cor + ';display:flex;align-items:center;justify-content:center;font-size:4.4vh;font-weight:800;color:#fff;flex-shrink:0">' + inicial + '</div>' +
+      '<div style="min-width:0">' +
+        '<div style="font-size:3.4vh;font-weight:800;color:#0f172a;line-height:1.1;word-break:break-word">' + esc(c.nome) + '</div>' +
+        '<div style="font-size:1.9vh;color:#64748b;margin-top:0.5vh;font-weight:600">' + setorTxt + '</div>' +
+      '</div>' +
+    '</div>' +
+    // Blocos de tarefas
+    '<div style="flex:1;overflow:hidden">' +
+      bloco('📌 Tarefas fixas', c.fixas, '#d97706', 'Nenhuma tarefa fixa') +
+      bloco('📅 Tarefas do dia', c.dia, '#16a34a', 'Nenhuma tarefa para hoje') +
+    '</div>' +
+  '</div>';
+}
+
+function tvCardMural(m) {
+  return '<div style="flex:1;background:#fffbeb;border-radius:2vh;padding:3.5vh 2.5vw;display:flex;flex-direction:column;justify-content:center;box-shadow:0 0.5vh 3vh rgba(0,0,0,0.13);border-top:1vh solid #f59e0b;min-width:0">' +
+    '<div style="font-size:5vh;margin-bottom:1.5vh">📌</div>' +
+    '<div style="font-size:2.7vh;line-height:1.45;color:#0f172a;font-weight:600;word-break:break-word">' + esc(m.text) + '</div>' +
+    '<div style="font-size:1.8vh;color:#92400e;margin-top:2vh;font-weight:700">' + esc(m.author || '') + (m.time ? ' · ' + m.time : '') + '</div>' +
+  '</div>';
+}
+
+function tvRenderSlide() {
+  var pal = document.getElementById('tv-palco');
+  var dots = document.getElementById('tv-dots');
+  if (!pal) return;
+
+  if (!_tvSlides.length) { pal.innerHTML = ''; return; }
+  if (_tvSlide >= _tvSlides.length) _tvSlide = 0;
+  var s = _tvSlides[_tvSlide];
+
+  var conteudo = '';
+  if (s.tipo === 'colabs') {
+    conteudo = s.itens.map(tvCardColab).join('');
+    if (s.itens.length === 1) conteudo += '<div style="flex:1"></div>';
+  } else if (s.tipo === 'mural') {
+    conteudo = s.itens.map(tvCardMural).join('');
+    if (s.itens.length === 1) conteudo += '<div style="flex:1"></div>';
+  } else {
+    conteudo = '<div style="flex:1;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:3vh">Nenhum colaborador ou aviso cadastrado</div>';
+  }
+
+  pal.innerHTML = '<div style="display:flex;gap:2vw;height:100%;animation:tvFade 0.6s ease">' + conteudo + '</div>';
+
+  if (dots) {
+    dots.innerHTML = _tvSlides.map(function(_, i) {
+      var at = i === _tvSlide;
+      return '<div style="width:' + (at?'3vw':'1vh') + ';height:1vh;border-radius:1vh;background:' + (at?'#16a34a':'rgba(255,255,255,0.3)') + ';transition:all 0.4s"></div>';
+    }).join('');
+  }
+}
+
+function tvProximo() {
+  _tvSlide++;
+  if (_tvSlide >= _tvSlides.length) {
+    _tvSlide = 0;
+    _tvSlides = tvMontarSlides(); // recarrega dados a cada volta completa
+  }
+  tvRenderSlide();
+}
+
+function tvIniciar() {
+  tvParar();
+  _tvSlide = 0;
+  _tvSlides = tvMontarSlides();
+  tvRenderSlide();
+  _tvTimer = setInterval(tvProximo, TV_SEGUNDOS * 1000);
+  _tvRelogio = setInterval(function() {
+    var r = document.getElementById('tv-hora');
+    if (!r) { tvParar(); return; }
+    var n = new Date();
+    r.textContent = String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0');
+  }, 1000);
+}
+
+function tvParar() {
+  if (_tvTimer)   { clearInterval(_tvTimer);   _tvTimer = null; }
+  if (_tvRelogio) { clearInterval(_tvRelogio); _tvRelogio = null; }
+}
+
+function tvTelaCheia() {
+  var box = document.getElementById('tv-box');
+  if (!box) return;
+  if (!document.fullscreenElement) {
+    (box.requestFullscreen || box.webkitRequestFullscreen || function(){}).call(box);
+  } else {
+    (document.exitFullscreen || document.webkitExitFullscreen || function(){}).call(document);
+  }
+}
+
+function renderTV() {
+  var agora = new Date();
+  var hh = String(agora.getHours()).padStart(2,'0') + ':' + String(agora.getMinutes()).padStart(2,'0');
+  var dataTxt = agora.toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long' });
+
+  return '<style>@keyframes tvFade{from{opacity:0;transform:translateY(1.5vh)}to{opacity:1;transform:none}}' +
+    '#tv-box:fullscreen{border-radius:0}#tv-box:-webkit-full-screen{border-radius:0}</style>' +
+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px">' +
+      '<div style="font-size:0.85rem;color:var(--text3)">Cada tela fica ' + TV_SEGUNDOS + ' segundos. Os dados atualizam sozinhos a cada volta completa.</div>' +
+      '<div style="display:flex;gap:8px">' +
+        '<button class="btn btn-sm" onclick="tvProximo()">Proximo ▸</button>' +
+        '<button class="btn btn-green btn-sm" onclick="tvTelaCheia()">⛶ Tela cheia</button>' +
+      '</div>' +
+    '</div>' +
+
+    '<div id="tv-box" style="background:#0f172a;border-radius:1.5vh;overflow:hidden;aspect-ratio:16/9;width:100%;display:flex;flex-direction:column;padding:3vh 2.5vw">' +
+
+      // Topo
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2.5vh;flex-shrink:0">' +
+        '<div style="font-size:3vh;font-weight:800;color:#fff;letter-spacing:-0.02em">Costa Nature Life</div>' +
+        '<div style="text-align:right">' +
+          '<div id="tv-hora" style="font-size:3.4vh;font-weight:800;color:#fff;line-height:1;font-variant-numeric:tabular-nums">' + hh + '</div>' +
+          '<div style="font-size:1.6vh;color:#94a3b8;text-transform:capitalize;margin-top:0.3vh">' + dataTxt + '</div>' +
+        '</div>' +
+      '</div>' +
+
+      // Palco dos slides
+      '<div id="tv-palco" style="flex:1;min-height:0"></div>' +
+
+      // Indicadores
+      '<div id="tv-dots" style="display:flex;gap:0.8vh;justify-content:center;align-items:center;margin-top:2.2vh;flex-shrink:0"></div>' +
+
+    '</div>';
+}
 function renderCompras() {
   let html = `<div class="card">
     <div class="add-task-form mb-2">
@@ -2314,6 +2569,8 @@ function iconDevolucao() { return `<svg viewBox="0 0 24 24" fill="none" stroke="
 function iconPonto() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`; }
 function iconEstoque() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>`; }
 function iconHome() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`; }
+function iconTarefas() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`; }
+function iconTV() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="13" rx="2"/><polyline points="17 2 12 7 7 2"/></svg>`; }
 function iconTruck() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`; }
 function iconFactory() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 20V8l6-4v4l6-4v4l6-4v16H2z"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="10" y1="20" x2="10" y2="14"/><line x1="14" y1="20" x2="14" y2="14"/></svg>`; }
 function iconCart() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>`; }

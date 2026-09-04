@@ -556,10 +556,19 @@ function applyParsed(parsed, forceMerge) {
     ? parsed.devolucoes
     : (Array.isArray(state.devolucoes) && state.devolucoes.length > 0 ? state.devolucoes : []);
 
-  // TV: periodos de vendas importados
-  var tvNovo  = (parsed.tv && parsed.tv.periodos) || {};
-  var tvAtual = (state.tv && state.tv.periodos)   || {};
-  state.tv = { periodos: Object.keys(tvNovo).length > 0 ? tvNovo : tvAtual };
+  // TV: dados de vendas importados (semana + meses)
+  var tvIn  = parsed.tv || {};
+  var tvOld = state.tv  || {};
+  var mesesIn  = tvIn.meses  || {};
+  var mesesOld = tvOld.meses || {};
+  state.tv = {
+    semana: tvIn.semana || tvOld.semana || null,
+    meses:  Object.keys(mesesIn).length > 0 ? mesesIn : mesesOld,
+  };
+  if (tvIn.periodos && !state.tv.semana) {   // formato antigo
+    var ksTv = Object.keys(tvIn.periodos).sort();
+    if (ksTv.length) state.tv.semana = tvIn.periodos[ksTv[ksTv.length - 1]];
+  }
   if (parsed.mlToken) {
     state.mlToken = parsed.mlToken;
     localStorage.setItem('ml_token', JSON.stringify(parsed.mlToken));
@@ -1643,89 +1652,83 @@ var _tvAba      = 'painel';   // 'painel' | 'dados'
 var _tvRelogio  = null;
 var _tvCarTimer = null;
 var _tvCarIdx   = 0;
+var _tvMuralIdx = 0;
+var _tvMuralTimer = null;
 var _tvChart    = null;
 var TV_CAR_SEG  = 6;
+var TV_MURAL_SEG = 10;
 
 // ---------- helpers de dados ----------
 
-function tvPeriodos() {
-  var p = (state.tv && state.tv.periodos) || {};
-  return Object.keys(p).sort().map(function(k){ return p[k]; });
+var MES_NOMES = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+var MES_CURTO = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+// Garante a estrutura e migra o formato antigo (periodos) se existir
+function tvDados() {
+  if (!state.tv) state.tv = {};
+  if (!state.tv.meses) state.tv.meses = {};
+  // Migracao: pega o periodo mais recente do formato antigo como semana
+  if (!state.tv.semana && state.tv.periodos) {
+    var ks = Object.keys(state.tv.periodos).sort();
+    if (ks.length) state.tv.semana = state.tv.periodos[ks[ks.length - 1]];
+    delete state.tv.periodos;
+  }
+  return state.tv;
 }
 
-function tvPeriodoAtual() {
-  var lista = tvPeriodos();
-  return lista.length ? lista[lista.length - 1] : null;
-}
+function tvSemana() { return tvDados().semana || null; }
 
 function tvFmtData(iso) {
   if (!iso) return '';
-  var p = iso.split('-');
-  return p[2] + '/' + p[1];
+  var p = String(iso).split('-');
+  return p.length >= 3 ? p[2] + '/' + p[1] : iso;
 }
 
-// Agrupa os periodos por mes para o grafico de barras
+function tvMesLabel(chave) {
+  var p = String(chave).split('-');
+  return MES_NOMES[parseInt(p[1],10) - 1] + ' ' + p[0];
+}
+
+// Grafico de barras: pedidos por mes, a partir das planilhas mensais
 function tvPedidosPorMes() {
-  var MES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
-  var acc = {};
-  tvPeriodos().forEach(function(per) {
-    var chave = (per.fim || per.inicio || '').slice(0,7); // AAAA-MM
-    if (!chave) return;
-    acc[chave] = (acc[chave] || 0) + (per.pedidos || 0);
-  });
-  var chaves = Object.keys(acc).sort().slice(-8);
+  var m = tvDados().meses || {};
+  var chaves = Object.keys(m).sort().slice(-8);
   return {
-    labels: chaves.map(function(k){ return MES[parseInt(k.slice(5,7),10) - 1]; }),
-    valores: chaves.map(function(k){ return acc[k]; }),
+    labels:  chaves.map(function(k){ return MES_CURTO[parseInt(k.slice(5,7),10) - 1]; }),
+    valores: chaves.map(function(k){ return m[k].pedidos || 0; }),
   };
 }
 
-// ---------- importacao da planilha ----------
+// ---------- leitura da planilha ----------
 
-// Extrai o periodo do nome do arquivo: Sales_by_Variant_20260823-20260829_...
 function tvPeriodoDoNome(nome) {
   var m = String(nome).match(/(\d{8})-(\d{8})/);
   if (!m) return null;
   function iso(s){ return s.slice(0,4) + '-' + s.slice(4,6) + '-' + s.slice(6,8); }
-  return { chave: m[1] + '-' + m[2], inicio: iso(m[1]), fim: iso(m[2]) };
+  return { inicio: iso(m[1]), fim: iso(m[2]) };
 }
 
 function tvPlataforma(loja) {
   var s = String(loja || '').toLowerCase();
-  if (s.indexOf('shopee') !== -1) return 'Shopee';
+  if (s.indexOf('shopee')  !== -1) return 'Shopee';
   if (s.indexOf('mercado') !== -1) return 'Mercado Livre';
-  if (s.indexOf('tiktok') !== -1) return 'TikTok';
+  if (s.indexOf('tiktok')  !== -1) return 'TikTok';
   return 'Outros';
 }
 
-function tvImportarPlanilha(input) {
-  var arq = input && input.files && input.files[0];
-  if (!arq) return;
-  var st = document.getElementById('tv-import-status');
-  function msg(txt, cor) { if (st) { st.textContent = txt; st.style.color = cor || 'var(--text2)'; } }
-
-  if (typeof XLSX === 'undefined') { msg('Biblioteca de planilha nao carregou. Recarregue a pagina.', 'var(--red)'); return; }
-
-  var per = tvPeriodoDoNome(arq.name);
-  if (!per) {
-    msg('Nao consegui ler o periodo no nome do arquivo. Esperado algo como Sales_by_Variant_20260823-20260829.xlsx', 'var(--red)');
-    return;
-  }
-
-  msg('Lendo planilha...');
+// Le o arquivo e devolve o resumo agrupado por SKU
+function tvLerPlanilha(arq, ok, erro) {
+  if (typeof XLSX === 'undefined') { erro('Biblioteca de planilha nao carregou. Recarregue a pagina.'); return; }
   var fr = new FileReader();
-  fr.onerror = function(){ msg('Falha ao ler o arquivo.', 'var(--red)'); };
+  fr.onerror = function(){ erro('Falha ao ler o arquivo.'); };
   fr.onload = function(e) {
     try {
       var wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
-      var ws = wb.Sheets[wb.SheetNames[0]];
-      var linhas = XLSX.utils.sheet_to_json(ws, { defval: '' });
-      if (!linhas.length) { msg('A planilha esta vazia.', 'var(--red)'); return; }
+      var linhas = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+      if (!linhas.length) { erro('A planilha esta vazia.'); return; }
 
       var col = Object.keys(linhas[0]);
-      function achar(alvo) {
-        return col.find(function(c){ return c.trim().toLowerCase() === alvo; });
-      }
+      function achar(alvo){ return col.find(function(c){ return c.trim().toLowerCase() === alvo; }); }
       var cSku  = achar('sku');
       var cUni  = achar('unidades vendidas');
       var cProd = achar('produtos');
@@ -1734,11 +1737,10 @@ function tvImportarPlanilha(input) {
       var cVal  = achar('valor de vendas');
 
       if (!cSku || !cUni) {
-        msg('Colunas nao encontradas. A planilha precisa ter "SKU" e "Unidades Vendidas". Encontrei: ' + col.join(', '), 'var(--red)');
+        erro('A planilha precisa ter as colunas "SKU" e "Unidades Vendidas". Encontrei: ' + col.join(', '));
         return;
       }
 
-      // Agrupa por SKU somando as unidades
       var mapa = {}, totalPed = 0, totalUni = 0, totalVal = 0, plats = {};
       linhas.forEach(function(r) {
         var sku = String(r[cSku] || '').trim();
@@ -1756,42 +1758,86 @@ function tvImportarPlanilha(input) {
       var skus = Object.keys(mapa).map(function(k){ return mapa[k]; })
         .sort(function(a,b){ return b.unidades - a.unidades; })
         .slice(0, 20)
-        .map(function(s){ return { sku: s.sku, nome: s.nome, unidades: Math.round(s.unidades), pedidos: Math.round(s.pedidos) }; });
+        .map(function(s){ return { sku:s.sku, nome:s.nome, unidades:Math.round(s.unidades), pedidos:Math.round(s.pedidos) }; });
 
-      if (!state.tv) state.tv = { periodos: {} };
-      if (!state.tv.periodos) state.tv.periodos = {};
-
-      state.tv.periodos[per.chave] = {
-        chave: per.chave, inicio: per.inicio, fim: per.fim,
-        pedidos: Math.round(totalPed), unidades: Math.round(totalUni),
-        valor: Math.round(totalVal * 100) / 100,
-        plataformas: plats, skus: skus,
-        arquivo: arq.name, importadoEm: Date.now(),
-      };
-
-      // Mantem no maximo 16 periodos, descartando os mais antigos
-      var todas = Object.keys(state.tv.periodos).sort();
-      while (todas.length > 16) { delete state.tv.periodos[todas.shift()]; }
-
-      saveState();
-      addLog('Importou vendas da TV: ' + tvFmtData(per.inicio) + ' a ' + tvFmtData(per.fim) + ' (' + skus.length + ' SKUs)');
-      msg('Importado: ' + Math.round(totalPed) + ' pedidos, ' + Math.round(totalUni) + ' unidades, ' + Object.keys(mapa).length + ' SKUs.', 'var(--green)');
-
-      if (input) input.value = '';
-      setTimeout(function(){ tvSetAba('dados'); }, 800);
-    } catch (err) {
-      msg('Erro ao processar: ' + err.message, 'var(--red)');
-    }
+      ok({
+        pedidos:  Math.round(totalPed),
+        unidades: Math.round(totalUni),
+        valor:    Math.round(totalVal * 100) / 100,
+        plataformas: plats,
+        skus: skus,
+        totalSkus: Object.keys(mapa).length,
+        arquivo: arq.name,
+        importadoEm: Date.now(),
+      });
+    } catch (err) { erro('Erro ao processar: ' + err.message); }
   };
   fr.readAsArrayBuffer(arq);
 }
 
-function tvExcluirPeriodo(chave) {
-  var p = state.tv && state.tv.periodos && state.tv.periodos[chave];
-  if (!p) return;
-  if (!confirm('Excluir o periodo ' + tvFmtData(p.inicio) + ' a ' + tvFmtData(p.fim) + '?')) return;
-  delete state.tv.periodos[chave];
-  addLog('Excluiu periodo de vendas da TV: ' + chave);
+// ---------- import: semana (sempre substitui) ----------
+
+function tvImportarSemana(input) {
+  var arq = input && input.files && input.files[0];
+  if (!arq) return;
+  var st = document.getElementById('tv-st-semana');
+  function msg(t,c){ if(st){ st.textContent=t; st.style.color=c||'var(--text2)'; } }
+
+  msg('Lendo planilha...');
+  tvLerPlanilha(arq, function(res) {
+    var per = tvPeriodoDoNome(arq.name) || { inicio:'', fim:'' };
+    var d = tvDados();
+    d.semana = Object.assign({}, res, { inicio: per.inicio, fim: per.fim });
+    saveState();
+    addLog('Atualizou vendas da semana na TV (' + res.totalSkus + ' SKUs, ' + res.pedidos + ' pedidos)');
+    msg('Semana atualizada: ' + res.pedidos + ' pedidos, ' + res.unidades + ' unidades, ' + res.totalSkus + ' SKUs.', 'var(--green)');
+    input.value = '';
+    setTimeout(function(){ tvSetAba('dados'); }, 900);
+  }, function(e){ msg(e, 'var(--red)'); });
+}
+
+function tvLimparSemana() {
+  if (!confirm('Remover os dados da semana? O ranking da TV fica vazio ate voce subir outra planilha.')) return;
+  var d = tvDados();
+  delete d.semana;
+  addLog('Removeu os dados da semana na TV');
+  saveState();
+  tvSetAba('dados');
+}
+
+// ---------- import: mes (escolhe o mes) ----------
+
+function tvImportarMes(input) {
+  var arq = input && input.files && input.files[0];
+  if (!arq) return;
+  var st  = document.getElementById('tv-st-mes');
+  var sel = document.getElementById('tv-mes-sel');
+  function msg(t,c){ if(st){ st.textContent=t; st.style.color=c||'var(--text2)'; } }
+
+  var chave = sel ? sel.value : '';
+  if (!chave) { msg('Selecione o mes antes de escolher o arquivo.', 'var(--red)'); input.value=''; return; }
+
+  msg('Lendo planilha...');
+  tvLerPlanilha(arq, function(res) {
+    var d = tvDados();
+    d.meses[chave] = Object.assign({}, res, { mes: chave });
+    // Mantem no maximo 12 meses
+    var ks = Object.keys(d.meses).sort();
+    while (ks.length > 12) { delete d.meses[ks.shift()]; }
+    saveState();
+    addLog('Importou vendas de ' + tvMesLabel(chave) + ' na TV (' + res.pedidos + ' pedidos)');
+    msg(tvMesLabel(chave) + ': ' + res.pedidos + ' pedidos, ' + res.unidades + ' unidades.', 'var(--green)');
+    input.value = '';
+    setTimeout(function(){ tvSetAba('dados'); }, 900);
+  }, function(e){ msg(e, 'var(--red)'); });
+}
+
+function tvExcluirMes(chave) {
+  var d = tvDados();
+  if (!d.meses[chave]) return;
+  if (!confirm('Excluir os dados de ' + tvMesLabel(chave) + '?')) return;
+  delete d.meses[chave];
+  addLog('Excluiu vendas de ' + tvMesLabel(chave) + ' na TV');
   saveState();
   tvSetAba('dados');
 }
@@ -1799,50 +1845,92 @@ function tvExcluirPeriodo(chave) {
 // ---------- render: aba de dados ----------
 
 function tvRenderDados() {
-  var lista = tvPeriodos().slice().reverse();
+  var d   = tvDados();
+  var sem = d.semana;
+  var meses = d.meses || {};
 
-  var html = '<div class="card" style="margin-bottom:1rem">' +
-    '<div style="font-weight:700;font-size:0.95rem;margin-bottom:0.5rem">Importar planilha de vendas</div>' +
-    '<div style="font-size:0.83rem;color:var(--text2);line-height:1.6;margin-bottom:1rem">' +
-      'Suba o arquivo <strong>Sales by Variant</strong> exportado do painel. O periodo e lido do proprio nome do arquivo, ' +
-      'e os SKUs repetidos sao agrupados somando as unidades vendidas.' +
-    '</div>' +
-    '<input type="file" accept=".xlsx,.xls" onchange="tvImportarPlanilha(this)" ' +
-      'style="font-size:0.85rem;color:var(--text2);cursor:pointer;padding:0.7rem;border:2px dashed var(--border);border-radius:10px;width:100%;background:var(--bg3)">' +
-    '<div id="tv-import-status" style="font-size:0.85rem;margin-top:0.7rem;min-height:1.3em"></div>' +
+  // Select dos ultimos 18 meses
+  var hoje = new Date(), opts = '';
+  for (var i = 0; i < 18; i++) {
+    var dt = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+    var k  = dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0');
+    opts += '<option value="' + k + '">' + tvMesLabel(k) + (meses[k] ? '  (ja importado)' : '') + '</option>';
+  }
+
+  var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">';
+
+  // --- Caixa da semana ---
+  html += '<div class="card">' +
+    '<div style="font-weight:700;font-size:0.95rem;margin-bottom:0.4rem">Vendas da semana</div>' +
+    '<div style="font-size:0.82rem;color:var(--text2);line-height:1.55;margin-bottom:0.9rem">' +
+      'Alimenta o ranking <strong>Mais vendidos</strong> da TV. Cada arquivo novo substitui o anterior.' +
+    '</div>';
+
+  if (sem) {
+    html += '<div style="background:var(--bg3);border-radius:10px;padding:0.8rem 1rem;margin-bottom:0.9rem;border-left:4px solid var(--green)">' +
+      '<div style="font-weight:700;font-size:0.9rem">' +
+        (sem.inicio ? tvFmtData(sem.inicio) + ' a ' + tvFmtData(sem.fim) : 'Periodo nao identificado') +
+      '</div>' +
+      '<div style="font-size:0.8rem;color:var(--text2);margin-top:0.25rem">' +
+        (sem.pedidos||0).toLocaleString('pt-BR') + ' pedidos &middot; ' +
+        (sem.unidades||0).toLocaleString('pt-BR') + ' unidades &middot; ' +
+        (sem.totalSkus || (sem.skus||[]).length) + ' SKUs' +
+      '</div>' +
+      ((sem.skus && sem.skus[0]) ? '<div style="font-size:0.78rem;color:var(--text3);margin-top:0.25rem">Top 1: ' +
+        esc(sem.skus[0].sku) + ' com ' + sem.skus[0].unidades + ' un</div>' : '') +
+    '</div>';
+  } else {
+    html += '<div style="background:var(--bg3);border-radius:10px;padding:0.8rem 1rem;margin-bottom:0.9rem;font-size:0.83rem;color:var(--text3)">Nenhuma planilha da semana carregada</div>';
+  }
+
+  html += '<input type="file" accept=".xlsx,.xls" onchange="tvImportarSemana(this)" ' +
+      'style="font-size:0.83rem;color:var(--text2);cursor:pointer;padding:0.65rem;border:2px dashed var(--border);border-radius:10px;width:100%;background:var(--bg3)">' +
+    '<div id="tv-st-semana" style="font-size:0.83rem;margin-top:0.6rem;min-height:1.2em"></div>' +
+    (sem ? '<button class="btn btn-sm btn-red" style="margin-top:0.5rem" onclick="tvLimparSemana()">Remover semana</button>' : '') +
   '</div>';
 
-  if (!lista.length) {
-    return html + '<div class="empty-state">' + iconEmpty() + '<p>Nenhum periodo importado ainda</p></div>';
+  // --- Caixa do mes ---
+  html += '<div class="card">' +
+    '<div style="font-weight:700;font-size:0.95rem;margin-bottom:0.4rem">Vendas do mes</div>' +
+    '<div style="font-size:0.82rem;color:var(--text2);line-height:1.55;margin-bottom:0.9rem">' +
+      'Alimenta o grafico <strong>Pedidos por mes</strong>. Escolha o mes e depois o arquivo.' +
+    '</div>' +
+    '<label style="font-size:0.78rem;color:var(--text2);font-weight:600;display:block;margin-bottom:0.3rem">Mes de referencia</label>' +
+    '<select id="tv-mes-sel" style="width:100%;padding:0.6rem 0.9rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.88rem;margin-bottom:0.8rem">' + opts + '</select>' +
+    '<input type="file" accept=".xlsx,.xls" onchange="tvImportarMes(this)" ' +
+      'style="font-size:0.83rem;color:var(--text2);cursor:pointer;padding:0.65rem;border:2px dashed var(--border);border-radius:10px;width:100%;background:var(--bg3)">' +
+    '<div id="tv-st-mes" style="font-size:0.83rem;margin-top:0.6rem;min-height:1.2em"></div>' +
+  '</div>';
+
+  html += '</div>';
+
+  // --- Tabela dos meses ---
+  var chaves = Object.keys(meses).sort().reverse();
+  if (!chaves.length) {
+    html += '<div class="empty-state">' + iconEmpty() + '<p>Nenhum mes importado ainda</p></div>';
+    return html;
   }
 
   html += '<div class="card">' +
-    '<div style="font-weight:700;font-size:0.95rem;margin-bottom:0.9rem">Periodos importados (' + lista.length + ')</div>' +
+    '<div style="font-weight:700;font-size:0.95rem;margin-bottom:0.9rem">Meses no grafico (' + chaves.length + ')</div>' +
     '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">' +
     '<thead><tr style="background:var(--bg3)">' +
-      '<th style="text-align:left;padding:9px 12px">Periodo</th>' +
+      '<th style="text-align:left;padding:9px 12px">Mes</th>' +
       '<th style="text-align:center;padding:9px 12px">Pedidos</th>' +
       '<th style="text-align:center;padding:9px 12px">Unidades</th>' +
-      '<th style="text-align:center;padding:9px 12px">SKUs</th>' +
       '<th style="text-align:left;padding:9px 12px">Top 1</th>' +
       '<th style="padding:9px 12px"></th>' +
     '</tr></thead><tbody>';
 
-  lista.forEach(function(p, i) {
-    var top = (p.skus && p.skus[0]) ? p.skus[0] : null;
-    var atual = i === 0;
-    html += '<tr style="border-bottom:1px solid var(--border);' + (atual?'background:var(--green)0d':'') + '">' +
-      '<td style="padding:8px 12px;font-weight:' + (atual?'700':'400') + '">' +
-        tvFmtData(p.inicio) + ' a ' + tvFmtData(p.fim) +
-        (atual ? ' <span style="font-size:0.7rem;background:var(--green);color:#fff;padding:1px 7px;border-radius:10px;margin-left:4px">na TV</span>' : '') +
-      '</td>' +
-      '<td style="padding:8px 12px;text-align:center;font-weight:700">' + (p.pedidos||0).toLocaleString('pt-BR') + '</td>' +
-      '<td style="padding:8px 12px;text-align:center">' + (p.unidades||0).toLocaleString('pt-BR') + '</td>' +
-      '<td style="padding:8px 12px;text-align:center;color:var(--text3)">' + ((p.skus||[]).length) + '</td>' +
+  chaves.forEach(function(k) {
+    var m = meses[k];
+    var top = (m.skus && m.skus[0]) ? m.skus[0] : null;
+    html += '<tr style="border-bottom:1px solid var(--border)">' +
+      '<td style="padding:8px 12px;font-weight:600">' + tvMesLabel(k) + '</td>' +
+      '<td style="padding:8px 12px;text-align:center;font-weight:700">' + (m.pedidos||0).toLocaleString('pt-BR') + '</td>' +
+      '<td style="padding:8px 12px;text-align:center">' + (m.unidades||0).toLocaleString('pt-BR') + '</td>' +
       '<td style="padding:8px 12px;font-size:0.8rem;color:var(--text2)">' + (top ? esc(top.sku) + ' (' + top.unidades + ' un)' : '--') + '</td>' +
-      '<td style="padding:8px 12px;text-align:right">' +
-        '<button class="btn btn-sm btn-red" onclick="tvExcluirPeriodo(\'' + p.chave + '\')">x</button>' +
-      '</td>' +
+      '<td style="padding:8px 12px;text-align:right"><button class="btn btn-sm btn-red" onclick="tvExcluirMes(\'' + k + '\')">x</button></td>' +
     '</tr>';
   });
 
@@ -1925,7 +2013,7 @@ function tvRenderCarrossel() {
 function tvRenderRanking() {
   var box = document.getElementById('tvRank');
   if (!box) return;
-  var per = tvPeriodoAtual();
+  var per = tvSemana();
   var skus = (per && per.skus) || [];
   if (!skus.length) {
     box.innerHTML = '<div style="grid-column:1/-1;opacity:0.6;font-size:14px">Importe uma planilha na aba Dados para ver o ranking</div>';
@@ -1968,28 +2056,47 @@ function tvRenderGrafico() {
   });
 }
 
+function tvMuralPaginas() {
+  var avisos = (state.mural || []);
+  var pgs = [];
+  for (var i = 0; i < avisos.length; i += 4) pgs.push(avisos.slice(i, i + 4));
+  return pgs;
+}
+
 function tvRenderMural() {
-  var box = document.getElementById('tvMural');
+  var box  = document.getElementById('tvMural');
+  var dots = document.getElementById('tvMuralDots');
   if (!box) return;
-  var avisos = (state.mural || []).slice(0, 4);
-  if (!avisos.length) {
-    box.innerHTML = '<div style="opacity:0.6;font-size:14px">Nenhum aviso no mural</div>';
+
+  var pgs = tvMuralPaginas();
+  if (!pgs.length) {
+    box.innerHTML = '<div style="opacity:0.6;font-size:1.5vh">Nenhum aviso no mural</div>';
+    if (dots) dots.innerHTML = '';
     return;
   }
+  if (_tvMuralIdx >= pgs.length) _tvMuralIdx = 0;
+
   var classes = ['tv-note-amber','tv-note-pink','tv-note-teal','tv-note-purple'];
-  box.innerHTML = avisos.map(function(a, i) {
+  box.innerHTML = pgs[_tvMuralIdx].map(function(a, i) {
     return '<div class="tv-note ' + classes[i % 4] + '">' +
       '<div class="tv-note-date">' + esc(a.author || 'Aviso') + (a.time ? ' &middot; ' + esc(a.time) : '') + '</div>' +
       '<div class="tv-note-text">' + esc(a.text) + '</div>' +
     '</div>';
   }).join('');
+
+  if (dots) {
+    dots.innerHTML = pgs.length > 1
+      ? pgs.map(function(_, i){ return '<span class="' + (i === _tvMuralIdx ? 'active' : '') + '"></span>'; }).join('')
+      : '';
+  }
 }
 
 function tvPainelHTML() {
-  var per = tvPeriodoAtual();
+  var per = tvSemana();
   var agora = new Date();
   var dataTxt = agora.toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long' });
-  var periodoTxt = per ? ('Semana ' + tvFmtData(per.inicio) + ' a ' + tvFmtData(per.fim)) : 'Sem dados importados';
+  var periodoTxt = (per && per.inicio) ? ('Semana ' + tvFmtData(per.inicio) + ' a ' + tvFmtData(per.fim))
+                 : (per ? 'Semana atual' : 'Sem dados importados');
 
   return '<div id="tvPanel" class="tv-panel">' +
     '<div class="tv-header">' +
@@ -2020,6 +2127,7 @@ function tvPainelHTML() {
         '<div class="tv-glass">' +
           '<h2><span class="tv-dot"></span>Mural de avisos</h2>' +
           '<div id="tvMural"></div>' +
+          '<div class="tv-car-dots" id="tvMuralDots" style="margin-top:0.8vh"></div>' +
         '</div>' +
       '</div>' +
 
@@ -2034,9 +2142,20 @@ function tvIniciar() {
   if (_tvAba !== 'painel') return;
   tvRenderGrafico();
   tvRenderRanking();
-  tvRenderMural();
   _tvCarIdx = 0;
   tvRenderCarrossel();
+  _tvMuralIdx = 0;
+  tvRenderMural();
+
+  _tvMuralTimer = setInterval(function() {
+    var box = document.getElementById('tvMural');
+    if (!box) { tvParar(); return; }
+    var pgs = tvMuralPaginas();
+    if (pgs.length > 1) {
+      _tvMuralIdx = (_tvMuralIdx + 1) % pgs.length;
+      tvRenderMural();
+    }
+  }, TV_MURAL_SEG * 1000);
 
   _tvCarTimer = setInterval(function() {
     var slot = document.getElementById('tvCarSlot');
@@ -2045,7 +2164,7 @@ function tvIniciar() {
     setTimeout(function() {
       var pares = tvCarrosselPares();
       _tvCarIdx = pares.length ? (_tvCarIdx + 1) % pares.length : 0;
-      if (_tvCarIdx === 0) { tvRenderRanking(); tvRenderMural(); }
+      if (_tvCarIdx === 0) tvRenderRanking();
       tvRenderCarrossel();
     }, 350);
   }, TV_CAR_SEG * 1000);
@@ -2060,7 +2179,8 @@ function tvIniciar() {
 }
 
 function tvParar() {
-  if (_tvCarTimer) { clearInterval(_tvCarTimer); _tvCarTimer = null; }
+  if (_tvCarTimer)   { clearInterval(_tvCarTimer);   _tvCarTimer   = null; }
+  if (_tvMuralTimer) { clearInterval(_tvMuralTimer); _tvMuralTimer = null; }
   if (_tvRelogio)  { clearInterval(_tvRelogio);  _tvRelogio  = null; }
   if (_tvChart)    { _tvChart.destroy();         _tvChart    = null; }
 }

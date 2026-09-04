@@ -2038,6 +2038,27 @@ function tvRenderGrafico() {
   var d = tvPedidosPorMes();
   if (_tvChart) { _tvChart.destroy(); _tvChart = null; }
   if (!d.labels.length) return;
+
+  // Plugin inline: escreve o valor acima de cada barra
+  var rotuloValores = {
+    id: 'rotuloValores',
+    afterDatasetsDraw: function(chart) {
+      var ctx = chart.ctx;
+      var alt = chart.chartArea ? (chart.chartArea.bottom - chart.chartArea.top) : 200;
+      ctx.save();
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.font = '700 ' + Math.max(10, Math.round(alt * 0.075)) + 'px "Segoe UI", system-ui, sans-serif';
+      chart.getDatasetMeta(0).data.forEach(function(barra, i) {
+        var v = chart.data.datasets[0].data[i];
+        if (v === null || v === undefined) return;
+        ctx.fillText(Number(v).toLocaleString('pt-BR'), barra.x, barra.y - 5);
+      });
+      ctx.restore();
+    },
+  };
+
   _tvChart = new Chart(cv, {
     type: 'bar',
     data: { labels: d.labels, datasets: [{
@@ -2047,12 +2068,14 @@ function tvRenderGrafico() {
     }]},
     options: {
       responsive: true, maintainAspectRatio: false, animation: { duration: 600 },
-      plugins: { legend: { display: false } },
+      layout: { padding: { top: 22 } },   // espaco para o rotulo nao cortar
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
       scales: {
         y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.15)' }, ticks: { color: 'rgba(255,255,255,0.85)' } },
         x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.85)' } },
       },
     },
+    plugins: [rotuloValores],
   });
 }
 

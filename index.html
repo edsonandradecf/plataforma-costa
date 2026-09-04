@@ -1692,7 +1692,7 @@ function tvMesLabel(chave) {
 // Grafico de barras: pedidos por mes, a partir das planilhas mensais
 function tvPedidosPorMes() {
   var m = tvDados().meses || {};
-  var chaves = Object.keys(m).sort().slice(-8);
+  var chaves = Object.keys(m).sort().slice(-12);
   return {
     labels:  chaves.map(function(k){ return MES_CURTO[parseInt(k.slice(5,7),10) - 1]; }),
     valores: chaves.map(function(k){ return m[k].pedidos || 0; }),

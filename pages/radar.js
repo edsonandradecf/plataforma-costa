@@ -1601,7 +1601,7 @@ function renderFinanceiro() {
       '<div class="card" style="padding:1.25rem;display:flex;flex-direction:column;gap:1rem">'+
         '<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text3)">📅 Mês de referência</div>'+
         '<input type="month" id="fin-mes-input" style="width:100%;padding:11px 14px;border:0.5px solid var(--border2);border-radius:10px;background:var(--input-bg);color:var(--text);font-size:0.95rem;font-weight:600;outline:none;transition:border 0.2s">'+
-        '<div style="font-size:0.78rem;color:var(--text3)">Selecione o mês antes de importar as planilhas. Importações anteriores do mesmo mês serão substituídas.</div>'+
+        '<div style="font-size:0.78rem;color:var(--text3)">Selecione o mês antes de importar. Pode subir mais de uma planilha por marketplace — elas são somadas e pedidos repetidos são ignorados. Importar de novo substitui o que havia no mês.</div>'+
       '</div>'+
 
       // Coluna status / importar
@@ -1618,28 +1618,28 @@ function renderFinanceiro() {
 
       // ML
       '<div class="fin-drop-zone" id="drop-ml" ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" ondrop="finHandleDrop(event,\'fin-ml-file\',\'drop-ml\')">'+
-        '<input type="file" id="fin-ml-file" accept=".xlsx,.xls" onchange="finShowDropName(\'fin-ml-file\',\'drop-ml-name\')">'+
+        '<input type="file" multiple id="fin-ml-file" accept=".xlsx,.xls" onchange="finShowDropName(\'fin-ml-file\',\'drop-ml-name\')">'+
         '<div class="fin-drop-icon">🟠</div>'+
         '<div class="fin-drop-label">Mercado Livre</div>'+
-        '<div class="fin-drop-sub">Arraste o .xlsx ou clique</div>'+
+        '<div class="fin-drop-sub">Arraste um ou mais .xlsx</div>'+
         '<div class="fin-drop-sel" id="drop-ml-name"></div>'+
       '</div>'+
 
       // Shopee
       '<div class="fin-drop-zone" id="drop-sp" ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" ondrop="finHandleDrop(event,\'fin-sp-file\',\'drop-sp\')">'+
-        '<input type="file" id="fin-sp-file" accept=".xlsx,.xls" onchange="finShowDropName(\'fin-sp-file\',\'drop-sp-name\')">'+
+        '<input type="file" multiple id="fin-sp-file" accept=".xlsx,.xls" onchange="finShowDropName(\'fin-sp-file\',\'drop-sp-name\')">'+
         '<div class="fin-drop-icon">🔴</div>'+
         '<div class="fin-drop-label">Shopee</div>'+
-        '<div class="fin-drop-sub">Arraste o .xlsx ou clique</div>'+
+        '<div class="fin-drop-sub">Arraste um ou mais .xlsx</div>'+
         '<div class="fin-drop-sel" id="drop-sp-name"></div>'+
       '</div>'+
 
       // TikTok
       '<div class="fin-drop-zone" id="drop-tt" ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" ondrop="finHandleDrop(event,\'fin-tt-file\',\'drop-tt\')">'+
-        '<input type="file" id="fin-tt-file" accept=".xlsx,.xls" onchange="finShowDropName(\'fin-tt-file\',\'drop-tt-name\')">'+
+        '<input type="file" multiple id="fin-tt-file" accept=".xlsx,.xls" onchange="finShowDropName(\'fin-tt-file\',\'drop-tt-name\')">'+
         '<div class="fin-drop-icon">⚫</div>'+
         '<div class="fin-drop-label">TikTok Shop</div>'+
-        '<div class="fin-drop-sub">Arraste o .xlsx ou clique</div>'+
+        '<div class="fin-drop-sub">Arraste um ou mais .xlsx</div>'+
         '<div class="fin-drop-sel" id="drop-tt-name"></div>'+
       '</div>'+
 
@@ -2007,31 +2007,34 @@ function finHandleDrop(event, inputId, zoneId) {
   var zone = document.getElementById(zoneId);
   if (zone) zone.classList.remove('drag-over');
   var files = event.dataTransfer.files;
-  if (!files || !files[0]) return;
+  if (!files || !files.length) return;
   var inp = document.getElementById(inputId);
   if (!inp) return;
-  // Atribui o arquivo ao input via DataTransfer
+  // Acumula: mantem os que ja estavam e soma os novos
   var dt = new DataTransfer();
-  dt.items.add(files[0]);
+  if (inp.files) Array.prototype.forEach.call(inp.files, function(f){ dt.items.add(f); });
+  Array.prototype.forEach.call(files, function(f){ dt.items.add(f); });
   inp.files = dt.files;
-  var nameId = zoneId.replace('drop-','drop-') + '-name';
-  var nameEl = document.getElementById(zoneId + '-name');
-  if (nameEl) {
-    nameEl.textContent = '✓ ' + files[0].name;
-    nameEl.style.color = 'var(--green)';
-  }
-  if (zone) { zone.style.borderColor = 'var(--green)'; zone.style.background = 'rgba(26,138,74,0.06)'; }
+  finShowDropName(inputId, zoneId + '-name');
 }
 
 function finShowDropName(inputId, nameElId) {
   var inp = document.getElementById(inputId);
   var nameEl = document.getElementById(nameElId);
   if (!inp || !nameEl) return;
-  if (inp.files && inp.files[0]) {
-    nameEl.textContent = '✓ ' + inp.files[0].name;
+  var n = inp.files ? inp.files.length : 0;
+  if (n) {
+    var nomes = Array.prototype.map.call(inp.files, function(f){ return f.name; });
+    nameEl.innerHTML = (n === 1)
+      ? '✓ ' + nomes[0]
+      : '✓ <strong>' + n + ' arquivos</strong><br><span style="font-size:0.92em;opacity:0.75">' + nomes.join('<br>') + '</span>';
     nameEl.style.color = 'var(--green)';
     var zone = inp.parentElement;
     if (zone) { zone.style.borderColor = 'var(--green)'; zone.style.background = 'rgba(26,138,74,0.06)'; }
+  } else {
+    nameEl.textContent = '';
+    var z2 = inp.parentElement;
+    if (z2) { z2.style.borderColor = ''; z2.style.background = ''; }
   }
 }
 
@@ -2383,27 +2386,64 @@ async function finImportar() {
 
     var msgs=[];
 
+    // Le todos os arquivos selecionados e concatena as linhas
+    async function readAll(input, sheetName, skipRows) {
+      var todas=[];
+      for (var i=0; i<input.files.length; i++) {
+        var linhas = await readSheet(input.files[i], sheetName, skipRows);
+        todas = todas.concat(linhas);
+      }
+      return todas;
+    }
+
+    // Remove duplicatas pela coluna de identificacao do pedido.
+    // Sem coluna conhecida, usa a linha inteira como assinatura.
+    function dedup(linhas, chaves) {
+      var vistos = {}, out = [], dups = 0;
+      linhas.forEach(function(r) {
+        var id = '';
+        for (var i=0; i<chaves.length && !id; i++) {
+          if (r[chaves[i]] !== undefined && r[chaves[i]] !== '') id = String(r[chaves[i]]);
+        }
+        var assinatura = id ? id + '|' + (r['SKU']||r['Seller SKU']||r['Número de referência SKU']||'') + '|' + (r['Quantidade']||r['Quantity']||r['Unidades']||'')
+                            : JSON.stringify(r);
+        if (vistos[assinatura]) { dups++; return; }
+        vistos[assinatura] = 1;
+        out.push(r);
+      });
+      return { linhas: out, dups: dups };
+    }
+
+    function resumo(nome, res, nArquivos) {
+      return '✅ ' + nome + ': ' + res.linhas.length + ' linhas' +
+        (nArquivos > 1 ? ' (' + nArquivos + ' arquivos)' : '') +
+        (res.dups ? ' · ' + res.dups + ' duplicadas ignoradas' : '');
+    }
+
     if (mlInp && mlInp.files.length) {
-      if(status) status.innerHTML='<span style="color:var(--blue)">⏳ Processando Mercado Livre...</span>';
-      var mlData=await readSheet(mlInp.files[0],'Vendas BR',5);
-      state.financeiro.meses[mes].ml=mlData;
-      msgs.push('✅ ML: '+mlData.length+' linhas');
+      if(status) status.innerHTML='<span style="color:var(--blue)">⏳ Processando Mercado Livre ('+mlInp.files.length+' arquivo'+(mlInp.files.length>1?'s':'')+')...</span>';
+      var mlData=await readAll(mlInp,'Vendas BR',5);
+      var mlRes=dedup(mlData,['N.º de venda','Nº de venda','Order ID','Número da venda']);
+      state.financeiro.meses[mes].ml=mlRes.linhas;
+      msgs.push(resumo('ML', mlRes, mlInp.files.length));
     }
     if (spInp && spInp.files.length) {
-      if(status) status.innerHTML='<span style="color:var(--blue)">⏳ Processando Shopee...</span>';
-      var spData=await readSheet(spInp.files[0],'orders',0);
-      state.financeiro.meses[mes].sp=spData;
-      msgs.push('✅ Shopee: '+spData.length+' linhas');
+      if(status) status.innerHTML='<span style="color:var(--blue)">⏳ Processando Shopee ('+spInp.files.length+' arquivo'+(spInp.files.length>1?'s':'')+')...</span>';
+      var spData=await readAll(spInp,'orders',0);
+      var spRes=dedup(spData,['ID do pedido','Order ID','Nº do pedido']);
+      state.financeiro.meses[mes].sp=spRes.linhas;
+      msgs.push(resumo('Shopee', spRes, spInp.files.length));
     }
     if (ttInp && ttInp.files.length) {
-      if(status) status.innerHTML='<span style="color:var(--blue)">⏳ Processando TikTok...</span>';
-      var ttRaw=await readSheet(ttInp.files[0],'OrderSKUList',0);
-      // Remove description row (first row with non-numeric Order ID)
-      var ttData=ttRaw.filter(function(r){
+      if(status) status.innerHTML='<span style="color:var(--blue)">⏳ Processando TikTok ('+ttInp.files.length+' arquivo'+(ttInp.files.length>1?'s':'')+')...</span>';
+      var ttRaw=await readAll(ttInp,'OrderSKUList',0);
+      // Remove a linha de descricao (primeira linha com Order ID nao numerico)
+      var ttFiltrado=ttRaw.filter(function(r){
         return /^\d{15,}/.test(String(r['Order ID']||''));
       });
-      state.financeiro.meses[mes].tt=ttData;
-      msgs.push('✅ TikTok: '+ttData.length+' pedidos');
+      var ttRes=dedup(ttFiltrado,['Order ID']);
+      state.financeiro.meses[mes].tt=ttRes.linhas;
+      msgs.push(resumo('TikTok', ttRes, ttInp.files.length));
     }
 
     _finMesSel=mes;

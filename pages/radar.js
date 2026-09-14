@@ -1652,22 +1652,45 @@ function renderFinanceiro() {
         mesKeys.map(function(k){
           var p=k.split('-'); var lbl=MONTHS[parseInt(p[1])-1]+'/'+p[0];
           var mes=meses[k];
-          return '<div class="fin-mes-badge">'+
-            '<div>'+
-              '<div style="font-weight:600;font-size:0.9rem;margin-bottom:5px">'+lbl+'</div>'+
+          var arqs = mes.arquivos || {};
+          var PLATS = [
+            { id:'ml', nome:'ML',     cor:'#f97316', bg:'rgba(249,115,22,0.12)' },
+            { id:'sp', nome:'Shopee', cor:'#EE4D2D', bg:'rgba(238,77,45,0.12)'  },
+            { id:'tt', nome:'TikTok', cor:'#6366f1', bg:'rgba(99,102,241,0.12)' },
+          ];
+
+          // Lista de arquivos de cada plataforma
+          var listaArqs = PLATS.map(function(pl){
+            var lista = Array.isArray(arqs[pl.id]) ? arqs[pl.id] : [];
+            if (!lista.length) return '';
+            return lista.map(function(a){
+              return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-top:0.5px solid var(--border)">'+
+                '<span style="font-size:0.68rem;font-weight:700;padding:1px 7px;border-radius:9px;background:'+pl.bg+';color:'+pl.cor+';flex-shrink:0">'+pl.nome+'</span>'+
+                '<span style="flex:1;min-width:0;font-size:0.78rem;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(a.nome)+'">'+esc(a.nome)+'</span>'+
+                '<span style="font-size:0.72rem;color:var(--text3);flex-shrink:0">'+(a.linhas||0)+' linhas</span>'+
+                '<button onclick="finExcluirArquivo(\''+k+'\',\''+pl.id+'\',\''+esc(a.nome).replace(/'/g,"\\'")+'\')" title="Excluir esta planilha" '+
+                  'style="background:none;border:0.5px solid var(--border2);border-radius:6px;padding:2px 8px;color:var(--red);cursor:pointer;font-size:0.72rem;flex-shrink:0">✕</button>'+
+              '</div>';
+            }).join('');
+          }).join('');
+
+          return '<div class="fin-mes-badge" style="flex-direction:column;align-items:stretch;gap:8px">'+
+            '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">'+
               '<div>'+
-                '<span class="fin-plat-dot" style="background:'+(mes.ml?'rgba(249,115,22,0.12)':'var(--bg3)')+';color:'+(mes.ml?'#f97316':'var(--text3)')+'">'+
-                  (mes.ml?'✓':'○')+' ML'+
-                '</span>'+
-                '<span class="fin-plat-dot" style="background:'+(mes.sp?'rgba(238,77,45,0.12)':'var(--bg3)')+';color:'+(mes.sp?'#EE4D2D':'var(--text3)')+'">'+
-                  (mes.sp?'✓':'○')+' Shopee'+
-                '</span>'+
-                '<span class="fin-plat-dot" style="background:'+(mes.tt?'rgba(99,102,241,0.12)':'var(--bg3)')+';color:'+(mes.tt?'#6366f1':'var(--text3)')+'">'+
-                  (mes.tt?'✓':'○')+' TikTok'+
-                '</span>'+
+                '<div style="font-weight:600;font-size:0.9rem;margin-bottom:5px">'+lbl+'</div>'+
+                '<div>'+
+                  PLATS.map(function(pl){
+                    var tem = mes[pl.id] && mes[pl.id].length;
+                    var n = (arqs[pl.id]||[]).length;
+                    return '<span class="fin-plat-dot" style="background:'+(tem?pl.bg:'var(--bg3)')+';color:'+(tem?pl.cor:'var(--text3)')+'">'+
+                      (tem?'✓':'○')+' '+pl.nome+(n>1?' ('+n+')':'')+
+                    '</span>';
+                  }).join('')+
+                '</div>'+
               '</div>'+
+              '<button onclick="finExcluirMes(\''+k+'\')" style="background:none;border:0.5px solid var(--border2);border-radius:8px;padding:6px 14px;color:var(--red);cursor:pointer;font-size:0.8rem;font-weight:600;flex-shrink:0">🗑 Excluir mês</button>'+
             '</div>'+
-            '<button onclick="finExcluirMes(\''+k+'\')" style="background:none;border:0.5px solid var(--border2);border-radius:8px;padding:6px 14px;color:var(--red);cursor:pointer;font-size:0.8rem;font-weight:600">🗑 Excluir</button>'+
+            (listaArqs ? '<div>'+listaArqs+'</div>' : '')+
           '</div>';
         }).join('')+
       '</div>'
@@ -1908,6 +1931,25 @@ function bindFinanceiro() {
 function finSelMes(k) {
   _finMesSel = k;
   navigate('financeiro');
+}
+
+function finExcluirArquivo(mesKey, plat, nomeArq) {
+  var mes = state.financeiro.meses && state.financeiro.meses[mesKey];
+  if (!mes) return;
+  var PLAT_NOME = { ml:'Mercado Livre', sp:'Shopee', tt:'TikTok' };
+  if (!confirm('Excluir a planilha "' + nomeArq + '" de ' + (PLAT_NOME[plat]||plat) + '?\n\nAs outras planilhas do mês continuam.')) return;
+
+  // Remove as linhas que vieram desse arquivo
+  if (Array.isArray(mes[plat])) {
+    mes[plat] = mes[plat].filter(function(r){ return r._arq !== nomeArq; });
+    if (!mes[plat].length) delete mes[plat];
+  }
+  // Remove o registro do arquivo
+  if (mes.arquivos && Array.isArray(mes.arquivos[plat])) {
+    mes.arquivos[plat] = mes.arquivos[plat].filter(function(a){ return a.nome !== nomeArq; });
+    if (!mes.arquivos[plat].length) delete mes.arquivos[plat];
+  }
+  finSaveFirebase().then(function(){ navigate('financeiro'); });
 }
 
 function finExcluirMes(k) {
@@ -2386,14 +2428,17 @@ async function finImportar() {
 
     var msgs=[];
 
-    // Le todos os arquivos selecionados e concatena as linhas
+    // Le todos os arquivos selecionados, marcando a origem de cada linha
     async function readAll(input, sheetName, skipRows) {
-      var todas=[];
+      var todas=[], nomes=[];
       for (var i=0; i<input.files.length; i++) {
-        var linhas = await readSheet(input.files[i], sheetName, skipRows);
+        var arq = input.files[i];
+        var linhas = await readSheet(arq, sheetName, skipRows);
+        linhas.forEach(function(r){ r._arq = arq.name; });
         todas = todas.concat(linhas);
+        nomes.push({ nome: arq.name, linhas: linhas.length });
       }
-      return todas;
+      return { linhas: todas, nomes: nomes };
     }
 
     // Remove duplicatas pela coluna de identificacao do pedido.
@@ -2405,8 +2450,13 @@ async function finImportar() {
         for (var i=0; i<chaves.length && !id; i++) {
           if (r[chaves[i]] !== undefined && r[chaves[i]] !== '') id = String(r[chaves[i]]);
         }
-        var assinatura = id ? id + '|' + (r['SKU']||r['Seller SKU']||r['Número de referência SKU']||'') + '|' + (r['Quantidade']||r['Quantity']||r['Unidades']||'')
-                            : JSON.stringify(r);
+        var assinatura;
+        if (id) {
+          assinatura = id + '|' + (r['SKU']||r['Seller SKU']||r['Número de referência SKU']||'') + '|' + (r['Quantidade']||r['Quantity']||r['Unidades']||'');
+        } else {
+          var copia = Object.assign({}, r); delete copia._arq;
+          assinatura = JSON.stringify(copia);
+        }
         if (vistos[assinatura]) { dups++; return; }
         vistos[assinatura] = 1;
         out.push(r);
@@ -2414,36 +2464,51 @@ async function finImportar() {
       return { linhas: out, dups: dups };
     }
 
-    function resumo(nome, res, nArquivos) {
-      return '✅ ' + nome + ': ' + res.linhas.length + ' linhas' +
-        (nArquivos > 1 ? ' (' + nArquivos + ' arquivos)' : '') +
-        (res.dups ? ' · ' + res.dups + ' duplicadas ignoradas' : '');
+    // Junta o que ja existia no mes com o que acabou de ser lido
+    function acumular(plat, res, chaves) {
+      var m = state.financeiro.meses[mes];
+      if (!m.arquivos) m.arquivos = {};
+      if (!Array.isArray(m.arquivos[plat])) m.arquivos[plat] = [];
+
+      var jaTinha = Array.isArray(m[plat]) ? m[plat] : [];
+      var combinado = dedup(jaTinha.concat(res.linhas), chaves);
+      m[plat] = combinado.linhas;
+
+      // Registra os arquivos novos, sem repetir nome
+      res.nomes.forEach(function(inf) {
+        var existente = m.arquivos[plat].find(function(a){ return a.nome === inf.nome; });
+        var qtdReal = combinado.linhas.filter(function(r){ return r._arq === inf.nome; }).length;
+        if (existente) { existente.linhas = qtdReal; existente.ts = Date.now(); }
+        else m.arquivos[plat].push({ nome: inf.nome, linhas: qtdReal, ts: Date.now() });
+      });
+
+      return { total: combinado.linhas.length, dups: jaTinha.length + res.linhas.length - combinado.linhas.length };
+    }
+
+    function resumo(nome, r, nArquivos) {
+      return '✅ ' + nome + ': ' + r.total + ' linhas no mês' +
+        (nArquivos > 1 ? ' (+' + nArquivos + ' arquivos)' : '') +
+        (r.dups ? ' · ' + r.dups + ' duplicadas ignoradas' : '');
     }
 
     if (mlInp && mlInp.files.length) {
       if(status) status.innerHTML='<span style="color:var(--blue)">⏳ Processando Mercado Livre ('+mlInp.files.length+' arquivo'+(mlInp.files.length>1?'s':'')+')...</span>';
-      var mlData=await readAll(mlInp,'Vendas BR',5);
-      var mlRes=dedup(mlData,['N.º de venda','Nº de venda','Order ID','Número da venda']);
-      state.financeiro.meses[mes].ml=mlRes.linhas;
-      msgs.push(resumo('ML', mlRes, mlInp.files.length));
+      var mlRaw=await readAll(mlInp,'Vendas BR',5);
+      msgs.push(resumo('ML', acumular('ml', mlRaw, ['N.º de venda','Nº de venda','Order ID','Número da venda']), mlInp.files.length));
     }
     if (spInp && spInp.files.length) {
       if(status) status.innerHTML='<span style="color:var(--blue)">⏳ Processando Shopee ('+spInp.files.length+' arquivo'+(spInp.files.length>1?'s':'')+')...</span>';
-      var spData=await readAll(spInp,'orders',0);
-      var spRes=dedup(spData,['ID do pedido','Order ID','Nº do pedido']);
-      state.financeiro.meses[mes].sp=spRes.linhas;
-      msgs.push(resumo('Shopee', spRes, spInp.files.length));
+      var spRaw=await readAll(spInp,'orders',0);
+      msgs.push(resumo('Shopee', acumular('sp', spRaw, ['ID do pedido','Order ID','Nº do pedido']), spInp.files.length));
     }
     if (ttInp && ttInp.files.length) {
       if(status) status.innerHTML='<span style="color:var(--blue)">⏳ Processando TikTok ('+ttInp.files.length+' arquivo'+(ttInp.files.length>1?'s':'')+')...</span>';
       var ttRaw=await readAll(ttInp,'OrderSKUList',0);
       // Remove a linha de descricao (primeira linha com Order ID nao numerico)
-      var ttFiltrado=ttRaw.filter(function(r){
+      ttRaw.linhas = ttRaw.linhas.filter(function(r){
         return /^\d{15,}/.test(String(r['Order ID']||''));
       });
-      var ttRes=dedup(ttFiltrado,['Order ID']);
-      state.financeiro.meses[mes].tt=ttRes.linhas;
-      msgs.push(resumo('TikTok', ttRes, ttInp.files.length));
+      msgs.push(resumo('TikTok', acumular('tt', ttRaw, ['Order ID']), ttInp.files.length));
     }
 
     _finMesSel=mes;

@@ -1,0 +1,505 @@
+// --- PRECIFICACAO --------------------------------------------------------------
+// Calculadora de preco de anuncio por marketplace.
+// Biblioteca de produtos salva em state.precificacao.produtos (Firebase).
+
+// Tabelas de comissao por plataforma
+var PRC_SHOPEE_TIERS = [
+  { min:0,   max:79.99,    pct:20, fixed:4  },
+  { min:80,  max:99.99,    pct:14, fixed:16 },
+  { min:100, max:199.99,   pct:14, fixed:20 },
+  { min:200, max:499.99,   pct:14, fixed:26 },
+  { min:500, max:Infinity, pct:14, fixed:26 },
+];
+var PRC_TIKTOK_TIERS = [
+  { min:0,  max:49.99,    pct:10, fixed:4 },
+  { min:50, max:Infinity, pct:6,  fixed:6 },
+];
+var PRC_TIKTOK_FRETE_PCT = 6;
+
+var PRC_MK = {
+  mercadolivre: { label:'Mercado Livre', cor:'#f5c518' },
+  shopee:       { label:'Shopee',        cor:'#EE4D2D' },
+  tiktok:       { label:'TikTok Shop',   cor:'#6366f1' },
+};
+
+var PRC_SEED = [
+  {nome:'Óleo de coco - 3L', custo:45.36, embalagem:8.35, etiqueta:0, frete:6.30, taxa:14, imposto:10, margem:21.43, roasOn:false, roas:null, vendaAtual:109.97, marketplace:'mercadolivre', tiktokFreteOn:true},
+  {nome:'Óleo de coco - 1L', custo:15.48, embalagem:6.78, etiqueta:0, frete:4.20, taxa:14, imposto:10, margem:20.38, roasOn:false, roas:null, vendaAtual:47.57, marketplace:'mercadolivre', tiktokFreteOn:true},
+  {nome:'Óleo de coco - 500 mL', custo:7.74, embalagem:4.75, etiqueta:0, frete:3.00, taxa:14, imposto:10, margem:20.62, roasOn:false, roas:null, vendaAtual:27.97, marketplace:'mercadolivre', tiktokFreteOn:true},
+  {nome:'Semente de Chia (1kg)', custo:5.12, embalagem:0.98, etiqueta:0, frete:1.95, taxa:14, imposto:10, margem:15.34, roasOn:false, roas:null, vendaAtual:13.27, marketplace:'mercadolivre', tiktokFreteOn:true},
+  {nome:'Uva Passa Preta (1kg)', custo:11.80, embalagem:0.98, etiqueta:0, frete:2.40, taxa:14, imposto:10, margem:9.91, roasOn:false, roas:null, vendaAtual:22.97, marketplace:'mercadolivre', tiktokFreteOn:true},
+  {nome:'Flor de Sal (1kg)', custo:17.32, embalagem:0.98, etiqueta:0, frete:3.00, taxa:14, imposto:10, margem:15.09, roasOn:false, roas:null, vendaAtual:34.97, marketplace:'mercadolivre', tiktokFreteOn:true},
+  {nome:'Psyllium em Pó (1kg)', custo:6.55, embalagem:0.98, etiqueta:0, frete:6.75, taxa:14, imposto:10, margem:16.43, roasOn:false, roas:null, vendaAtual:23.97, marketplace:'mercadolivre', tiktokFreteOn:true},
+  {nome:'Nozes Quartz (1kg)', custo:32.54, embalagem:0.98, etiqueta:0, frete:3.00, taxa:14, imposto:10, margem:15.10, roasOn:false, roas:null, vendaAtual:59.97, marketplace:'mercadolivre', tiktokFreteOn:true},
+  {nome:'Linhaça Dourada (1kg)', custo:11.28, embalagem:0.98, etiqueta:0, frete:3.00, taxa:14, imposto:10, margem:14.89, roasOn:false, roas:null, vendaAtual:24.97, marketplace:'mercadolivre', tiktokFreteOn:true},
+  {nome:'Beterraba em pó (1kg)', custo:21.60, embalagem:0.98, etiqueta:0, frete:3.00, taxa:14, imposto:10, margem:10.36, roasOn:false, roas:null, vendaAtual:38.97, marketplace:'mercadolivre', tiktokFreteOn:true},
+  {nome:'Semente de Abóbora (1Kg)', custo:56.30, embalagem:0.98, etiqueta:0, frete:3.00, taxa:14, imposto:10, margem:15.72, roasOn:false, roas:null, vendaAtual:100.00, marketplace:'mercadolivre', tiktokFreteOn:true},
+  {nome:'Flocos de Arroz Natural (400g)', custo:5.32, embalagem:0.98, etiqueta:0, frete:2.40, taxa:14, imposto:10, margem:25.09, roasOn:false, roas:null, vendaAtual:17.09, marketplace:'mercadolivre', tiktokFreteOn:true},
+  {nome:'Flocos de Arroz Cacau (500g)', custo:6.65, embalagem:0.98, etiqueta:0, frete:2.40, taxa:14, imposto:10, margem:25.77, roasOn:false, roas:null, vendaAtual:19.97, marketplace:'mercadolivre', tiktokFreteOn:true},
+  {nome:'Gergelim Branco (1kg)', custo:11.50, embalagem:0.98, etiqueta:0, frete:2.40, taxa:14, imposto:10, margem:15.44, roasOn:false, roas:null, vendaAtual:24.57, marketplace:'mercadolivre', tiktokFreteOn:true},
+  {nome:'Psyllium Husk (1kg)', custo:6.41, embalagem:0.98, etiqueta:0, frete:6.75, taxa:14, imposto:10, margem:61.86, roasOn:false, roas:null, vendaAtual:100.00, marketplace:'mercadolivre', tiktokFreteOn:true},
+  {nome:'Pepita de Girassol (1Kg)', custo:10.41, embalagem:0.98, etiqueta:0, frete:2.40, taxa:14, imposto:10, margem:17.49, roasOn:false, roas:null, vendaAtual:23.57, marketplace:'mercadolivre', tiktokFreteOn:true},
+  {nome:'Ervilha Partida (1Kg)', custo:4.18, embalagem:0.98, etiqueta:0, frete:3.00, taxa:14, imposto:10, margem:15.87, roasOn:false, roas:null, vendaAtual:13.57, marketplace:'mercadolivre', tiktokFreteOn:true},
+];
+
+var _prcEditIdx = null;
+var _prcMk      = 'mercadolivre';
+var _prcBusca   = '';
+
+// ---------- dados ----------
+
+function prcProdutos() {
+  if (!state.precificacao) state.precificacao = {};
+  if (!Array.isArray(state.precificacao.produtos)) state.precificacao.produtos = [];
+  return state.precificacao.produtos;
+}
+
+// Popula com os produtos iniciais apenas se a biblioteca nunca foi usada
+function prcSemear() {
+  if (!state.precificacao) state.precificacao = {};
+  if (Array.isArray(state.precificacao.produtos)) return false;
+  state.precificacao.produtos = PRC_SEED.map(function(p, i) {
+    return Object.assign({}, p, { id: 'p' + i });
+  });
+  saveState();
+  return true;
+}
+
+function prcFmt(n) {
+  return 'R$ ' + (Number(n)||0).toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 });
+}
+function prcPct(n) {
+  return (Number(n)||0).toLocaleString('pt-BR', { minimumFractionDigits:2, maximumFractionDigits:2 }) + '%';
+}
+function prcVal(id) {
+  var el = document.getElementById(id);
+  return el ? (parseFloat(el.value) || 0) : 0;
+}
+
+// ---------- calculo ----------
+
+function prcFindTier(tiers, price) {
+  for (var i = 0; i < tiers.length; i++) {
+    if (price >= tiers[i].min && price <= tiers[i].max) return tiers[i];
+  }
+  return tiers[tiers.length - 1];
+}
+
+// Comissao em faixas depende do proprio preco: resolve por iteracao
+function prcResolveTiered(custosFixosBase, impostoPct, margemPct, adsPct, tiers, extraPct) {
+  var guess = custosFixosBase / Math.max(0.0001, (1 - impostoPct/100 - margemPct/100 - adsPct - extraPct/100));
+  var tier = prcFindTier(tiers, guess);
+  var price = guess, denom = 0;
+  for (var i = 0; i < 10; i++) {
+    denom = 1 - (tier.pct/100) - (impostoPct/100) - (margemPct/100) - adsPct - (extraPct/100);
+    if (denom <= 0) return { error:true, tier:tier };
+    var novo = (custosFixosBase + tier.fixed) / denom;
+    var novoTier = prcFindTier(tiers, novo);
+    price = novo;
+    if (novoTier === tier) break;
+    tier = novoTier;
+  }
+  return { price:price, tier:tier, denom:denom };
+}
+
+function prcLerCampos() {
+  var chkRoas = document.getElementById('prc-roas-on');
+  var chkTT   = document.getElementById('prc-tt-frete');
+  var nomeEl  = document.getElementById('prc-nome');
+  return {
+    nome:      nomeEl ? nomeEl.value.trim() : '',
+    custo:     prcVal('prc-custo'),
+    embalagem: prcVal('prc-embalagem'),
+    etiqueta:  prcVal('prc-etiqueta'),
+    frete:     prcVal('prc-frete'),
+    taxa:      prcVal('prc-taxa'),
+    imposto:   prcVal('prc-imposto'),
+    margem:    prcVal('prc-margem'),
+    roasOn:    chkRoas ? chkRoas.checked : false,
+    roas:      prcVal('prc-roas'),
+    tiktokFreteOn: chkTT ? chkTT.checked : true,
+    marketplace:   _prcMk,
+  };
+}
+
+function prcCalcular() {
+  var d = prcLerCampos();
+  var base   = d.custo + d.embalagem + d.etiqueta + d.frete;
+  var adsPct = (d.roasOn && d.roas > 0) ? (1 / d.roas) : 0;
+
+  var hint = document.getElementById('prc-roas-hint');
+  if (hint) hint.textContent = (d.roasOn && d.roas > 0)
+    ? 'ROAS ' + d.roas + ' = ' + prcPct(adsPct*100) + ' da venda em ads'
+    : 'ex: ROAS 8 = 12,50% da venda em ads';
+
+  var preco, comissaoPct = 0, comissaoFixa = 0, fretePrograma = 0, erro = false, faixaTxt = '';
+
+  if (d.marketplace === 'mercadolivre') {
+    var denom = 1 - (d.taxa/100) - (d.imposto/100) - (d.margem/100) - adsPct;
+    if (denom <= 0 || base <= 0) erro = true;
+    else {
+      preco = base / denom;
+      comissaoPct = preco * d.taxa / 100;
+    }
+  } else {
+    var tiers = d.marketplace === 'shopee' ? PRC_SHOPEE_TIERS : PRC_TIKTOK_TIERS;
+    var extra = (d.marketplace === 'tiktok' && d.tiktokFreteOn) ? PRC_TIKTOK_FRETE_PCT : 0;
+    var r = prcResolveTiered(base, d.imposto, d.margem, adsPct, tiers, extra);
+    if (r.error || base <= 0) erro = true;
+    else {
+      preco = r.price;
+      comissaoPct   = preco * r.tier.pct / 100;
+      comissaoFixa  = r.tier.fixed;
+      fretePrograma = extra > 0 ? preco * extra / 100 : 0;
+      faixaTxt = 'Faixa aplicada: ' +
+        (r.tier.max === Infinity ? 'acima de ' + prcFmt(r.tier.min) : 'de ' + prcFmt(r.tier.min) + ' a ' + prcFmt(r.tier.max)) +
+        ' → ' + r.tier.pct + '% + ' + prcFmt(r.tier.fixed) +
+        (extra > 0 ? ' + Programa de Frete ' + extra + '%' : '');
+    }
+  }
+
+  var elPreco = document.getElementById('prc-preco');
+  var elSub   = document.getElementById('prc-sub');
+  var elFaixa = document.getElementById('prc-faixa');
+  var elBd    = document.getElementById('prc-breakdown');
+
+  if (elFaixa) {
+    elFaixa.style.display = faixaTxt ? 'block' : 'none';
+    elFaixa.textContent = faixaTxt;
+  }
+
+  if (erro) {
+    if (elPreco) elPreco.textContent = '—';
+    if (elSub)   elSub.innerHTML = '<span style="color:var(--red)">Essa margem não é sustentável com esses custos e taxas. Reduza a margem, o ROAS-alvo, ou revise os custos.</span>';
+    if (elBd)    elBd.innerHTML = '';
+    return null;
+  }
+
+  var imposto = preco * d.imposto / 100;
+  var lucro   = preco * d.margem / 100;
+
+  if (elPreco) elPreco.textContent = prcFmt(preco);
+  if (elSub) {
+    elSub.textContent = 'Lucro de ' + prcFmt(lucro) + ' por unidade · ' + PRC_MK[d.marketplace].label +
+      (d.roasOn && d.roas > 0 ? ' · ROAS ' + d.roas : '');
+  }
+
+  prcRenderBreakdown([
+    { label:'Custo produto',     value:d.custo,        cor:'#4C6650' },
+    { label:'Embalagem',         value:d.embalagem,    cor:'#6F8F72' },
+    { label:'Etiqueta',          value:d.etiqueta,     cor:'#9DB79F' },
+    { label:'Frete envio',       value:d.frete,        cor:'#B9C2AE' },
+    { label:'Comissão (%)',      value:comissaoPct,    cor:'#C85C43' },
+    { label:'Comissão fixa',     value:comissaoFixa,   cor:'#D97B5F' },
+    { label:'Programa de Frete', value:fretePrograma,  cor:'#E0A15F' },
+    { label:'Imposto',           value:imposto,        cor:'#E08767' },
+    { label:'Anúncios (ROAS)',   value:preco*adsPct,   cor:'#AD7F1F' },
+    { label:'Lucro',             value:lucro,          cor:'#E7B73E' },
+  ], preco);
+
+  return { preco:preco, lucro:lucro };
+}
+
+function prcRenderBreakdown(items, total) {
+  var box = document.getElementById('prc-breakdown');
+  if (!box) return;
+  var visiveis = items.filter(function(i){ return i.value > 0; });
+
+  var barra = '<div style="display:flex;height:14px;border-radius:7px;overflow:hidden;margin-bottom:0.9rem;background:var(--bg3)">' +
+    visiveis.map(function(i) {
+      return '<div title="' + i.label + '" style="width:' + ((i.value/total)*100) + '%;background:' + i.cor + '"></div>';
+    }).join('') + '</div>';
+
+  var legenda = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px 16px">' +
+    visiveis.map(function(i) {
+      return '<div style="display:flex;align-items:center;justify-content:space-between;font-size:0.82rem">' +
+        '<span style="display:flex;align-items:center;gap:7px;color:var(--text2);min-width:0">' +
+          '<span style="width:9px;height:9px;border-radius:3px;background:' + i.cor + ';flex-shrink:0"></span>' +
+          '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + i.label + '</span>' +
+        '</span>' +
+        '<span style="font-weight:600;flex-shrink:0;margin-left:8px">' + prcFmt(i.value) + '</span>' +
+      '</div>';
+    }).join('') + '</div>';
+
+  box.innerHTML = barra + legenda;
+}
+
+// ---------- acoes ----------
+
+function prcSetMk(mk) {
+  _prcMk = mk;
+  ['mercadolivre','shopee','tiktok'].forEach(function(id) {
+    var b = document.getElementById('prc-mk-' + id);
+    if (!b) return;
+    var at = id === mk;
+    b.style.background   = at ? PRC_MK[id].cor : 'var(--bg2)';
+    b.style.color        = at ? (id === 'mercadolivre' ? '#3d3000' : '#fff') : 'var(--text2)';
+    b.style.borderColor  = at ? PRC_MK[id].cor : 'var(--border)';
+    b.style.fontWeight   = at ? '700' : '600';
+  });
+  var boxML = document.getElementById('prc-box-ml');
+  var boxTT = document.getElementById('prc-box-tt');
+  if (boxML) boxML.style.display = (mk === 'mercadolivre') ? 'block' : 'none';
+  if (boxTT) boxTT.style.display = (mk === 'tiktok') ? 'block' : 'none';
+  prcCalcular();
+}
+
+function prcSelecionar(idx) {
+  var p = prcProdutos()[idx];
+  if (!p) return;
+  _prcEditIdx = idx;
+  function set(id, v) { var e = document.getElementById(id); if (e) e.value = (v === null || v === undefined) ? '' : v; }
+  set('prc-nome', p.nome);
+  set('prc-custo', p.custo);
+  set('prc-embalagem', p.embalagem);
+  set('prc-etiqueta', p.etiqueta);
+  set('prc-frete', p.frete);
+  set('prc-taxa', p.taxa);
+  set('prc-imposto', p.imposto);
+  set('prc-margem', p.margem);
+  set('prc-roas', p.roas || '');
+
+  var chk = document.getElementById('prc-roas-on');
+  if (chk) chk.checked = !!p.roasOn;
+  var roasInp = document.getElementById('prc-roas');
+  if (roasInp) roasInp.disabled = !p.roasOn;
+  var chkTT = document.getElementById('prc-tt-frete');
+  if (chkTT) chkTT.checked = p.tiktokFreteOn !== false;
+
+  var atual = document.getElementById('prc-venda-atual');
+  if (atual) atual.textContent = p.vendaAtual ? 'Preço atual: ' + prcFmt(p.vendaAtual) : '';
+  var btnEx = document.getElementById('prc-btn-excluir');
+  if (btnEx) btnEx.style.display = '';
+
+  prcSetMk(p.marketplace || 'mercadolivre');
+  prcRenderLista();
+}
+
+function prcNovo() {
+  _prcEditIdx = null;
+  function set(id, v) { var e = document.getElementById(id); if (e) e.value = v; }
+  set('prc-nome',''); set('prc-custo',''); set('prc-embalagem','');
+  set('prc-etiqueta',''); set('prc-frete',''); set('prc-taxa',14);
+  set('prc-imposto',10); set('prc-margem',15); set('prc-roas','');
+  var chk = document.getElementById('prc-roas-on');   if (chk) chk.checked = false;
+  var roas = document.getElementById('prc-roas');     if (roas) roas.disabled = true;
+  var chkTT = document.getElementById('prc-tt-frete');if (chkTT) chkTT.checked = true;
+  var atual = document.getElementById('prc-venda-atual'); if (atual) atual.textContent = '';
+  var btnEx = document.getElementById('prc-btn-excluir'); if (btnEx) btnEx.style.display = 'none';
+  prcSetMk('mercadolivre');
+  prcRenderLista();
+  var n = document.getElementById('prc-nome'); if (n) n.focus();
+}
+
+function prcSalvar() {
+  var d = prcLerCampos();
+  var nota = document.getElementById('prc-nota');
+  function aviso(t, cor) { if (nota) { nota.textContent = t; nota.style.color = cor || 'var(--text3)'; } }
+
+  if (!d.nome) { aviso('Dê um nome ao produto antes de salvar.', 'var(--red)'); return; }
+
+  var calc = prcCalcular();
+  var lista = prcProdutos();
+  var registro = {
+    id: (_prcEditIdx !== null && lista[_prcEditIdx]) ? lista[_prcEditIdx].id : 'p' + Date.now(),
+    nome: d.nome, custo: d.custo, embalagem: d.embalagem, etiqueta: d.etiqueta,
+    frete: d.frete, taxa: d.taxa, imposto: d.imposto, margem: d.margem,
+    roasOn: d.roasOn, roas: d.roas, marketplace: d.marketplace,
+    tiktokFreteOn: d.tiktokFreteOn,
+    vendaAtual: (_prcEditIdx !== null && lista[_prcEditIdx]) ? lista[_prcEditIdx].vendaAtual : (calc ? calc.preco : null),
+  };
+
+  if (_prcEditIdx !== null && lista[_prcEditIdx]) {
+    lista[_prcEditIdx] = registro;
+    addLog('Atualizou precificação: "' + d.nome + '"');
+  } else {
+    lista.push(registro);
+    _prcEditIdx = lista.length - 1;
+    addLog('Cadastrou precificação: "' + d.nome + '"');
+  }
+
+  saveState();
+  prcRenderLista();
+  var btnEx = document.getElementById('prc-btn-excluir');
+  if (btnEx) btnEx.style.display = '';
+  aviso('Salvo na biblioteca.', 'var(--green)');
+  setTimeout(function(){ aviso(''); }, 2500);
+}
+
+function prcExcluir() {
+  var lista = prcProdutos();
+  if (_prcEditIdx === null || !lista[_prcEditIdx]) return;
+  var nome = lista[_prcEditIdx].nome;
+  if (!confirm('Excluir "' + nome + '" da biblioteca?')) return;
+  lista.splice(_prcEditIdx, 1);
+  addLog('Excluiu precificação: "' + nome + '"');
+  saveState();
+  _prcEditIdx = null;
+  prcNovo();
+}
+
+function prcSetBusca(v) {
+  _prcBusca = v;
+  prcRenderLista();
+}
+
+// ---------- render ----------
+
+function prcRenderLista() {
+  var box = document.getElementById('prc-lista');
+  if (!box) return;
+  var lista = prcProdutos();
+  var termo = (_prcBusca || '').toLowerCase();
+
+  var itens = lista.map(function(p, i){ return { p:p, i:i }; })
+    .filter(function(o){ return !termo || (o.p.nome||'').toLowerCase().indexOf(termo) !== -1; });
+
+  if (!itens.length) {
+    box.innerHTML = '<div style="padding:1.2rem;text-align:center;color:var(--text3);font-size:0.85rem">' +
+      (lista.length ? 'Nenhum produto encontrado.' : 'Nenhum produto salvo ainda.') + '</div>';
+    return;
+  }
+
+  box.innerHTML = itens.map(function(o) {
+    var p = o.p, ativo = o.i === _prcEditIdx;
+    var mk = PRC_MK[p.marketplace] || PRC_MK.mercadolivre;
+    var bom = (p.margem || 0) >= 15;
+    return '<div onclick="prcSelecionar(' + o.i + ')" style="display:flex;align-items:center;justify-content:space-between;gap:10px;' +
+      'padding:9px 12px;border-radius:9px;cursor:pointer;margin-bottom:4px;' +
+      'background:' + (ativo ? 'rgba(26,138,74,0.10)' : 'transparent') + ';' +
+      'border:1px solid ' + (ativo ? 'var(--green)' : 'transparent') + '">' +
+      '<div style="min-width:0;flex:1">' +
+        '<div style="font-size:0.85rem;font-weight:' + (ativo?'700':'500') + ';overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(p.nome) + '</div>' +
+        '<div style="font-size:0.7rem;color:' + mk.cor + ';font-weight:600;margin-top:1px">' + mk.label + '</div>' +
+      '</div>' +
+      '<span style="flex-shrink:0;font-size:0.75rem;font-weight:700;padding:2px 9px;border-radius:11px;' +
+        'background:' + (bom ? 'rgba(26,138,74,0.12)' : 'rgba(192,57,43,0.12)') + ';' +
+        'color:' + (bom ? 'var(--green)' : 'var(--red)') + '">' + prcPct(p.margem) + '</span>' +
+    '</div>';
+  }).join('');
+}
+
+function prcCampo(id, label, sufixo, step) {
+  return '<div style="display:flex;flex-direction:column;gap:4px">' +
+    '<label style="font-size:0.76rem;font-weight:600;color:var(--text2)">' + label + '</label>' +
+    '<div style="position:relative">' +
+      '<input type="number" id="' + id + '" step="' + (step||'0.01') + '" oninput="prcCalcular()" ' +
+        'style="width:100%;padding:0.6rem 0.8rem;' + (sufixo?'padding-right:2.1rem;':'') +
+        'border:0.5px solid var(--border2);border-radius:9px;background:var(--input-bg);color:var(--text);font-size:0.9rem;outline:none">' +
+      (sufixo ? '<span style="position:absolute;right:0.75rem;top:50%;transform:translateY(-50%);font-size:0.78rem;color:var(--text3);pointer-events:none">' + sufixo + '</span>' : '') +
+    '</div>' +
+  '</div>';
+}
+
+function renderPrecificacao() {
+  if (!isAdmin()) {
+    return '<div class="empty-state">' + iconEmpty() + '<p>Esta página é restrita a administradores.</p></div>';
+  }
+
+  return '<div style="display:grid;grid-template-columns:270px 1fr;gap:1rem;align-items:start">' +
+
+    // ---- Coluna esquerda: biblioteca ----
+    '<div class="card" style="padding:1rem;position:sticky;top:1rem">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.8rem">' +
+        '<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text3)">Biblioteca</div>' +
+        '<button onclick="prcNovo()" class="btn btn-green btn-sm">+ Novo</button>' +
+      '</div>' +
+      '<input type="text" placeholder="Buscar produto..." oninput="prcSetBusca(this.value)" ' +
+        'style="width:100%;padding:0.5rem 0.7rem;border:0.5px solid var(--border2);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.83rem;outline:none;margin-bottom:0.7rem">' +
+      '<div id="prc-lista" style="max-height:62vh;overflow-y:auto"></div>' +
+    '</div>' +
+
+    // ---- Coluna direita ----
+    '<div style="display:flex;flex-direction:column;gap:1rem">' +
+
+      // Marketplace
+      '<div class="card" style="padding:1.1rem 1.25rem">' +
+        '<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:0.7rem">Marketplace</div>' +
+        '<div style="display:flex;gap:7px">' +
+          ['mercadolivre','shopee','tiktok'].map(function(id) {
+            return '<button id="prc-mk-' + id + '" onclick="prcSetMk(\'' + id + '\')" ' +
+              'style="flex:1;padding:0.6rem;border:2px solid var(--border);border-radius:9px;background:var(--bg2);' +
+              'color:var(--text2);font-weight:600;cursor:pointer;font-size:0.85rem">' + PRC_MK[id].label + '</button>';
+          }).join('') +
+        '</div>' +
+      '</div>' +
+
+      // Dados do produto
+      '<div class="card" style="padding:1.1rem 1.25rem">' +
+        '<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:0.9rem">' +
+          '<label style="font-size:0.76rem;font-weight:600;color:var(--text2)">Nome do produto</label>' +
+          '<input type="text" id="prc-nome" placeholder="Ex: Semente de Chia (1kg)" ' +
+            'style="width:100%;padding:0.6rem 0.8rem;border:0.5px solid var(--border2);border-radius:9px;background:var(--input-bg);color:var(--text);font-size:0.9rem;outline:none">' +
+          '<div id="prc-venda-atual" style="font-size:0.75rem;color:var(--text3);min-height:1em"></div>' +
+        '</div>' +
+
+        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.7rem;margin-bottom:0.9rem">' +
+          prcCampo('prc-custo','Custo produto','R$') +
+          prcCampo('prc-embalagem','Embalagem','R$') +
+          prcCampo('prc-etiqueta','Etiqueta','R$') +
+          prcCampo('prc-frete','Frete envio','R$') +
+        '</div>' +
+
+        '<div id="prc-box-ml" style="margin-bottom:0.9rem">' +
+          prcCampo('prc-taxa','Comissão do anúncio (Mercado Livre)','%') +
+        '</div>' +
+
+        '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:0.7rem;margin-bottom:0.9rem">' +
+          prcCampo('prc-imposto','Imposto','%') +
+          prcCampo('prc-margem','Margem desejada','%') +
+        '</div>' +
+
+        '<div id="prc-box-tt" style="display:none;margin-bottom:0.9rem;padding:0.7rem 0.9rem;background:var(--bg3);border-radius:9px">' +
+          '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.84rem">' +
+            '<input type="checkbox" id="prc-tt-frete" checked onchange="prcCalcular()" style="width:auto;margin:0"> ' +
+            'Participar do Programa de Frete Grátis (+' + PRC_TIKTOK_FRETE_PCT + '%)' +
+          '</label>' +
+        '</div>' +
+
+        '<div style="padding:0.7rem 0.9rem;background:var(--bg3);border-radius:9px">' +
+          '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.84rem;margin-bottom:0.5rem">' +
+            '<input type="checkbox" id="prc-roas-on" onchange="prcToggleRoas(this)" style="width:auto;margin:0"> ' +
+            'Embutir custo de anúncios (ROAS-alvo)' +
+          '</label>' +
+          '<div style="display:flex;align-items:center;gap:10px">' +
+            '<input type="number" id="prc-roas" step="0.1" disabled placeholder="8" oninput="prcCalcular()" ' +
+              'style="width:110px;padding:0.5rem 0.7rem;border:0.5px solid var(--border2);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.88rem;outline:none">' +
+            '<span id="prc-roas-hint" style="font-size:0.76rem;color:var(--text3)">ex: ROAS 8 = 12,50% da venda em ads</span>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+
+      // Resultado
+      '<div class="card" style="padding:1.25rem">' +
+        '<div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:0.5rem">Preço de venda sugerido</div>' +
+        '<div id="prc-preco" style="font-size:2.4rem;font-weight:800;line-height:1.1;color:var(--green)">—</div>' +
+        '<div id="prc-sub" style="font-size:0.85rem;color:var(--text2);margin-top:0.3rem;min-height:1.2em"></div>' +
+        '<div id="prc-faixa" style="display:none;font-size:0.78rem;color:var(--text3);margin-top:0.5rem;padding:0.5rem 0.75rem;background:var(--bg3);border-radius:8px"></div>' +
+        '<div id="prc-breakdown" style="margin-top:1.1rem"></div>' +
+      '</div>' +
+
+      // Acoes
+      '<div style="display:flex;align-items:center;gap:10px">' +
+        '<button onclick="prcSalvar()" class="btn btn-green" style="padding:0.7rem 1.6rem">Salvar na biblioteca</button>' +
+        '<button id="prc-btn-excluir" onclick="prcExcluir()" class="btn btn-red btn-sm" style="display:none">Excluir</button>' +
+        '<span id="prc-nota" style="font-size:0.82rem;color:var(--text3)"></span>' +
+      '</div>' +
+
+    '</div>' +
+  '</div>';
+}
+
+function prcToggleRoas(chk) {
+  var inp = document.getElementById('prc-roas');
+  if (inp) inp.disabled = !chk.checked;
+  prcCalcular();
+}
+
+function bindPrecificacao() {
+  if (!isAdmin()) return;
+  prcSemear();
+  prcRenderLista();
+  var lista = prcProdutos();
+  if (lista.length) prcSelecionar(0);
+  else prcNovo();
+}

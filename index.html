@@ -458,6 +458,7 @@ let state = {
   ponto: { colaboradores: [], registros: [] },
   devolucoes: [],
   tv: { periodos: {} },   // painel da TV: vendas importadas por periodo
+  precificacao: { produtos: null },  // biblioteca da calculadora de preco
   produtos: [],        // catálogo de produtos finais (salvo separado no Firebase)
   mlToken: null,
   shopeeToken: null,
@@ -495,6 +496,7 @@ function dataSize(d) {
          (Array.isArray(d.tabnutri)           ? d.tabnutri.length          : 0) +
          (Array.isArray(est.produtos)         ? est.produtos.length        : 0) +
          (Array.isArray(d.devolucoes)         ? d.devolucoes.length        : 0) +
+         ((d.precificacao && Array.isArray(d.precificacao.produtos)) ? d.precificacao.produtos.length : 0) +
          (Array.isArray(pt.colaboradores)     ? pt.colaboradores.length    : 0) +
          (Array.isArray(pt.registros)         ? pt.registros.length        : 0);
 }
@@ -565,6 +567,15 @@ function applyParsed(parsed, forceMerge) {
     semana: tvIn.semana || tvOld.semana || null,
     meses:  Object.keys(mesesIn).length > 0 ? mesesIn : mesesOld,
   };
+  // Precificacao: biblioteca de produtos (null = nunca usada, [] = esvaziada de proposito)
+  var prcIn  = (parsed.precificacao && parsed.precificacao.produtos);
+  var prcOld = (state.precificacao && state.precificacao.produtos);
+  state.precificacao = {
+    produtos: (Array.isArray(prcIn) && prcIn.length > 0) ? prcIn
+            : (Array.isArray(prcOld) && prcOld.length > 0) ? prcOld
+            : (Array.isArray(prcIn) ? prcIn : prcOld || null),
+  };
+
   if (tvIn.periodos && !state.tv.semana) {   // formato antigo
     var ksTv = Object.keys(tvIn.periodos).sort();
     if (ksTv.length) state.tv.semana = tvIn.periodos[ksTv[ksTv.length - 1]];
@@ -759,6 +770,7 @@ function saveState() {
     ponto:       state.ponto,
     devolucoes:  state.devolucoes,
     tv:          state.tv,
+    precificacao: state.precificacao,
     mlToken:     state.mlToken     || null,
     shopeeToken: state.shopeeToken || null,
   };
@@ -1019,12 +1031,13 @@ function getPagesAdmin() {
     { id: 'produtos',     label: 'Produtos',              icon: iconProdutos() },
     { id: 'marketplaces', label: 'Marketplaces',          icon: iconMkts() },
     { id: 'margemviva',   label: 'Radar',                 icon: iconMargem() },
+    { id: 'precificacao', label: 'Precificação',          icon: iconPrecificacao() },
     { id: 'financeiro',   label: 'Financeiro',            icon: iconFinanceiro() },
     { id: 'logs',         label: 'Logs',                  icon: iconLog() },
   ];
 }
 function getPagesLimited() {
-  return getPagesAdmin().filter(p => p.id !== 'logs' && p.id !== 'financeiro' && p.id !== 'produtos' && p.id !== 'marketplaces' && p.id !== 'margemviva' && p.id !== '__sep__');
+  return getPagesAdmin().filter(p => p.id !== 'logs' && p.id !== 'financeiro' && p.id !== 'produtos' && p.id !== 'marketplaces' && p.id !== 'margemviva' && p.id !== 'precificacao' && p.id !== '__sep__');
 }
 
 function buildSidebar() {
@@ -1139,7 +1152,7 @@ async function renovarTokens() {
 
 function renderPage() {
   if (!state.currentUser) return;
-  var titles = { inicio:'Início', tarefas:'Tarefas', tv:'TV', compras:'Compras', estoque:'Estoque', ponto:'Ponto Virtual', mural:'Mural', etiquetas:'Gerador de Etiquetas', tabnutri:'Tabela Nutricional', produtos:'Produtos', marketplaces:'Marketplaces', margemviva:'Radar', logs:'Logs', financeiro:'Financeiro' };
+  var titles = { inicio:'Início', tarefas:'Tarefas', tv:'TV', compras:'Compras', estoque:'Estoque', ponto:'Ponto Virtual', mural:'Mural', etiquetas:'Gerador de Etiquetas', tabnutri:'Tabela Nutricional', produtos:'Produtos', marketplaces:'Marketplaces', margemviva:'Radar', precificacao:'Precificação', logs:'Logs', financeiro:'Financeiro' };
   var titleEl = document.getElementById('page-title');
   if (titleEl) titleEl.textContent = titles[state.currentPage] || '';
   var c = document.getElementById('page-content');
@@ -1158,6 +1171,7 @@ function renderPage() {
   if (pg === 'margemviva')    { c.innerHTML = (state.currentUser.role === 'admin' ? renderMargemViva() : '<div class="empty-state">' + iconEmpty() + '<p>Acesso restrito a administradores.</p></div>'); return; }
   if (pg === 'ponto')     { c.innerHTML = renderPonto(); return; }
   if (pg === 'logs')      { c.innerHTML = renderLogs(); return; }
+  if (pg === 'precificacao') { c.innerHTML = renderPrecificacao(); bindPrecificacao(); return; }
   if (pg === 'financeiro') { c.innerHTML = renderFinanceiro(); bindFinanceiro(); return; }
 }
 
@@ -1185,7 +1199,7 @@ window.addEventListener('popstate', function(e) {
 function pageFromHash() {
   var hash = window.location.hash.replace('#', '').trim();
   // Lista de páginas válidas
-  var valid = ['inicio','tarefas','tv','compras','estoque','ponto','mural','etiquetas','tabnutri','produtos','marketplaces','margemviva','logs','financeiro'];
+  var valid = ['inicio','tarefas','tv','compras','estoque','ponto','mural','etiquetas','tabnutri','produtos','marketplaces','margemviva','precificacao','logs','financeiro'];
   return valid.indexOf(hash) !== -1 ? hash : 'inicio';
 }
 
@@ -3047,6 +3061,7 @@ function iconPonto() { return `<svg viewBox="0 0 24 24" fill="none" stroke="curr
 function iconEstoque() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>`; }
 function iconHome() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`; }
 function iconTarefas() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`; }
+function iconPrecificacao() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>`; }
 function iconTV() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="13" rx="2"/><polyline points="17 2 12 7 7 2"/></svg>`; }
 function iconTruck() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>`; }
 function iconFactory() { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 20V8l6-4v4l6-4v4l6-4v16H2z"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="10" y1="20" x2="10" y2="14"/><line x1="14" y1="20" x2="14" y2="14"/></svg>`; }
@@ -3701,6 +3716,7 @@ var _mktsMesSel  = ''; // mês independente
 <script src="pages/tabnutri.js?v=2"></script>
 <script src="pages/produtos.js?v=2"></script>
 <script src="pages/radar.js?v=2"></script>
+<script src="pages/precificacao.js?v=2"></script>
 <script>
 // Remove Service Worker completamente
 if ('serviceWorker' in navigator) {

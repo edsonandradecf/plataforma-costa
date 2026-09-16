@@ -454,7 +454,7 @@ let state = {
   logs: [],
   tabnutri: [],
   financeiro: { meses: {}, despesas: {}, aliquota: 0, custoProdutos: {}, tarifasSku: {} },
-  estoque: { produtos: [], movimentacoes: [], historicoManual: [] },
+  estoque: { produtos: [], movimentacoes: [], historicoManual: [], acabados: [] },
   ponto: { colaboradores: [], registros: [] },
   devolucoes: [],
   tv: { periodos: {} },   // painel da TV: vendas importadas por periodo
@@ -541,6 +541,7 @@ function applyParsed(parsed, forceMerge) {
     produtos:        manterLista(est.produtos,        estA.produtos),
     movimentacoes:   manterLista(est.movimentacoes,   estA.movimentacoes),
     historicoManual: manterLista(est.historicoManual, estA.historicoManual),
+    acabados:        manterLista(est.acabados,        estA.acabados),
   };
   var pt = parsed.ponto || {};
   // Formato correto: { colaboradores: [...], registros: [...] }

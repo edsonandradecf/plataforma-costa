@@ -300,7 +300,7 @@ function estoqueMovProdutoChange() {
   box.innerHTML =
     '<div style="font-weight:700;font-size:0.88rem;margin-bottom:0.3rem">🏭 Produção</div>' +
     '<div style="font-size:0.8rem;color:var(--text2);margin-bottom:0.8rem">' +
-      'Informe quanto foi produzido de cada item. A baixa de <strong>' + esc(mp.nome) + '</strong> é calculada automaticamente.' +
+      'Informe quanto foi produzido de cada item. A baixa de <strong>' + esc(mp.nome) + '</strong> é o valor que você digitar no campo Quantidade acima.' +
     '</div>' +
     '<div style="display:flex;flex-direction:column;gap:7px">' +
       acabados.map(function(o) {
@@ -308,9 +308,9 @@ function estoqueMovProdutoChange() {
         return '<div style="display:flex;align-items:center;gap:10px">' +
           '<div style="flex:1;min-width:0">' +
             '<div style="font-size:0.85rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(p.nome) + '</div>' +
-            '<div style="font-size:0.72rem;color:var(--text3)">' + esc(p.sku||'') + ' · ' + p.peso + ' ' + esc(p.unidade||'kg') + ' = ' + estoquePesoNaUnidadeMp(p, mp) + ' ' + esc(mp.unidade||'kg') + ' · estoque: ' + (p.qtd || 0) + '</div>' +
+            '<div style="font-size:0.72rem;color:var(--text3)">' + esc(p.sku||'') + ' · ' + p.peso + ' ' + esc(p.unidade||'kg') + ' · estoque atual: ' + (p.qtd || 0) + '</div>' +
           '</div>' +
-          '<input type="number" min="0" step="1" value="0" data-pa="' + o.i + '" data-peso="' + estoquePesoNaUnidadeMp(p, mp) + '" ' +
+          '<input type="number" min="0" step="1" value="0" data-pa="' + o.i + '" data-nome="' + esc(p.nome) + '" ' +
             'class="est-prod-qtd" oninput="estoqueCalcProducao()" ' +
             'style="width:90px;padding:0.45rem 0.6rem;border:1px solid var(--border);border-radius:7px;background:var(--input-bg);color:var(--text);font-size:0.9rem;text-align:center">' +
         '</div>';
@@ -321,38 +321,41 @@ function estoqueMovProdutoChange() {
   estoqueCalcProducao();
 }
 
-// Soma peso x quantidade e joga no campo de quantidade da saida
+// Apenas informa o que sera lancado. Nao altera a quantidade da materia prima.
 function estoqueCalcProducao() {
   var inputs = document.querySelectorAll('.est-prod-qtd');
   var resumo = document.getElementById('est-prod-resumo');
-  var campoQtd = document.getElementById('est-mov-qtd');
-  if (!inputs.length) return;
+  if (!inputs.length || !resumo) return;
 
-  var totalMp = 0, totalUn = 0;
+  var itens = [], totalUn = 0;
   Array.prototype.forEach.call(inputs, function(inp) {
-    var q = parseFloat(inp.value) || 0;
-    var peso = parseFloat(inp.getAttribute('data-peso')) || 0;
-    totalMp += q * peso;
-    totalUn += q;
+    var q = parseFloat(String(inp.value).replace(',','.')) || 0;
+    if (q > 0) {
+      totalUn += q;
+      itens.push(q + 'x ' + (inp.getAttribute('data-nome') || ''));
+    }
   });
 
-  totalMp = Math.round(totalMp * 1000) / 1000;
-  if (campoQtd && totalUn > 0) campoQtd.value = totalMp;
+  var qtdEl = document.getElementById('est-mov-qtd');
+  var saida = qtdEl ? (parseFloat(String(qtdEl.value).replace(',','.')) || 0) : 0;
 
   var selP = document.getElementById('est-mov-produto');
-  var mp = selP && selP.value !== '' ? state.estoque.produtos[parseInt(selP.value)] : null;
+  var mp = (selP && selP.value !== '') ? state.estoque.produtos[parseInt(selP.value)] : null;
   var disponivel = mp ? mp.qtd : 0;
-  var falta = totalMp > disponivel;
+  var unMp = mp ? (mp.unidade || 'un') : '';
 
-  if (resumo) {
-    resumo.innerHTML = totalUn > 0
-      ? 'Serão produzidas <strong>' + totalUn + '</strong> unidade' + (totalUn>1?'s':'') + ', consumindo <strong>' +
-        totalMp + ' ' + esc(mp ? (mp.unidade||'un') : '') + '</strong> de matéria prima.' +
-        (falta ? '<div style="color:var(--red);font-weight:600;margin-top:4px">⚠ Estoque insuficiente: disponível ' + disponivel + '</div>'
-               : '<div style="color:var(--text3);margin-top:4px">Saldo após a baixa: ' + Math.round((disponivel-totalMp)*1000)/1000 + '</div>') +
-        '<div style="color:var(--text3);margin-top:4px;font-size:0.78rem">Você pode ajustar a quantidade acima se houver perda no processo.</div>'
-      : '<span style="color:var(--text3)">Sem produção informada — a saída será apenas baixa de estoque.</span>';
+  if (!totalUn) {
+    resumo.innerHTML = '<span style="color:var(--text3)">Sem produção informada — será registrada apenas a baixa de estoque.</span>';
+    return;
   }
+
+  resumo.innerHTML =
+    '<div>Entrada no produto acabado: <strong>' + itens.join(', ') + '</strong></div>' +
+    '<div style="margin-top:4px">Baixa em ' + esc(mp ? mp.nome : '') + ': <strong>' + saida + ' ' + esc(unMp) + '</strong>' +
+      ' <span style="color:var(--text3)">(o valor que você digitou no campo Quantidade)</span></div>' +
+    (saida > disponivel
+      ? '<div style="color:var(--red);font-weight:600;margin-top:4px">⚠ Estoque insuficiente: disponível ' + disponivel + '</div>'
+      : '<div style="color:var(--text3);margin-top:4px">Saldo após a baixa: ' + (Math.round((disponivel - saida) * 1000) / 1000) + '</div>');
 }
 
 // Le o que foi produzido no painel
@@ -366,22 +369,6 @@ function estoqueLerProducao() {
   return out;
 }
 
-
-// Converte o peso do produto acabado para a unidade da materia prima.
-// Ex: 100 g de uma MP medida em kg = 0,1
-function estoquePesoNaUnidadeMp(pa, mp) {
-  var peso = parseFloat(pa.peso) || 0;
-  var uPa  = String(pa.unidade || 'kg').trim().toLowerCase();
-  var uMp  = String((mp && mp.unidade) || 'kg').trim().toLowerCase();
-
-  function fator(u) {
-    if (u === 'g' || u === 'ml') return 0.001;   // grama e mililitro
-    if (u === 'mg')              return 0.000001;
-    return 1;                                     // kg, l, un
-  }
-  // peso convertido para a base (kg/L) e depois para a unidade da MP
-  return (peso * fator(uPa)) / fator(uMp);
-}
 
 // ── PRODUTO ACABADO ─────────────────────────────────────────────────────────
 
@@ -426,7 +413,7 @@ function renderEstoqueAcabado() {
   lista.forEach(function(o, k) {
     var p = o.p, i = o.i;
     var mp = estoqueAchaMp(p.materiaPrima);
-    var custo = (mp && typeof mp.cmp === 'number' && p.peso) ? mp.cmp * estoquePesoNaUnidadeMp(p, mp) : null;
+    var custo = (mp && typeof mp.cmp === 'number' && p.peso) ? mp.cmp * p.peso : null;
 
     html += '<tr style="border-bottom:0.5px solid var(--border);' + (k % 2 ? 'background:var(--bg3)' : '') + '">' +
       '<td style="padding:9px 14px;font-weight:600">' + esc(p.nome) + '</td>' +
@@ -674,7 +661,7 @@ function renderEstoqueMovimentacao() {
           '</div>'
         : '<input type="hidden" id="est-mov-tipo" value="saida">') +
         '<div><label style="font-size:0.78rem;color:var(--text2);margin-bottom:4px;display:block">Quantidade</label>' +
-          '<input type="number" id="est-mov-qtd" min="1" value="1" style="width:100%;padding:0.6rem 0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem">' +
+          '<input type="number" id="est-mov-qtd" min="0" step="any" value="1" oninput="estoqueCalcProducao()" style="width:100%;padding:0.6rem 0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem">' +
         '</div>' +
         (isAdm ?
           '<div><label style="font-size:0.78rem;color:var(--text2);margin-bottom:4px;display:block">Custo R$/kg</label>' +

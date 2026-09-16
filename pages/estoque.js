@@ -265,6 +265,108 @@ function podeOperarEstoque() {
   return isAdmin();
 }
 
+// ── PRODUÇÃO: saída de matéria prima que vira produto acabado ───────────────
+
+// Produtos acabados vinculados a uma matéria prima
+function estoqueAcabadosDaMp(nomeMp) {
+  return estoqueAcabados().map(function(p, i){ return { p:p, i:i }; })
+    .filter(function(o){ return o.p.materiaPrima === nomeMp; });
+}
+
+function estoqueMovProdutoChange() {
+  var box  = document.getElementById('est-mov-producao');
+  var selP = document.getElementById('est-mov-produto');
+  var selT = document.getElementById('est-mov-tipo');
+  if (!box || !selP) return;
+
+  var tipo = selT ? selT.value : 'saida';
+  var idx  = selP.value;
+
+  if (tipo !== 'saida' || idx === '') { box.style.display = 'none'; box.innerHTML = ''; return; }
+
+  var mp = state.estoque.produtos[parseInt(idx)];
+  if (!mp) { box.style.display = 'none'; return; }
+
+  var acabados = estoqueAcabadosDaMp(mp.nome);
+  if (!acabados.length) {
+    box.style.display = 'block';
+    box.innerHTML = '<div style="font-size:0.83rem;color:var(--text3)">' +
+      'Nenhum produto acabado vinculado a <strong>' + esc(mp.nome) + '</strong>. ' +
+      'A saída será registrada apenas como baixa de estoque.</div>';
+    return;
+  }
+
+  box.style.display = 'block';
+  box.innerHTML =
+    '<div style="font-weight:700;font-size:0.88rem;margin-bottom:0.3rem">🏭 Produção</div>' +
+    '<div style="font-size:0.8rem;color:var(--text2);margin-bottom:0.8rem">' +
+      'Informe quanto foi produzido de cada item. A baixa de <strong>' + esc(mp.nome) + '</strong> é calculada automaticamente.' +
+    '</div>' +
+    '<div style="display:flex;flex-direction:column;gap:7px">' +
+      acabados.map(function(o) {
+        var p = o.p;
+        return '<div style="display:flex;align-items:center;gap:10px">' +
+          '<div style="flex:1;min-width:0">' +
+            '<div style="font-size:0.85rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(p.nome) + '</div>' +
+            '<div style="font-size:0.72rem;color:var(--text3)">' + esc(p.sku||'') + ' · ' + p.peso + ' ' + esc(p.unidade||'kg') + ' por unidade · estoque: ' + (p.qtd || 0) + '</div>' +
+          '</div>' +
+          '<input type="number" min="0" step="1" value="0" data-pa="' + o.i + '" data-peso="' + p.peso + '" ' +
+            'class="est-prod-qtd" oninput="estoqueCalcProducao()" ' +
+            'style="width:90px;padding:0.45rem 0.6rem;border:1px solid var(--border);border-radius:7px;background:var(--input-bg);color:var(--text);font-size:0.9rem;text-align:center">' +
+        '</div>';
+      }).join('') +
+    '</div>' +
+    '<div id="est-prod-resumo" style="margin-top:0.8rem;padding-top:0.7rem;border-top:1px solid var(--border);font-size:0.83rem;color:var(--text2)"></div>';
+
+  estoqueCalcProducao();
+}
+
+// Soma peso x quantidade e joga no campo de quantidade da saida
+function estoqueCalcProducao() {
+  var inputs = document.querySelectorAll('.est-prod-qtd');
+  var resumo = document.getElementById('est-prod-resumo');
+  var campoQtd = document.getElementById('est-mov-qtd');
+  if (!inputs.length) return;
+
+  var totalMp = 0, totalUn = 0;
+  Array.prototype.forEach.call(inputs, function(inp) {
+    var q = parseFloat(inp.value) || 0;
+    var peso = parseFloat(inp.getAttribute('data-peso')) || 0;
+    totalMp += q * peso;
+    totalUn += q;
+  });
+
+  totalMp = Math.round(totalMp * 1000) / 1000;
+  if (campoQtd && totalUn > 0) campoQtd.value = totalMp;
+
+  var selP = document.getElementById('est-mov-produto');
+  var mp = selP && selP.value !== '' ? state.estoque.produtos[parseInt(selP.value)] : null;
+  var disponivel = mp ? mp.qtd : 0;
+  var falta = totalMp > disponivel;
+
+  if (resumo) {
+    resumo.innerHTML = totalUn > 0
+      ? 'Serão produzidas <strong>' + totalUn + '</strong> unidade' + (totalUn>1?'s':'') + ', consumindo <strong>' +
+        totalMp + ' ' + esc(mp ? (mp.unidade||'un') : '') + '</strong> de matéria prima.' +
+        (falta ? '<div style="color:var(--red);font-weight:600;margin-top:4px">⚠ Estoque insuficiente: disponível ' + disponivel + '</div>'
+               : '<div style="color:var(--text3);margin-top:4px">Saldo após a baixa: ' + Math.round((disponivel-totalMp)*1000)/1000 + '</div>') +
+        '<div style="color:var(--text3);margin-top:4px;font-size:0.78rem">Você pode ajustar a quantidade acima se houver perda no processo.</div>'
+      : '<span style="color:var(--text3)">Sem produção informada — a saída será apenas baixa de estoque.</span>';
+  }
+}
+
+// Le o que foi produzido no painel
+function estoqueLerProducao() {
+  var inputs = document.querySelectorAll('.est-prod-qtd');
+  var out = [];
+  Array.prototype.forEach.call(inputs, function(inp) {
+    var q = parseFloat(inp.value) || 0;
+    if (q > 0) out.push({ idx: parseInt(inp.getAttribute('data-pa')), qtd: q });
+  });
+  return out;
+}
+
+
 // ── PRODUTO ACABADO ─────────────────────────────────────────────────────────
 
 function estoqueAcabados() {
@@ -299,6 +401,7 @@ function renderEstoqueAcabado() {
       '<th style="text-align:left;padding:10px 14px;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Produto</th>' +
       '<th style="text-align:left;padding:10px 12px;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">SKU</th>' +
       '<th style="text-align:center;padding:10px 12px;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Peso</th>' +
+      '<th style="text-align:center;padding:10px 12px;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Estoque</th>' +
       '<th style="text-align:left;padding:10px 12px;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Matéria Prima</th>' +
       '<th style="text-align:right;padding:10px 12px;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text3)">Custo do insumo</th>' +
       '<th style="padding:10px 14px"></th>' +
@@ -313,6 +416,8 @@ function renderEstoqueAcabado() {
       '<td style="padding:9px 14px;font-weight:600">' + esc(p.nome) + '</td>' +
       '<td style="padding:9px 12px"><code style="font-size:0.8rem;background:var(--bg3);padding:1px 7px;border-radius:5px">' + esc(p.sku || '—') + '</code></td>' +
       '<td style="padding:9px 12px;text-align:center">' + (p.peso ? p.peso + ' ' + esc(p.unidade || 'kg') : '—') + '</td>' +
+      '<td style="padding:9px 12px;text-align:center;font-weight:700;font-size:1rem;color:' +
+        ((p.qtd||0) <= 0 ? 'var(--red)' : 'var(--green)') + '">' + (p.qtd || 0) + '</td>' +
       '<td style="padding:9px 12px">' +
         (p.materiaPrima
           ? esc(p.materiaPrima) + (mp ? '' : '<span style="color:var(--amber);font-size:0.75rem"> (não encontrada)</span>')
@@ -322,6 +427,8 @@ function renderEstoqueAcabado() {
         (custo !== null ? 'R$ ' + custo.toFixed(2) : '<span style="color:var(--text3)">—</span>') +
       '</td>' +
       '<td style="padding:9px 14px;text-align:right;white-space:nowrap">' +
+        (podeOperarEstoque() ? '<button onclick="estoqueMovAcabado(' + i + ',\'entrada\')" title="Entrada" style="background:none;border:0.5px solid var(--border2);border-radius:7px;padding:3px 9px;color:var(--green);cursor:pointer;font-size:0.8rem;margin-right:4px">+</button>' +
+                              '<button onclick="estoqueMovAcabado(' + i + ',\'saida\')" title="Saída" style="background:none;border:0.5px solid var(--border2);border-radius:7px;padding:3px 9px;color:var(--red);cursor:pointer;font-size:0.8rem;margin-right:4px">−</button>' : '') +
         (isAdmin() ? '<button onclick="estoqueAbrirModalAcabado(' + i + ')" title="Editar" style="background:none;border:none;cursor:pointer;font-size:0.85rem;padding:2px 5px">✏️</button>' +
                      '<button onclick="estoqueExcluirAcabado(' + i + ')" title="Excluir" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:0.9rem;padding:2px 5px">×</button>' : '') +
       '</td>' +
@@ -330,6 +437,83 @@ function renderEstoqueAcabado() {
 
   html += '</tbody></table></div></div>';
   return html;
+}
+
+// Entrada / saida manual no estoque do produto acabado
+function estoqueMovAcabado(idx, tipo) {
+  var p = estoqueAcabados()[idx];
+  if (!p) return;
+  var modal = document.getElementById('modal');
+  var mc    = document.getElementById('modal-content');
+  if (!modal || !mc) return;
+
+  var ehEntrada = tipo === 'entrada';
+  mc.innerHTML =
+    '<div style="padding:1.5rem;min-width:320px;max-width:400px">' +
+      '<div style="font-size:1.1rem;font-weight:700;margin-bottom:4px">' +
+        (ehEntrada ? '📥 Entrada' : '📤 Saída') + ' — Produto Acabado</div>' +
+      '<div style="font-size:0.85rem;color:var(--text3);margin-bottom:1.25rem">' +
+        esc(p.nome) + ' · estoque atual: <strong>' + (p.qtd || 0) + '</strong></div>' +
+
+      '<div style="margin-bottom:12px">' +
+        '<label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:4px;font-weight:600">Quantidade *</label>' +
+        '<input id="pa-mov-qtd" type="number" min="1" step="1" value="1" class="tn-input" style="width:100%;margin:0">' +
+      '</div>' +
+
+      '<div style="margin-bottom:1.25rem">' +
+        '<label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:4px;font-weight:600">Observação</label>' +
+        '<input id="pa-mov-obs" class="tn-input" placeholder="' +
+          (ehEntrada ? 'Ex: ajuste de inventário' : 'Ex: venda, perda, avaria') + '" style="width:100%;margin:0">' +
+      '</div>' +
+
+      '<div style="display:flex;gap:8px">' +
+        '<button class="btn" style="flex:1" onclick="closeModal()">Cancelar</button>' +
+        '<button class="btn ' + (ehEntrada ? 'btn-green' : 'btn-red') + '" style="flex:1" ' +
+          'onclick="estoqueSalvarMovAcabado(' + idx + ',\'' + tipo + '\')">✓ Confirmar</button>' +
+      '</div>' +
+      '<div id="pa-mov-status" style="font-size:0.82rem;color:var(--red);text-align:center;margin-top:8px;min-height:1.2em"></div>' +
+    '</div>';
+
+  modal.style.display = 'flex';
+  setTimeout(function(){ var e = document.getElementById('pa-mov-qtd'); if (e) { e.focus(); e.select(); } }, 50);
+}
+
+function estoqueSalvarMovAcabado(idx, tipo) {
+  var p = estoqueAcabados()[idx];
+  if (!p) return;
+  var qtd = parseFloat(((document.getElementById('pa-mov-qtd')||{}).value || '0').replace(',','.')) || 0;
+  var obs = ((document.getElementById('pa-mov-obs')||{}).value || '').trim();
+  var st  = document.getElementById('pa-mov-status');
+
+  if (qtd <= 0) { if (st) st.textContent = '⚠ Informe uma quantidade válida.'; return; }
+  var atual = p.qtd || 0;
+  if (tipo === 'saida' && qtd > atual) {
+    if (st) st.textContent = '⚠ Quantidade maior que o estoque (' + atual + ').';
+    return;
+  }
+
+  p.qtd = tipo === 'entrada' ? atual + qtd : atual - qtd;
+
+  var now = new Date();
+  state.estoque.movimentacoes.push({
+    id: Date.now(),
+    data: now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'}),
+    dataISO: now.toISOString().slice(0,10),
+    produto: p.nome,
+    tipo: tipo,
+    qtd: qtd,
+    saldoApos: p.qtd,
+    usuario: state.currentUser ? state.currentUser.login : '--',
+    obs: obs,
+    acabado: true,
+  });
+
+  addLog((tipo === 'entrada' ? 'Entrada' : 'Saída') + ' de produto acabado: ' + qtd + 'x ' + p.nome +
+    ' (antes: ' + atual + ' → agora: ' + p.qtd + ')');
+  saveState();
+  closeModal();
+  var c = document.getElementById('page-content');
+  if (c) c.innerHTML = renderEstoque();
 }
 
 function estoqueAchaMp(nome) {
@@ -419,9 +603,10 @@ function estoqueSalvarAcabado(idx) {
   var dup = lista.some(function(p, i){ return p.sku === sku && i !== idx; });
   if (dup) return erro('⚠ Já existe um produto com o SKU "' + sku + '".');
 
-  var reg = { nome:nome, sku:sku, peso:peso, unidade:unidade, materiaPrima:mp };
+  var reg = { nome:nome, sku:sku, peso:peso, unidade:unidade, materiaPrima:mp, qtd:0 };
 
   if (idx !== null && idx !== 'null' && lista[idx]) {
+    reg.qtd = lista[idx].qtd || 0;   // preserva o estoque ao editar
     lista[idx] = reg;
     addLog('Editou produto acabado: "' + nome + '"');
   } else {
@@ -459,14 +644,14 @@ function renderEstoqueMovimentacao() {
       '<div class="card-header" style="margin-bottom:1rem"><span class="card-title">Registrar Movimentação</span></div>' +
       '<div style="display:grid;grid-template-columns:' + (isAdm ? '1.5fr 1fr 90px 100px 100px 1fr' : '1fr 100px 1fr') + ';gap:10px;align-items:end">' +
         '<div><label style="font-size:0.78rem;color:var(--text2);margin-bottom:4px;display:block">Produto</label>' +
-          '<select id="est-mov-produto" style="width:100%;padding:0.6rem 0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem">' +
+          '<select id="est-mov-produto" onchange="estoqueMovProdutoChange()" style="width:100%;padding:0.6rem 0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem">' +
             '<option value="">Selecione...</option>' +
             produtos.map(function(p,i){ return '<option value="' + i + '">' + esc(p.nome) + ' (' + p.qtd + ' ' + esc(p.unidade||'un') + ')</option>'; }).join('') +
           '</select>' +
         '</div>' +
         (isAdm ?
           '<div><label style="font-size:0.78rem;color:var(--text2);margin-bottom:4px;display:block">Tipo</label>' +
-            '<select id="est-mov-tipo" style="width:100%;padding:0.6rem 0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem">' +
+            '<select id="est-mov-tipo" onchange="estoqueMovProdutoChange()" style="width:100%;padding:0.6rem 0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem">' +
               '<option value="entrada">📥 Entrada</option>' +
               '<option value="saida">📤 Saída</option>' +
             '</select>' +
@@ -487,6 +672,8 @@ function renderEstoqueMovimentacao() {
           '<input type="text" id="est-mov-obs" placeholder="Opcional" style="width:100%;padding:0.6rem 0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem">' +
         '</div>' +
       '</div>' +
+      // Painel de producao: aparece na saida quando a MP tem produtos acabados
+      '<div id="est-mov-producao" style="display:none;margin-top:1rem;padding:1rem;background:var(--bg3);border-radius:10px;border-left:4px solid var(--green)"></div>' +
       '<div style="margin-top:10px;display:flex;gap:8px;align-items:center">' +
         '<button class="btn btn-green" onclick="estoqueRegistrarMov()">✓ Registrar</button>' +
         '<span id="est-mov-status" style="font-size:0.85rem;color:var(--text2)"></span>' +
@@ -1055,13 +1242,16 @@ function estoqueRegistrarMov() {
 
   var idx   = idxEl  ? parseInt(idxEl.value)  : -1;
   var tipo  = tipoEl ? tipoEl.value           : 'saida';
-  var qtd   = qtdEl  ? parseInt(qtdEl.value)  : 0;
+  var qtd   = qtdEl  ? (parseFloat(String(qtdEl.value).replace(',','.')) || 0) : 0;
   var obs   = obsEl  ? obsEl.value.trim()     : '';
   var custo = custoEl ? parseFloat(custoEl.value.replace(',','.')) || 0 : 0;
   var frete = freteEl ? parseFloat(freteEl.value.replace(',','.')) || 0 : 0;
 
   if (isNaN(idx) || idx < 0 || !state.estoque.produtos[idx]) { if(status) status.textContent = '⚠ Selecione um produto.'; return; }
-  if (!qtd || qtd < 1) { if(status) status.textContent = '⚠ Informe uma quantidade válida.'; return; }
+  if (!qtd || qtd <= 0) { if(status) status.textContent = '⚠ Informe uma quantidade válida.'; return; }
+
+  // Producao informada no painel (saida que vira produto acabado)
+  var producao = (tipo === 'saida' && typeof estoqueLerProducao === 'function') ? estoqueLerProducao() : [];
 
   var p = state.estoque.produtos[idx];
   if (tipo === 'saida' && qtd > p.qtd) { if(status) status.textContent = '⚠ Quantidade maior que o estoque (' + p.qtd + ').'; return; }
@@ -1110,10 +1300,42 @@ function estoqueRegistrarMov() {
     mov.cmpResultante = p.cmp;     // snapshot para auditoria
   }
 
+  // Producao: da entrada no estoque dos produtos acabados
+  var produzidos = [];
+  if (producao.length) {
+    var acab = estoqueAcabados();
+    producao.forEach(function(item) {
+      var pa = acab[item.idx];
+      if (!pa) return;
+      pa.qtd = (pa.qtd || 0) + item.qtd;
+      produzidos.push(item.qtd + 'x ' + pa.nome);
+      state.estoque.movimentacoes.push({
+        id: Date.now() + item.idx + 1,
+        data: dataStr,
+        dataISO: dataISO,
+        produto: pa.nome,
+        tipo: 'entrada',
+        qtd: item.qtd,
+        saldoApos: pa.qtd,
+        usuario: state.currentUser ? state.currentUser.login : '--',
+        obs: 'Produção a partir de ' + p.nome,
+        acabado: true,
+      });
+    });
+    mov.producao = produzidos.join(', ');
+  }
+
   state.estoque.movimentacoes.push(mov);
-  addLog((tipo === 'entrada' ? 'Entrada' : 'Saída') + ' de estoque: ' + qtd + 'x ' + p.nome + ' (antes: ' + anterior + ' → agora: ' + p.qtd + ')');
+  addLog((tipo === 'entrada' ? 'Entrada' : 'Saída') + ' de estoque: ' + qtd + 'x ' + p.nome +
+    ' (antes: ' + anterior + ' → agora: ' + p.qtd + ')' +
+    (produzidos.length ? ' | Produziu: ' + produzidos.join(', ') : ''));
   saveState();
-  if (status) { status.textContent = '✓ Registrado!'; setTimeout(function(){ status.textContent=''; }, 2000); }
+  if (status) {
+    status.textContent = produzidos.length
+      ? '✓ Registrado! Produzido: ' + produzidos.join(', ')
+      : '✓ Registrado!';
+    setTimeout(function(){ status.textContent=''; }, 3000);
+  }
   navigate('estoque');
 }
 

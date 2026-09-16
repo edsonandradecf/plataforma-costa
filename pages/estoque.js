@@ -308,9 +308,9 @@ function estoqueMovProdutoChange() {
         return '<div style="display:flex;align-items:center;gap:10px">' +
           '<div style="flex:1;min-width:0">' +
             '<div style="font-size:0.85rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(p.nome) + '</div>' +
-            '<div style="font-size:0.72rem;color:var(--text3)">' + esc(p.sku||'') + ' · ' + p.peso + ' ' + esc(p.unidade||'kg') + ' por unidade · estoque: ' + (p.qtd || 0) + '</div>' +
+            '<div style="font-size:0.72rem;color:var(--text3)">' + esc(p.sku||'') + ' · ' + p.peso + ' ' + esc(p.unidade||'kg') + ' = ' + estoquePesoNaUnidadeMp(p, mp) + ' ' + esc(mp.unidade||'kg') + ' · estoque: ' + (p.qtd || 0) + '</div>' +
           '</div>' +
-          '<input type="number" min="0" step="1" value="0" data-pa="' + o.i + '" data-peso="' + p.peso + '" ' +
+          '<input type="number" min="0" step="1" value="0" data-pa="' + o.i + '" data-peso="' + estoquePesoNaUnidadeMp(p, mp) + '" ' +
             'class="est-prod-qtd" oninput="estoqueCalcProducao()" ' +
             'style="width:90px;padding:0.45rem 0.6rem;border:1px solid var(--border);border-radius:7px;background:var(--input-bg);color:var(--text);font-size:0.9rem;text-align:center">' +
         '</div>';
@@ -367,6 +367,22 @@ function estoqueLerProducao() {
 }
 
 
+// Converte o peso do produto acabado para a unidade da materia prima.
+// Ex: 100 g de uma MP medida em kg = 0,1
+function estoquePesoNaUnidadeMp(pa, mp) {
+  var peso = parseFloat(pa.peso) || 0;
+  var uPa  = String(pa.unidade || 'kg').trim().toLowerCase();
+  var uMp  = String((mp && mp.unidade) || 'kg').trim().toLowerCase();
+
+  function fator(u) {
+    if (u === 'g' || u === 'ml') return 0.001;   // grama e mililitro
+    if (u === 'mg')              return 0.000001;
+    return 1;                                     // kg, l, un
+  }
+  // peso convertido para a base (kg/L) e depois para a unidade da MP
+  return (peso * fator(uPa)) / fator(uMp);
+}
+
 // ── PRODUTO ACABADO ─────────────────────────────────────────────────────────
 
 function estoqueAcabados() {
@@ -410,7 +426,7 @@ function renderEstoqueAcabado() {
   lista.forEach(function(o, k) {
     var p = o.p, i = o.i;
     var mp = estoqueAchaMp(p.materiaPrima);
-    var custo = (mp && typeof mp.cmp === 'number' && p.peso) ? mp.cmp * p.peso : null;
+    var custo = (mp && typeof mp.cmp === 'number' && p.peso) ? mp.cmp * estoquePesoNaUnidadeMp(p, mp) : null;
 
     html += '<tr style="border-bottom:0.5px solid var(--border);' + (k % 2 ? 'background:var(--bg3)' : '') + '">' +
       '<td style="padding:9px 14px;font-weight:600">' + esc(p.nome) + '</td>' +

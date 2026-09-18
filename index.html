@@ -520,44 +520,36 @@ function applyParsed(parsed, forceMerge) {
   }
   var t = parsed.tasks || {};
   var tAtual = state.tasks || {};
-  function manterLista(nova, atual) {
-    if (Array.isArray(nova) && nova.length > 0) return nova;
-    if (Array.isArray(atual) && atual.length > 0) return atual;
+  // Aceita o dado como veio, inclusive lista vazia (exclusao e legitima).
+  // A protecao contra payload vazio por falha esta no guard de dataSize acima.
+  function manterLista(nova) {
     return Array.isArray(nova) ? nova : [];
   }
   state.tasks = {
-    expedicao: manterLista(t.expedicao, tAtual.expedicao),
-    producao:  manterLista(t.producao,  tAtual.producao),
+    expedicao: manterLista(t.expedicao),
+    producao:  manterLista(t.producao),
   };
-  state.compras  = manterLista(parsed.compras,  state.compras);
-  state.mural    = manterLista(parsed.mural,    state.mural);
-  state.agenda   = manterLista(parsed.agenda,   state.agenda);
+  state.compras  = manterLista(parsed.compras);
+  state.mural    = manterLista(parsed.mural);
+  state.agenda   = manterLista(parsed.agenda);
   state.logs     = Array.isArray(parsed.logs)     ? parsed.logs     : [];
-  state.tabnutri = manterLista(parsed.tabnutri, state.tabnutri);
+  state.tabnutri = manterLista(parsed.tabnutri);
 
   var est  = parsed.estoque || {};
   var estA = state.estoque  || {};
   state.estoque = {
-    produtos:        manterLista(est.produtos,        estA.produtos),
-    movimentacoes:   manterLista(est.movimentacoes,   estA.movimentacoes),
-    historicoManual: manterLista(est.historicoManual, estA.historicoManual),
-    acabados:        manterLista(est.acabados,        estA.acabados),
+    produtos:        manterLista(est.produtos),
+    movimentacoes:   manterLista(est.movimentacoes),
+    historicoManual: manterLista(est.historicoManual),
+    acabados:        manterLista(est.acabados),
   };
   var pt = parsed.ponto || {};
   // Formato correto: { colaboradores: [...], registros: [...] }
   state.ponto = {
-    colaboradores: Array.isArray(pt.colaboradores) && pt.colaboradores.length > 0
-      ? pt.colaboradores
-      : (state.ponto && Array.isArray(state.ponto.colaboradores) && state.ponto.colaboradores.length > 0
-          ? state.ponto.colaboradores : []),
-    registros: Array.isArray(pt.registros) && pt.registros.length > 0
-      ? pt.registros
-      : (state.ponto && Array.isArray(state.ponto.registros) && state.ponto.registros.length > 0
-          ? state.ponto.registros : []),
+    colaboradores: manterLista(pt.colaboradores),
+    registros:     manterLista(pt.registros),
   };
-  state.devolucoes = Array.isArray(parsed.devolucoes) && parsed.devolucoes.length > 0
-    ? parsed.devolucoes
-    : (Array.isArray(state.devolucoes) && state.devolucoes.length > 0 ? state.devolucoes : []);
+  state.devolucoes = manterLista(parsed.devolucoes);
 
   // TV: dados de vendas importados (semana + meses)
   var tvIn  = parsed.tv || {};
@@ -569,12 +561,9 @@ function applyParsed(parsed, forceMerge) {
     meses:  Object.keys(mesesIn).length > 0 ? mesesIn : mesesOld,
   };
   // Precificacao: biblioteca de produtos (null = nunca usada, [] = esvaziada de proposito)
-  var prcIn  = (parsed.precificacao && parsed.precificacao.produtos);
-  var prcOld = (state.precificacao && state.precificacao.produtos);
+  var prcIn = (parsed.precificacao && parsed.precificacao.produtos);
   state.precificacao = {
-    produtos: (Array.isArray(prcIn) && prcIn.length > 0) ? prcIn
-            : (Array.isArray(prcOld) && prcOld.length > 0) ? prcOld
-            : (Array.isArray(prcIn) ? prcIn : prcOld || null),
+    produtos: Array.isArray(prcIn) ? prcIn : ((state.precificacao && state.precificacao.produtos) || null),
   };
 
   if (tvIn.periodos && !state.tv.semana) {   // formato antigo

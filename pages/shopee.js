@@ -73,7 +73,15 @@ function shopeeSaveToken(t) {
   _shopeeToken = t;
   localStorage.setItem('shopee_token', JSON.stringify(t));
   state.shopeeToken = t;
-  saveState();
+  // Grava SOMENTE o token no Firebase. Usar saveState() aqui mandaria o
+  // estado inteiro e, numa aba sem dados carregados, apagaria tudo.
+  try {
+    fetch(FIREBASE_URL + '/data/shopeeToken.json', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(t),
+    }).catch(function(){});
+  } catch(e) {}
 }
 function shopeeTokenValid() {
   var t = shopeeLoadToken();

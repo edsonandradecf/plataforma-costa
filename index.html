@@ -794,6 +794,22 @@ async function pushToCloud(data) {
     console.warn('pushToCloud bloqueado: Firebase ainda não confirmado');
     return;
   }
+  // Trava de seguranca: nunca grava um estado vazio por cima de dados existentes.
+  // Protege contra saves disparados por rotinas de fundo (ex: refresh de token)
+  // em abas que ficaram abertas sem os dados carregados.
+  if (dataSize(data) === 0) {
+    try {
+      const atual = await (await fetch(FIREBASE_URL + '/data.json')).json();
+      if (dataSize(atual) > 0) {
+        console.warn('pushToCloud BLOQUEADO: tentativa de gravar estado vazio sobre ' + dataSize(atual) + ' itens.');
+        showSyncStatus('Gravacao vazia bloqueada', 'var(--amber)');
+        return;
+      }
+    } catch (e) {
+      console.warn('pushToCloud bloqueado: nao foi possivel verificar o estado remoto.');
+      return;
+    }
+  }
   if (_isSaving) { _pendingSave = true; return; }
   _isSaving = true;
   showSyncStatus('^ Salvando...', 'var(--text3)');

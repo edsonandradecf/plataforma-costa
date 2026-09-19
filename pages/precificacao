@@ -122,6 +122,11 @@ function prcLerCampos() {
   };
 }
 
+
+
+
+
+
 function prcCalcular() {
   var d = prcLerCampos();
   var base   = d.custo + d.embalagem + d.etiqueta + d.frete;

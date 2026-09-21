@@ -1123,7 +1123,17 @@ function startApp() {
     history.replaceState({ page: initialPage }, '', '#' + initialPage);
   }
   buildSidebar();
-  renderPage();
+  // Se a pagina inicial falhar (ex: modulo que nao carregou), volta para o Inicio
+  // em vez de abortar o login — senao o sync nao liga e o estado fica pela metade.
+  try {
+    renderPage();
+  } catch (e) {
+    console.error('Falha ao abrir "' + state.currentPage + '":', e);
+    state.currentPage = 'inicio';
+    history.replaceState({ page: 'inicio' }, '', '#inicio');
+    buildSidebar();
+    try { renderPage(); } catch (e2) { console.error('Falha ao abrir o Inicio:', e2); }
+  }
   startRealtimeSync();
   setTimeout(estoqueHistLoadFirebase, 2000);
   iniciarRenovacaoAutomatica();
@@ -1177,7 +1187,13 @@ function renderPage() {
   if (pg === 'margemviva')    { c.innerHTML = (state.currentUser.role === 'admin' ? renderMargemViva() : '<div class="empty-state">' + iconEmpty() + '<p>Acesso restrito a administradores.</p></div>'); return; }
   if (pg === 'ponto')     { c.innerHTML = renderPonto(); return; }
   if (pg === 'logs')      { c.innerHTML = renderLogs(); return; }
-  if (pg === 'precificacao') { c.innerHTML = renderPrecificacao(); bindPrecificacao(); return; }
+  if (pg === 'precificacao') {
+    if (typeof renderPrecificacao !== 'function') {
+      c.innerHTML = '<div class="empty-state">' + iconEmpty() + '<p>O módulo de Precificação não carregou (pages/precificacao.js).</p></div>';
+      return;
+    }
+    c.innerHTML = renderPrecificacao(); bindPrecificacao(); return;
+  }
   if (pg === 'financeiro') { c.innerHTML = renderFinanceiro(); bindFinanceiro(); return; }
 }
 

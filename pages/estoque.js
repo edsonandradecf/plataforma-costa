@@ -128,8 +128,8 @@ function renderEstoque() {
   if (isMp)    return tabBar + renderEstoqueLista();
   if (isPa)    return tabBar + renderEstoqueAcabado();
   if (isMov)   return tabBar + renderEstoqueMovimentacao();
-  if (isHist)  return tabBar + (isAdmin() ? renderEstoqueHistorico() : '<div class="empty-state">'+iconEmpty()+'<p>Acesso restrito.</p></div>');
-  if (isCust)  return tabBar + (isAdmin() ? renderEstoqueCusto() : '<div class="empty-state">'+iconEmpty()+'<p>Acesso restrito.</p></div>');
+  if (isHist)  return tabBar + (estoqueLiberado() ? renderEstoqueHistorico() : '<div class="empty-state">'+iconEmpty()+'<p>Acesso restrito.</p></div>');
+  if (isCust)  return tabBar + (estoqueLiberado() ? renderEstoqueCusto() : '<div class="empty-state">'+iconEmpty()+'<p>Acesso restrito.</p></div>');
   return tabBar + renderEstoqueLista();
 }
 
@@ -176,7 +176,7 @@ function renderEstoqueLista() {
           return '<option value="' + o[0] + '"' + (ordem === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
         }).join('') +
       '</select>' +
-      (isAdmin() ? '<button class="btn btn-green" onclick="estoqueAbrirModalProduto(null)">+ Nova Matéria Prima</button>' : '') +
+      (estoqueLiberado() ? '<button class="btn btn-green" onclick="estoqueAbrirModalProduto(null)">+ Nova Matéria Prima</button>' : '') +
     '</div>';
 
   // Resumo
@@ -235,7 +235,7 @@ function renderEstoqueLista() {
       '<td style="padding:9px 14px;text-align:right;white-space:nowrap">' +
         (podeOperarEstoque() ? '<button onclick="estoqueAbrirModalMov(' + i + ',\'entrada\')" title="Entrada" style="background:none;border:0.5px solid var(--border2);border-radius:7px;padding:3px 9px;color:var(--green);cursor:pointer;font-size:0.8rem;margin-right:4px">+</button>' +
                               '<button onclick="estoqueAbrirModalMov(' + i + ',\'saida\')" title="Saída" style="background:none;border:0.5px solid var(--border2);border-radius:7px;padding:3px 9px;color:var(--red);cursor:pointer;font-size:0.8rem;margin-right:4px">−</button>' : '') +
-        (isAdmin() ? '<button onclick="estoqueAbrirModalProduto(' + i + ')" title="Editar" style="background:none;border:none;cursor:pointer;font-size:0.85rem;padding:2px 5px">✏️</button>' +
+        (estoqueLiberado() ? '<button onclick="estoqueAbrirModalProduto(' + i + ')" title="Editar" style="background:none;border:none;cursor:pointer;font-size:0.85rem;padding:2px 5px">✏️</button>' +
                      '<button onclick="estoqueExcluirProduto(' + i + ')" title="Excluir" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:0.9rem;padding:2px 5px">×</button>' : '') +
       '</td>' +
     '</tr>';
@@ -259,10 +259,13 @@ function estoqueSetOrdem(v) {
   if (c) c.innerHTML = renderEstoque();
 }
 
-// Quem pode movimentar estoque (admin sempre; outros conforme permissao global)
+// Estoque com acesso livre: qualquer usuario logado pode cadastrar, editar,
+// excluir e movimentar. isAdmin() continua existindo para as outras paginas.
+function estoqueLiberado() {
+  return !!(state && state.currentUser);
+}
 function podeOperarEstoque() {
-  if (typeof podeOperar === 'function') return podeOperar();
-  return isAdmin();
+  return estoqueLiberado();
 }
 
 // ── PRODUÇÃO: saída de matéria prima que vira produto acabado ───────────────
@@ -390,7 +393,7 @@ function renderEstoqueAcabado() {
       '<input type="text" placeholder="Buscar produto ou SKU..." value="' + esc(_estoqueBuscaPa || '') + '" ' +
         'oninput="estoqueSetBuscaPa(this.value)" ' +
         'style="flex:1;min-width:200px;padding:0.6rem 0.9rem;border:0.5px solid var(--border2);border-radius:9px;background:var(--input-bg);color:var(--text);font-size:0.9rem;outline:none">' +
-      (isAdmin() ? '<button class="btn btn-green" onclick="estoqueAbrirModalAcabado(null)">+ Novo Produto</button>' : '') +
+      (estoqueLiberado() ? '<button class="btn btn-green" onclick="estoqueAbrirModalAcabado(null)">+ Novo Produto</button>' : '') +
     '</div>';
 
   if (!lista.length) {
@@ -432,7 +435,7 @@ function renderEstoqueAcabado() {
       '<td style="padding:9px 14px;text-align:right;white-space:nowrap">' +
         (podeOperarEstoque() ? '<button onclick="estoqueMovAcabado(' + i + ',\'entrada\')" title="Entrada" style="background:none;border:0.5px solid var(--border2);border-radius:7px;padding:3px 9px;color:var(--green);cursor:pointer;font-size:0.8rem;margin-right:4px">+</button>' +
                               '<button onclick="estoqueMovAcabado(' + i + ',\'saida\')" title="Saída" style="background:none;border:0.5px solid var(--border2);border-radius:7px;padding:3px 9px;color:var(--red);cursor:pointer;font-size:0.8rem;margin-right:4px">−</button>' : '') +
-        (isAdmin() ? '<button onclick="estoqueAbrirModalAcabado(' + i + ')" title="Editar" style="background:none;border:none;cursor:pointer;font-size:0.85rem;padding:2px 5px">✏️</button>' +
+        (estoqueLiberado() ? '<button onclick="estoqueAbrirModalAcabado(' + i + ')" title="Editar" style="background:none;border:none;cursor:pointer;font-size:0.85rem;padding:2px 5px">✏️</button>' +
                      '<button onclick="estoqueExcluirAcabado(' + i + ')" title="Excluir" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:0.9rem;padding:2px 5px">×</button>' : '') +
       '</td>' +
     '</tr>';
@@ -638,7 +641,7 @@ function estoqueExcluirAcabado(idx) {
 function renderEstoqueMovimentacao() {
   var produtos = state.estoque.produtos;
   var movs = state.estoque.movimentacoes;
-  var isAdm = isAdmin();
+  var isAdm = estoqueLiberado();
   var html = '';
 
   // Formulário de movimentação

@@ -1096,7 +1096,7 @@ function cleanOldTasks() {
     if (!state.tasks) state.tasks = {};
     if (!Array.isArray(state.tasks[area])) state.tasks[area] = [];
     const before = state.tasks[area].length;
-    state.tasks[area] = state.tasks[area].filter(t => t.fixa || !(t.done && t.date < todayStr));
+    state.tasks[area] = state.tasks[area].filter(t => tarefaEhRecorrente(t) || !(t.done && t.date < todayStr));
     if (state.tasks[area].length !== before) changed = true;
   });
   // Não salva aqui -- evita sobrescrever Firebase com dados locais ainda não sincronizados
@@ -1269,10 +1269,12 @@ function renderInicio() {
     const cols = (state.ponto && state.ponto.colaboradores) || [];
 
     const tasks = [...(state.tasks[area]||[])]
-      .filter(t => !t.done)
+      .filter(t => tarefaPendenteHoje(t))
       .sort((a, b) => {
-        const dateA = a.date + (a.time || '');
-        const dateB = b.date + (b.time || '');
+        const ra = tarefaEhRecorrente(a), rb = tarefaEhRecorrente(b);
+        if (ra !== rb) return ra ? -1 : 1;
+        const dateA = (a.date||'') + (a.time || '');
+        const dateB = (b.date||'') + (b.time || '');
         return dateA.localeCompare(dateB);
       })
       .slice(0, 8);
@@ -1282,10 +1284,12 @@ function renderInicio() {
     }
 
     return '<div class="task-list">' + tasks.map(t => {
-      const isLate     = t.date < todayStr;
-      const isToday    = t.date === todayStr;
-      const isTomorrow = t.date === tomorrowStr;
-      const dateStr = new Date(t.date + 'T12:00:00').toLocaleDateString('pt-BR') + (t.time ? ' ' + t.time : ' · Sem horário');
+      const rec        = tarefaEhRecorrente(t);
+      const isLate     = !rec && t.date < todayStr;
+      const isToday    = rec || t.date === todayStr;
+      const isTomorrow = !rec && t.date === tomorrowStr;
+      const dateStr = rec ? '🔁 ' + tarefaRegraTexto(t)
+        : new Date(t.date + 'T12:00:00').toLocaleDateString('pt-BR') + (t.time ? ' ' + t.time : ' · Sem horário');
 
       let badge = '';
       if (isLate)     badge = '<span class="task-badge">⚠ Atraso</span>';
@@ -1418,12 +1422,12 @@ function renderTarefas() {
     html += '<div class="card" style="margin-bottom:1rem">' +
       '<div style="font-weight:700;font-size:0.9rem;margin-bottom:0.9rem">+ Nova Tarefa</div>' +
 
-      // Tipo de prazo: data especifica ou fixa (todo dia)
+      // Tipo de prazo: data especifica ou recorrente
       '<div style="display:flex;gap:6px;margin-bottom:10px">' +
         '<button type="button" id="tk-prazo-data" onclick="tarefaSetPrazo(\'data\')" ' +
           'style="flex:1;padding:8px;border:2px solid var(--green);border-radius:8px;background:var(--green);color:#fff;font-weight:700;cursor:pointer;font-size:0.83rem">📅 Data especifica</button>' +
-        '<button type="button" id="tk-prazo-fixa" onclick="tarefaSetPrazo(\'fixa\')" ' +
-          'style="flex:1;padding:8px;border:2px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text2);font-weight:600;cursor:pointer;font-size:0.83rem">📌 Tarefa fixa (todo dia)</button>' +
+        '<button type="button" id="tk-prazo-rec" onclick="tarefaSetPrazo(\'rec\')" ' +
+          'style="flex:1;padding:8px;border:2px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text2);font-weight:600;cursor:pointer;font-size:0.83rem">🔁 Repetir</button>' +
       '</div>' +
 
       '<input type="text" id="task-text" placeholder="Descrição da tarefa..." style="width:100%;padding:0.6rem 0.9rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.9rem;margin-bottom:10px">' +
@@ -1438,8 +1442,23 @@ function renderTarefas() {
         '</div>' +
       '</div>' +
 
-      '<div id="tk-aviso-fixa" style="display:none;padding:10px 12px;background:var(--bg3);border-radius:8px;font-size:0.8rem;color:var(--text2);margin-bottom:10px">' +
-        '📌 Aparece todo dia na TV e na lista, sem data de vencimento. Ideal para rotinas do dia a dia.' +
+      '<div id="tk-campo-rec" style="display:none;padding:10px 12px;background:var(--bg3);border-radius:8px;margin-bottom:10px">' +
+        '<label style="font-size:0.78rem;color:var(--text2);display:block;margin-bottom:5px;font-weight:600">Frequência</label>' +
+        '<select id="tk-rec-tipo" onchange="tarefaRecTipoChange()" style="width:100%;padding:0.55rem 0.8rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.88rem;margin-bottom:8px">' +
+          '<option value="uteis">Todo dia útil (seg a sex)</option>' +
+          '<option value="dias">Dias da semana escolhidos</option>' +
+          '<option value="mensal">Mensal (um dia do mês)</option>' +
+        '</select>' +
+        '<div id="tk-rec-dias" style="display:none;gap:5px;flex-wrap:wrap;margin-bottom:6px">' +
+          ['Dom','Seg','Ter','Qua','Qui','Sex','Sab'].map(function(nm, d){
+            return '<label style="display:flex;align-items:center;gap:4px;padding:5px 9px;border:1px solid var(--border);border-radius:7px;background:var(--bg2);cursor:pointer;font-size:0.8rem">' +
+              '<input type="checkbox" class="tk-rec-dia" value="' + d + '"' + (d===1?' checked':'') + ' style="width:auto;margin:0"> ' + nm + '</label>';
+          }).join('') +
+        '</div>' +
+        '<div id="tk-rec-mensal" style="display:none;align-items:center;gap:8px;font-size:0.84rem;margin-bottom:6px">' +
+          'Todo dia <input type="number" id="tk-rec-diames" min="1" max="31" value="1" style="width:70px;padding:0.45rem 0.6rem;border:1px solid var(--border);border-radius:7px;background:var(--input-bg);color:var(--text)"> do mês' +
+        '</div>' +
+        '<div style="font-size:0.75rem;color:var(--text3)">Pode ser concluída normalmente — no próximo dia em que se repete, volta pendente sozinha.</div>' +
       '</div>' +
 
       // Atribuição: setor ou pessoa
@@ -1504,11 +1523,15 @@ function renderTarefas() {
     }
   }
 
-  // Ordena: fixas no topo, depois pendentes por data, concluidas no fim
+  // Ordena: pendentes hoje primeiro (recorrentes no topo), depois por data; feitas no fim
+  function peso(t) {
+    if (tarefaEhRecorrente(t)) return tarefaPendenteHoje(t) ? 0 : (tarefaFeitaHoje(t) ? 3 : 2);
+    return t.done ? 3 : 1;
+  }
   lista.sort(function(a, b) {
-    if (a.done !== b.done) return a.done ? 1 : -1;
-    if (!!a.fixa !== !!b.fixa) return a.fixa ? -1 : 1;
-    if (a.fixa && b.fixa) return 0;
+    var pa = peso(a), pb = peso(b);
+    if (pa !== pb) return pa - pb;
+    if (tarefaEhRecorrente(a) || tarefaEhRecorrente(b)) return 0;
     return (a.date + (a.time||'')).localeCompare(b.date + (b.time||''));
   });
 
@@ -1521,9 +1544,20 @@ function renderTarefas() {
     lista.forEach(function(t) {
       var badge = '', dateStr;
 
-      if (t.fixa) {
-        dateStr = 'Todo dia';
-        badge = '<span class="task-badge" style="background:#d97706;color:#fff;border:none">📌 Fixa</span>';
+      var rec = tarefaEhRecorrente(t);
+      var feitaHoje = rec && tarefaFeitaHoje(t);
+      var ocorreHoje = rec && tarefaOcorreEm(t);
+      if (rec) {
+        dateStr = '🔁 ' + tarefaRegraTexto(t);
+        if (ocorreHoje) {
+          badge = feitaHoje
+            ? '<span class="task-badge" style="background:var(--green);color:#fff;border:none">✓ Feita hoje</span>'
+            : '<span class="task-badge" style="background:#d97706;color:#fff;border:none">Hoje</span>';
+        } else {
+          var prox = tarefaProxima(t);
+          badge = '<span class="task-badge" style="background:var(--bg3);color:var(--text3);border:none">' +
+            (prox ? 'Próxima: ' + TK_DIAS[prox.getDay()] + ' ' + prox.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}) : '—') + '</span>';
+        }
       } else {
         var isLate     = !t.done && t.date < todayStr;
         var isToday    = !t.done && t.date === todayStr;
@@ -1543,11 +1577,12 @@ function renderTarefas() {
         destBadge = '<span style="padding:2px 9px;border-radius:12px;font-size:0.7rem;font-weight:700;background:' + sc + '18;color:' + sc + ';white-space:nowrap">' + setorIcon(t._setor) + ' ' + setorLabel(t._setor) + '</span>';
       }
 
-      var marcador = t.fixa
-        ? '<div title="Tarefa fixa: nao pode ser concluida" style="width:20px;height:20px;border-radius:5px;background:#d9770618;color:#d97706;display:flex;align-items:center;justify-content:center;font-size:0.8rem;flex-shrink:0;cursor:default">📌</div>'
-        : '<div class="task-check ' + (t.done?'checked':'') + '" onclick="toggleTarefa(\'' + t._setor + '\',' + t._idx + ')"></div>';
+      var concluida = rec ? feitaHoje : t.done;
+      var marcador = (rec && !ocorreHoje)
+        ? '<div title="Nao se repete hoje" style="width:20px;height:20px;border-radius:5px;background:var(--bg3);color:var(--text3);display:flex;align-items:center;justify-content:center;font-size:0.75rem;flex-shrink:0;cursor:default">🔁</div>'
+        : '<div class="task-check ' + (concluida?'checked':'') + '" onclick="toggleTarefa(\'' + t._setor + '\',' + t._idx + ')"></div>';
 
-      html += '<div class="task-item ' + (t.done?'done':'') + '">' +
+      html += '<div class="task-item ' + (concluida?'done':'') + '"' + (rec && !ocorreHoje ? ' style="opacity:0.6"' : '') + '>' +
         marcador +
         '<div class="task-text">' + esc(t.text) + '</div>' +
         destBadge +
@@ -1564,18 +1599,77 @@ function renderTarefas() {
 }
 
 var _tarefaTipo  = 'setor'; // 'setor' | 'pessoa'
-var _tarefaPrazo = 'data';  // 'data'  | 'fixa'
+var _tarefaPrazo = 'data';  // 'data'  | 'rec'
+
+// --- Recorrencia -------------------------------------------------------------
+// Uma tarefa recorrente e UMA so, com a regra e a lista de dias em que foi
+// concluida. Nada e gerado automaticamente nem gravado em segundo plano.
+var TK_DIAS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sab'];
+
+function tkDataLocal(d) {
+  d = d || new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+// Tarefas "fixas" antigas passam a valer como "todo dia util"
+function tarefaRegra(t) {
+  if (!t) return null;
+  if (t.recorrencia && t.recorrencia.tipo) return t.recorrencia;
+  if (t.fixa) return { tipo: 'uteis' };
+  return null;
+}
+function tarefaEhRecorrente(t) { return !!tarefaRegra(t); }
+function tarefaOcorreEm(t, d) {
+  var r = tarefaRegra(t); if (!r) return false;
+  d = d || new Date();
+  var ds = d.getDay();
+  if (r.tipo === 'uteis')  return ds >= 1 && ds <= 5;
+  if (r.tipo === 'dias')   return (r.dias || []).indexOf(ds) !== -1;
+  if (r.tipo === 'mensal') {
+    var ultimo = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+    return d.getDate() === Math.min(r.diaMes || 1, ultimo);
+  }
+  return false;
+}
+function tarefaFeitaHoje(t) {
+  return Array.isArray(t.concluidasEm) && t.concluidasEm.indexOf(tkDataLocal()) !== -1;
+}
+function tarefaRegraTexto(t) {
+  var r = tarefaRegra(t); if (!r) return '';
+  if (r.tipo === 'uteis')  return 'Seg a Sex';
+  if (r.tipo === 'dias')   return (r.dias || []).slice().sort().map(function(x){ return TK_DIAS[x]; }).join(', ');
+  if (r.tipo === 'mensal') return 'Todo dia ' + (r.diaMes || 1);
+  return '';
+}
+function tarefaProxima(t) {
+  for (var i = 1; i <= 62; i++) {
+    var d = new Date(); d.setDate(d.getDate() + i);
+    if (tarefaOcorreEm(t, d)) return d;
+  }
+  return null;
+}
+function tarefaPendenteHoje(t) {
+  return tarefaEhRecorrente(t) ? (tarefaOcorreEm(t) && !tarefaFeitaHoje(t)) : !t.done;
+}
+
+function tarefaRecTipoChange() {
+  var tipo = (document.getElementById('tk-rec-tipo') || {}).value || 'uteis';
+  var bd = document.getElementById('tk-rec-dias');
+  var bm = document.getElementById('tk-rec-mensal');
+  if (bd) bd.style.display = tipo === 'dias'   ? 'flex' : 'none';
+  if (bm) bm.style.display = tipo === 'mensal' ? 'flex' : 'none';
+}
 
 function tarefaSetPrazo(p) {
   _tarefaPrazo = p;
   var cd = document.getElementById('tk-campo-data');
-  var av = document.getElementById('tk-aviso-fixa');
+  var av = document.getElementById('tk-campo-rec');
   var bd = document.getElementById('tk-prazo-data');
-  var bf = document.getElementById('tk-prazo-fixa');
+  var bf = document.getElementById('tk-prazo-rec');
   if (!cd) return;
   var ehData = p === 'data';
   cd.style.display = ehData ? 'grid' : 'none';
   if (av) av.style.display = ehData ? 'none' : 'block';
+  if (!ehData) tarefaRecTipoChange();
   if (bd) { bd.style.background = ehData?'var(--green)':'var(--bg2)'; bd.style.color = ehData?'#fff':'var(--text2)'; bd.style.borderColor = ehData?'var(--green)':'var(--border)'; bd.style.fontWeight = ehData?'700':'600'; }
   if (bf) { bf.style.background = !ehData?'#d97706':'var(--bg2)'; bf.style.color = !ehData?'#fff':'var(--text2)'; bf.style.borderColor = !ehData?'#d97706':'var(--border)'; bf.style.fontWeight = !ehData?'700':'600'; }
 }
@@ -1617,9 +1711,22 @@ function addTarefa() {
   var text = ((document.getElementById('task-text')||{}).value || '').trim();
   if (!text) { alert('Preencha a descrição da tarefa.'); return; }
 
-  var fixa = _tarefaPrazo === 'fixa';
+  var recorrente = _tarefaPrazo === 'rec';
+  var recorrencia = null;
   var date = '', time = '';
-  if (!fixa) {
+  if (recorrente) {
+    var tipo = (document.getElementById('tk-rec-tipo') || {}).value || 'uteis';
+    recorrencia = { tipo: tipo };
+    if (tipo === 'dias') {
+      recorrencia.dias = Array.prototype.map.call(document.querySelectorAll('.tk-rec-dia:checked'), function(c){ return parseInt(c.value); });
+      if (!recorrencia.dias.length) { alert('Escolha ao menos um dia da semana.'); return; }
+    }
+    if (tipo === 'mensal') {
+      var dm = parseInt((document.getElementById('tk-rec-diames') || {}).value || 1);
+      if (!dm || dm < 1 || dm > 31) { alert('Informe um dia do mes entre 1 e 31.'); return; }
+      recorrencia.diaMes = dm;
+    }
+  } else {
     date = (document.getElementById('task-date')||{}).value || '';
     var noTime = (document.getElementById('task-no-time')||{}).checked;
     time = noTime ? '' : ((document.getElementById('task-time')||{}).value || '');
@@ -1644,13 +1751,14 @@ function addTarefa() {
 
   state.tasks[setor].push({
     text: text, date: date, time: time, done: false, id: Date.now(),
-    fixa: fixa,
+    recorrencia: recorrencia,
+    concluidasEm: [],
     colabIdx: colabIdx,
     colabNome: colabIdx !== null && cols[colabIdx] ? cols[colabIdx].nome : null,
   });
 
   saveState();
-  addLog('Adicionou tarefa' + (fixa?' fixa':'') + ' (' + (colabIdx !== null ? cols[colabIdx].nome : setorLabel(setor)) + '): "' + text + '"');
+  addLog('Adicionou tarefa' + (recorrente?' recorrente ('+tarefaRegraTexto({recorrencia:recorrencia})+')':'') + ' (' + (colabIdx !== null ? cols[colabIdx].nome : setorLabel(setor)) + '): "' + text + '"');
 
   var tx = document.getElementById('task-text');
   if (tx) tx.value = '';
@@ -1662,7 +1770,21 @@ function addTarefa() {
 
 function toggleTarefa(setor, i) {
   if (!state.tasks[setor] || !state.tasks[setor][i]) return;
-  if (state.tasks[setor][i].fixa) return; // tarefa fixa nao se conclui
+  var tr = state.tasks[setor][i];
+  if (tarefaEhRecorrente(tr)) {
+    if (!tarefaOcorreEm(tr)) return;                 // so conclui no dia em que se repete
+    var hoje = tkDataLocal();
+    if (!Array.isArray(tr.concluidasEm)) tr.concluidasEm = [];
+    var pos = tr.concluidasEm.indexOf(hoje);
+    if (pos === -1) tr.concluidasEm.push(hoje); else tr.concluidasEm.splice(pos, 1);
+    tr.concluidasEm = tr.concluidasEm.slice(-60);   // guarda so o historico recente
+    addLog('Marcou tarefa recorrente como ' + (pos === -1 ? 'feita' : 'pendente') + ' hoje: "' + tr.text + '"');
+    saveState();
+    var elR = document.getElementById('page-content');
+    if (elR) elR.innerHTML = renderTarefas();
+    setTimeout(tarefaRestaurarBotoes, 30);
+    return;
+  }
   state.tasks[setor][i].done = !state.tasks[setor][i].done;
   var t = state.tasks[setor][i];
   addLog('Marcou tarefa como ' + (t.done?'concluída':'pendente') + ': "' + t.text + '"');
@@ -1983,7 +2105,7 @@ function tvCarrosselPares() {
   var todas = [];
   SETORES.forEach(function(s) {
     ((state.tasks && state.tasks[s.id]) || []).forEach(function(t) {
-      if (t.done) return;
+      if (!tarefaPendenteHoje(t)) return;
       todas.push(Object.assign({}, t, { _setor: s.id }));
     });
   });
@@ -1996,8 +2118,8 @@ function tvCarrosselPares() {
       return semDono && setor && normalizarSetor(t._setor) === setor;
     });
     var juntas = minhas.concat(doSetor)
-      .filter(function(t){ return t.fixa || t.date <= hojeStr; })
-      .sort(function(a,b){ return (a.fixa?0:1) - (b.fixa?0:1); });
+      .filter(function(t){ return tarefaEhRecorrente(t) || t.date <= hojeStr; })
+      .sort(function(a,b){ return (tarefaEhRecorrente(a)?0:1) - (tarefaEhRecorrente(b)?0:1); });
     return { nome: c.nome, idx: i, setor: setor, tarefas: juntas };
   });
 
@@ -2014,7 +2136,7 @@ function tvCardPessoa(p) {
 
   var itens = p.tarefas.length
     ? p.tarefas.slice(0, 5).map(function(t) {
-        return '<div class="tv-task"><span class="tv-box' + (t.fixa ? ' fix' : '') + '"></span>' + esc(t.text) + '</div>';
+        return '<div class="tv-task"><span class="tv-box' + (tarefaEhRecorrente(t) ? ' fix' : '') + '"></span>' + esc(t.text) + '</div>';
       }).join('')
     : '<div class="tv-task" style="opacity:0.55;font-style:italic">Sem tarefas para hoje</div>';
 

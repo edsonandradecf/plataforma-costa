@@ -653,9 +653,11 @@ function startRealtimeSync() {
         applyParsed(incoming, true);
         localStorage.setItem('costa_state', JSON.stringify(incoming));
 
-        // Re-renderiza a página atual com os novos dados
+        // Re-renderiza a página atual com os novos dados.
+        // Na TV, atualiza so o conteudo: recriar a pagina derruba a tela cheia.
         if (state.currentUser) {
-          safeRenderPage();
+          if (state.currentPage === 'tv' && document.getElementById('tvPanel')) tvAtualizarDados();
+          else safeRenderPage();
           showSyncStatus('🔄 Atualizado', 'var(--green)');
           setTimeout(() => showSyncStatus('', ''), 1500);
         }
@@ -2329,6 +2331,16 @@ function tvPainelHTML() {
 
 // ---------- ciclo de vida ----------
 
+// Atualiza os blocos da TV sem recriar o painel (mantem a tela cheia ativa)
+function tvAtualizarDados() {
+  try {
+    tvRenderMural();
+    tvRenderRanking();
+    tvRenderCarrossel();
+    tvRenderGrafico();
+  } catch (e) { console.warn('TV: falha ao atualizar', e); }
+}
+
 var _tvWakeLock = null;
 // Impede a tela de apagar/entrar em descanso enquanto o painel esta aberto.
 // Onde o navegador nao suportar, simplesmente nao faz nada.
@@ -2345,9 +2357,23 @@ document.addEventListener('visibilitychange', function() {
   if (document.visibilityState === 'visible' && !_tvWakeLock && state.currentPage === 'tv') tvManterAcesa();
 });
 
+var _tvPollTimer = null;
 function tvIniciar() {
   tvParar();
   tvManterAcesa();
+
+  // Releitura periodica: se a conexao em tempo real cair, a TV nao fica defasada
+  _tvPollTimer = setInterval(function() {
+    if (state.currentPage !== 'tv') return;
+    fetch(FIREBASE_URL + '/data.json?x=' + Date.now())
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d || dataSize(d) === 0) return;
+        applyParsed(d, true);
+        tvAtualizarDados();
+      })
+      .catch(function(){});
+  }, 5 * 60 * 1000);
   if (_tvAba !== 'painel') return;
   tvRenderGrafico();
   tvRenderRanking();
@@ -2388,6 +2414,7 @@ function tvIniciar() {
 }
 
 function tvParar() {
+  if (_tvPollTimer) { clearInterval(_tvPollTimer); _tvPollTimer = null; }
   if (_tvWakeLock) { try { _tvWakeLock.release(); } catch(e) {} _tvWakeLock = null; }
   if (_tvCarTimer)   { clearInterval(_tvCarTimer);   _tvCarTimer   = null; }
   if (_tvMuralTimer) { clearInterval(_tvMuralTimer); _tvMuralTimer = null; }

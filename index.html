@@ -320,54 +320,56 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   padding:7px 6px; border-bottom:0.5px solid var(--border); align-items:center; font-size:0.82rem; }
 .fin-rank-row:hover { background:var(--bg3); }
 /* ---- Painel da TV ---- */
-.tv-panel { font-family:'Segoe UI',system-ui,sans-serif; color:#fff; border-radius:20px; padding:24px;
-  background:linear-gradient(135deg,#0a0a0a 0%,#1c1c1c 40%,#3a2410 75%,#ff8a1e 100%);
-  aspect-ratio:16/9; width:100%; display:flex; flex-direction:column; overflow:hidden; }
-.tv-panel:fullscreen, .tv-panel:-webkit-full-screen { border-radius:0; aspect-ratio:auto; height:100vh; padding:2.5vh 2vw; }
-.tv-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1.8vh; flex-shrink:0; }
-.tv-header h1 { font-size:2.6vh; font-weight:600; letter-spacing:0.3px; margin:0; }
-.tv-clock { font-size:1.6vh; color:#ff8a1e; background:rgba(0,0,0,0.35); backdrop-filter:blur(12px);
-  border:1px solid rgba(255,138,30,0.45); padding:0.8vh 1.2vw; border-radius:999px; text-transform:capitalize; }
-.tv-grid { display:grid; grid-template-columns:1.35fr 0.9fr; gap:1.5vh 1.2vw; flex:1; min-height:0; }
-.tv-col { display:flex; flex-direction:column; gap:1.5vh; min-height:0; }
+.tv-panel { font-family:'Segoe UI',system-ui,sans-serif; color:#e8eaf2; border-radius:22px; padding:2.6vh 1.6vw;
+  background:#1e2235; aspect-ratio:16/9; width:100%; display:flex; flex-direction:column; overflow:hidden; }
+.tv-panel:fullscreen, .tv-panel:-webkit-full-screen { border-radius:0; aspect-ratio:auto; height:100vh; }
+.tv-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:2vh; flex-shrink:0; }
+.tv-header h1 { font-size:2.4vh; font-weight:700; letter-spacing:-0.01em; margin:0; }
+.tv-clock { font-size:1.5vh; color:#94a3c4; background:#272c44; padding:0.8vh 1.2vw; border-radius:10px;
+  text-transform:capitalize; font-weight:500; }
+.tv-grid { display:grid; grid-template-columns:1.35fr 0.9fr; gap:1.6vh 1.2vw; flex:1; min-height:0; }
+.tv-col { display:flex; flex-direction:column; gap:1.6vh; min-height:0; }
+.tv-baixo { display:grid; grid-template-columns:1fr 1fr; gap:1.2vw; flex:1; min-height:0; }
 .tv-flex { flex:1; display:flex; flex-direction:column; min-height:0; }
-.tv-glass { background:rgba(20,20,20,0.45); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
-  border:1px solid rgba(255,138,30,0.35); border-radius:18px; padding:1.8vh 1.3vw; box-shadow:0 8px 32px rgba(0,0,0,0.35); min-height:0; }
-.tv-glass h2 { font-size:1.7vh; font-weight:600; margin:0 0 1.4vh; display:flex; align-items:center; gap:0.5vw; color:#fff; }
-.tv-dot { width:0.9vh; height:0.9vh; border-radius:50%; background:#ff8a1e; box-shadow:0 0 8px rgba(255,138,30,0.9); flex-shrink:0; }
+.tv-glass { background:#272c44; border:1px solid #2f3552; border-radius:16px; padding:1.8vh 1.2vw; min-height:0; }
+.tv-glass h2 { font-size:1.35vh; font-weight:700; margin:0 0 1.6vh; display:flex; align-items:center; gap:0.5vw;
+  text-transform:uppercase; letter-spacing:0.09em; color:#b9c0da; }
+.tv-dot { width:0.85vh; height:0.85vh; border-radius:50%; background:#34d399; box-shadow:0 0 8px rgba(52,211,153,0.7); flex-shrink:0; }
+.tv-dot.azul { background:#60a5fa; box-shadow:0 0 8px rgba(96,165,250,0.7); }
+.tv-dot.rosa { background:#fb7185; box-shadow:0 0 8px rgba(251,113,133,0.7); }
 .tv-chart-wrap { position:relative; height:20vh; }
-.tv-rank-cols { display:grid; grid-template-columns:1fr 1fr; gap:0 1.6vw; flex:1; overflow:hidden; align-content:start; }
-.tv-rank-item { margin-bottom:0.9vh; }
-.tv-rank-row { display:flex; justify-content:space-between; font-size:1.35vh; margin-bottom:0.4vh; color:rgba(255,255,255,0.92); gap:0.5vw; }
+/* mais vendidos: uma coluna, paginado */
+.tv-rank-cols { flex:1; overflow:hidden; }
+.tv-rank-item { margin-bottom:1.05vh; }
+.tv-rank-row { display:flex; justify-content:space-between; font-size:1.5vh; margin-bottom:0.45vh; color:#dfe3f0; gap:0.5vw; }
 .tv-rank-row span:first-child { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.tv-rank-row span:last-child { color:rgba(255,255,255,0.6); flex-shrink:0; }
-.tv-rank-track { height:0.7vh; border-radius:999px; background:rgba(255,255,255,0.12); overflow:hidden; }
-.tv-rank-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,#ffb35c,#ff8a1e); }
+.tv-rank-row span:last-child { color:#8b94b8; flex-shrink:0; font-weight:600; }
+.tv-rank-track { height:0.8vh; border-radius:999px; background:#323852; overflow:hidden; }
+.tv-rank-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,#60a5fa,#3b82f6); }
+/* tarefas */
 .tv-car-wrap { flex:1; display:flex; flex-direction:column; min-height:0; }
-.tv-car-slot { flex:1; display:flex; flex-direction:column; gap:1.3vh; min-height:0; }
-.tv-card { flex:1; background:rgba(0,0,0,0.30); border:1px solid rgba(255,138,30,0.25); border-radius:14px;
-  padding:1.5vh 1.1vw; backdrop-filter:blur(10px); opacity:0; transform:translateY(6px);
-  transition:opacity .5s ease,transform .5s ease; display:flex; flex-direction:column; min-height:0; overflow:hidden; }
+.tv-car-slot { flex:1; display:flex; flex-direction:column; gap:1.4vh; min-height:0; }
+.tv-card { flex:1; background:#2f3552; border:1px solid #384063; border-radius:14px; padding:1.6vh 1.1vw;
+  opacity:0; transform:translateY(6px); transition:opacity .5s ease, transform .5s ease;
+  display:flex; flex-direction:column; min-height:0; overflow:hidden; }
 .tv-card.show { opacity:1; transform:none; }
-.tv-person { display:flex; align-items:center; gap:0.8vw; margin-bottom:1.2vh; }
-.tv-avatar { width:5vh; height:5vh; border-radius:50%; display:flex; align-items:center; justify-content:center;
-  font-size:1.9vh; font-weight:700; color:#26214f; flex-shrink:0; }
-.tv-name { font-size:2.1vh; font-weight:600; line-height:1.1; }
-.tv-role { font-size:1.35vh; color:rgba(255,255,255,0.55); margin-top:0.2vh; }
-.tv-task { font-size:1.65vh; display:flex; align-items:flex-start; gap:0.5vw; margin-bottom:0.9vh; color:rgba(255,255,255,0.92); }
-.tv-box { width:1.5vh; height:1.5vh; border-radius:4px; border:2px solid rgba(255,138,30,0.7); margin-top:0.25vh; flex-shrink:0; }
-.tv-box.fix { background:#ff8a1e; border-color:#ff8a1e; }
-.tv-car-dots { display:flex; justify-content:center; gap:0.5vw; margin-top:1.2vh; flex-shrink:0; }
-.tv-car-dots span { width:0.8vh; height:0.8vh; border-radius:50%; background:rgba(255,255,255,0.25); transition:background .3s; }
-.tv-car-dots span.active { background:#ff8a1e; }
-.tv-note { border-radius:11px; padding:0.9vh 1vw; margin-bottom:0.9vh; backdrop-filter:blur(10px); border:1px solid rgba(255,255,255,0.2); }
+.tv-person { display:flex; align-items:center; gap:0.8vw; margin-bottom:1.3vh; }
+.tv-avatar { width:5.2vh; height:5.2vh; border-radius:14px; display:flex; align-items:center; justify-content:center;
+  font-size:1.9vh; font-weight:800; color:#fff; flex-shrink:0; }
+.tv-name { font-size:2vh; font-weight:700; line-height:1.1; }
+.tv-role { font-size:1.3vh; color:#8b94b8; margin-top:0.25vh; font-weight:500; }
+.tv-task { font-size:1.6vh; display:flex; align-items:flex-start; gap:0.6vw; margin-bottom:1vh; color:#dfe3f0; }
+.tv-box { width:1.5vh; height:1.5vh; border-radius:5px; border:2px solid #566089; margin-top:0.25vh; flex-shrink:0; }
+.tv-box.fix { background:#34d399; border-color:#34d399; }
+/* mural */
+.tv-note { border-radius:12px; padding:1vh 1vw; margin-bottom:0.9vh; background:#2f3552; border-left:3px solid #60a5fa; }
 .tv-note:last-child { margin-bottom:0; }
-.tv-note-date { font-size:1.2vh; font-weight:600; opacity:0.85; text-transform:uppercase; letter-spacing:0.4px; }
-.tv-note-text { font-size:1.55vh; margin-top:0.3vh; font-weight:500; }
-.tv-note-amber { background:rgba(255,138,30,0.30); border-color:rgba(255,138,30,0.5); }
-.tv-note-pink  { background:rgba(255,255,255,0.16); }
-.tv-note-teal  { background:rgba(0,0,0,0.35); border-color:rgba(255,255,255,0.2); }
-.tv-note-purple{ background:rgba(255,179,92,0.18); }
+.tv-note-date { font-size:1.15vh; font-weight:700; color:#8b94b8; text-transform:uppercase; letter-spacing:0.06em; }
+.tv-note-text { font-size:1.55vh; margin-top:0.35vh; font-weight:500; color:#e8eaf2; }
+/* indicadores */
+.tv-car-dots { display:flex; justify-content:center; gap:0.5vw; margin-top:1.1vh; flex-shrink:0; align-items:center; }
+.tv-car-dots span { width:0.75vh; height:0.75vh; border-radius:50%; background:#3d4468; transition:all .3s; }
+.tv-car-dots span.active { background:#60a5fa; width:2.2vw; border-radius:99px; }
 
 .fin-upload-box { background:var(--card); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border:0.5px solid var(--border); border-radius:14px;
   padding:1.5rem; box-shadow:var(--shadow); }
@@ -1828,6 +1830,8 @@ var _tvMuralTimer = null;
 var _tvChart    = null;
 var TV_CAR_SEG  = 6;
 var TV_MURAL_SEG = 10;
+var TV_RANK_SEG  = 8;
+var _tvRankTimer = null;
 
 // ---------- helpers de dados ----------
 
@@ -2142,13 +2146,13 @@ function tvCarrosselPares() {
 }
 
 function tvCardPessoa(p) {
-  var CORES = ['#ffb35c','#f5f5f5','#ff8a1e','#c8c8c8','#ffd9a8','#e0e0e0'];
+  var CORES = ['linear-gradient(135deg,#60a5fa,#6366f1)','linear-gradient(135deg,#fb7185,#f43f5e)','linear-gradient(135deg,#34d399,#10b981)','linear-gradient(135deg,#c084fc,#a855f7)'];
   var cor = CORES[p.idx % 6];
   var ini = (p.nome || '?').split(' ').map(function(x){ return x[0]; }).slice(0,2).join('').toUpperCase();
   var setorTxt = p.setor === 'expedicao' ? 'Expedicao' : (p.setor === 'producao' ? 'Producao' : '');
 
   var itens = p.tarefas.length
-    ? p.tarefas.slice(0, 5).map(function(t) {
+    ? p.tarefas.slice(0, 9).map(function(t) {
         return '<div class="tv-task"><span class="tv-box' + (tarefaEhRecorrente(t) ? ' fix' : '') + '"></span>' + esc(t.text) + '</div>';
       }).join('')
     : '<div class="tv-task" style="opacity:0.55;font-style:italic">Sem tarefas para hoje</div>';
@@ -2181,26 +2185,49 @@ function tvRenderCarrossel() {
   }
 }
 
-function tvRenderRanking() {
-  var box = document.getElementById('tvRank');
-  if (!box) return;
+var TV_RANK_POR_PAGINA = 14;
+var _tvRankIdx = 0;
+var TV_CORES = ['linear-gradient(90deg,#60a5fa,#3b82f6)','linear-gradient(90deg,#fb7185,#f43f5e)',
+                'linear-gradient(90deg,#34d399,#10b981)','linear-gradient(90deg,#c084fc,#a855f7)'];
+
+function tvRankPaginas() {
   var per = tvSemana();
   var skus = (per && per.skus) || [];
+  var pgs = [];
+  for (var i = 0; i < skus.length; i += TV_RANK_POR_PAGINA) pgs.push(skus.slice(i, i + TV_RANK_POR_PAGINA));
+  return pgs;
+}
+
+function tvRenderRanking() {
+  var box  = document.getElementById('tvRank');
+  var dots = document.getElementById('tvRankDots');
+  if (!box) return;
+
+  var per  = tvSemana();
+  var skus = (per && per.skus) || [];
   if (!skus.length) {
-    box.innerHTML = '<div style="grid-column:1/-1;opacity:0.6;font-size:14px">Importe uma planilha na aba Dados para ver o ranking</div>';
+    box.innerHTML = '<div style="opacity:0.6;font-size:1.5vh">Importe uma planilha na aba Dados para ver o ranking</div>';
+    if (dots) dots.innerHTML = '';
     return;
   }
+
+  var pgs = tvRankPaginas();
+  if (_tvRankIdx >= pgs.length) _tvRankIdx = 0;
   var max = skus[0].unidades || 1;
-  function coluna(itens) {
-    return '<div>' + itens.map(function(s) {
-      var pct = Math.max(6, Math.round((s.unidades / max) * 100));
-      return '<div class="tv-rank-item">' +
-        '<div class="tv-rank-row"><span>' + esc(s.nome || s.sku) + '</span><span>' + s.unidades + ' un</span></div>' +
-        '<div class="tv-rank-track"><div class="tv-rank-fill" style="width:' + pct + '%"></div></div>' +
-      '</div>';
-    }).join('') + '</div>';
+
+  box.innerHTML = pgs[_tvRankIdx].map(function(s, i) {
+    var pct = Math.max(6, Math.round((s.unidades / max) * 100));
+    return '<div class="tv-rank-item">' +
+      '<div class="tv-rank-row"><span>' + esc(s.nome || s.sku) + '</span><span>' + s.unidades + ' un</span></div>' +
+      '<div class="tv-rank-track"><div class="tv-rank-fill" style="width:' + pct + '%;background:' + TV_CORES[i % 4] + '"></div></div>' +
+    '</div>';
+  }).join('');
+
+  if (dots) {
+    dots.innerHTML = pgs.length > 1
+      ? pgs.map(function(_, i){ return '<span class="' + (i === _tvRankIdx ? 'active' : '') + '"></span>'; }).join('')
+      : '';
   }
-  box.innerHTML = coluna(skus.slice(0,10)) + coluna(skus.slice(10,20));
 }
 
 function tvRenderGrafico() {
@@ -2217,7 +2244,7 @@ function tvRenderGrafico() {
       var ctx = chart.ctx;
       var alt = chart.chartArea ? (chart.chartArea.bottom - chart.chartArea.top) : 200;
       ctx.save();
-      ctx.fillStyle = '#fff';
+      ctx.fillStyle = '#e8eaf2';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
       ctx.font = '700 ' + Math.max(10, Math.round(alt * 0.075)) + 'px "Segoe UI", system-ui, sans-serif';
@@ -2234,16 +2261,20 @@ function tvRenderGrafico() {
     type: 'bar',
     data: { labels: d.labels, datasets: [{
       data: d.valores,
-      backgroundColor: 'rgba(255,255,255,0.75)',
-      borderRadius: 6, maxBarThickness: 26,
+      backgroundColor: function(ctx) {
+        var g = ctx.chart.ctx.createLinearGradient(0, 0, 0, ctx.chart.height || 200);
+        g.addColorStop(0, '#60a5fa'); g.addColorStop(1, '#6366f1');
+        return g;
+      },
+      borderRadius: 7, maxBarThickness: 30,
     }]},
     options: {
       responsive: true, maintainAspectRatio: false, animation: { duration: 600 },
       layout: { padding: { top: 22 } },   // espaco para o rotulo nao cortar
       plugins: { legend: { display: false }, tooltip: { enabled: false } },
       scales: {
-        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.15)' }, ticks: { color: 'rgba(255,255,255,0.85)' } },
-        x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.85)' } },
+        y: { beginAtZero: true, grid: { color: '#323852' }, ticks: { color: '#7c86a8' } },
+        x: { grid: { display: false }, ticks: { color: '#7c86a8' } },
       },
     },
     plugins: [rotuloValores],
@@ -2253,7 +2284,7 @@ function tvRenderGrafico() {
 function tvMuralPaginas() {
   var avisos = (state.mural || []);
   var pgs = [];
-  for (var i = 0; i < avisos.length; i += 4) pgs.push(avisos.slice(i, i + 4));
+  for (var i = 0; i < avisos.length; i += 2) pgs.push(avisos.slice(i, i + 2));
   return pgs;
 }
 
@@ -2270,9 +2301,9 @@ function tvRenderMural() {
   }
   if (_tvMuralIdx >= pgs.length) _tvMuralIdx = 0;
 
-  var classes = ['tv-note-amber','tv-note-pink','tv-note-teal','tv-note-purple'];
+  var bordas = ['#60a5fa','#fb7185','#34d399','#c084fc'];
   box.innerHTML = pgs[_tvMuralIdx].map(function(a, i) {
-    return '<div class="tv-note ' + classes[i % 4] + '">' +
+    return '<div class="tv-note" style="border-left-color:' + bordas[i % 4] + '">' +
       '<div class="tv-note-date">' + esc(a.author || 'Aviso') + (a.time ? ' &middot; ' + esc(a.time) : '') + '</div>' +
       '<div class="tv-note-text">' + esc(a.text) + '</div>' +
     '</div>';
@@ -2294,22 +2325,32 @@ function tvPainelHTML() {
 
   return '<div id="tvPanel" class="tv-panel">' +
     '<div class="tv-header">' +
-      '<h1>Painel de Expedicao</h1>' +
+      '<h1>Painel de Expedição</h1>' +
       '<div class="tv-clock" id="tvClock">' + dataTxt + '</div>' +
     '</div>' +
     '<div class="tv-grid">' +
 
+      // Esquerda: grafico em cima; embaixo mais vendidos + mural lado a lado
       '<div class="tv-col">' +
         '<div class="tv-glass">' +
-          '<h2><span class="tv-dot"></span>Pedidos por mes</h2>' +
+          '<h2><span class="tv-dot azul"></span>Pedidos por mês</h2>' +
           '<div class="tv-chart-wrap"><canvas id="tvChart"></canvas></div>' +
         '</div>' +
-        '<div class="tv-glass tv-flex">' +
-          '<h2><span class="tv-dot"></span>Mais vendidos &middot; ' + periodoTxt + '</h2>' +
-          '<div class="tv-rank-cols" id="tvRank"></div>' +
+        '<div class="tv-baixo">' +
+          '<div class="tv-glass tv-flex">' +
+            '<h2><span class="tv-dot"></span>Mais vendidos &middot; ' + periodoTxt + '</h2>' +
+            '<div class="tv-rank-cols" id="tvRank"></div>' +
+            '<div class="tv-car-dots" id="tvRankDots"></div>' +
+          '</div>' +
+          '<div class="tv-glass tv-flex">' +
+            '<h2><span class="tv-dot rosa"></span>Mural de avisos</h2>' +
+            '<div id="tvMural" style="flex:1"></div>' +
+            '<div class="tv-car-dots" id="tvMuralDots"></div>' +
+          '</div>' +
         '</div>' +
       '</div>' +
 
+      // Direita: tarefas ocupando a lateral inteira
       '<div class="tv-col">' +
         '<div class="tv-glass tv-flex">' +
           '<h2><span class="tv-dot"></span>Tarefas da equipe</h2>' +
@@ -2317,11 +2358,6 @@ function tvPainelHTML() {
             '<div class="tv-car-slot" id="tvCarSlot"></div>' +
             '<div class="tv-car-dots" id="tvCarDots"></div>' +
           '</div>' +
-        '</div>' +
-        '<div class="tv-glass">' +
-          '<h2><span class="tv-dot"></span>Mural de avisos</h2>' +
-          '<div id="tvMural"></div>' +
-          '<div class="tv-car-dots" id="tvMuralDots" style="margin-top:0.8vh"></div>' +
         '</div>' +
       '</div>' +
 
@@ -2381,6 +2417,14 @@ function tvIniciar() {
   tvRenderCarrossel();
   _tvMuralIdx = 0;
   tvRenderMural();
+  _tvRankIdx = 0;
+  tvRenderRanking();
+
+  _tvRankTimer = setInterval(function() {
+    if (!document.getElementById('tvRank')) { tvParar(); return; }
+    var pgs = tvRankPaginas();
+    if (pgs.length > 1) { _tvRankIdx = (_tvRankIdx + 1) % pgs.length; tvRenderRanking(); }
+  }, TV_RANK_SEG * 1000);
 
   _tvMuralTimer = setInterval(function() {
     var box = document.getElementById('tvMural');
@@ -2414,6 +2458,7 @@ function tvIniciar() {
 }
 
 function tvParar() {
+  if (_tvRankTimer) { clearInterval(_tvRankTimer); _tvRankTimer = null; }
   if (_tvPollTimer) { clearInterval(_tvPollTimer); _tvPollTimer = null; }
   if (_tvWakeLock) { try { _tvWakeLock.release(); } catch(e) {} _tvWakeLock = null; }
   if (_tvCarTimer)   { clearInterval(_tvCarTimer);   _tvCarTimer   = null; }

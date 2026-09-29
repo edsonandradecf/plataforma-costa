@@ -985,6 +985,17 @@ function togglePassVis() {
         document.getElementById('login-pass').value = senha;
         document.getElementById('login-remember').checked = true;
 
+        // Modo TV: abrindo em .../#tv entra sozinho e vai direto ao painel.
+        // Serve para a TV da operacao ligar ja na tela certa, sem ninguem clicar.
+        if (window.location.hash === '#tv') {
+          state.currentUser = user;
+          _loginTime = Date.now();
+          _firebaseReady = false;
+          state.currentPage = 'tv';
+          startApp();
+          return;
+        }
+
         if (mlCode || (shopeeCode && shopeeShopId)) {
           state.currentUser = user;
           _loginTime = Date.now();
@@ -2318,8 +2329,25 @@ function tvPainelHTML() {
 
 // ---------- ciclo de vida ----------
 
+var _tvWakeLock = null;
+// Impede a tela de apagar/entrar em descanso enquanto o painel esta aberto.
+// Onde o navegador nao suportar, simplesmente nao faz nada.
+function tvManterAcesa() {
+  try {
+    if (!navigator.wakeLock) return;
+    navigator.wakeLock.request('screen').then(function(lock) {
+      _tvWakeLock = lock;
+      lock.addEventListener('release', function(){ _tvWakeLock = null; });
+    }).catch(function(){});
+  } catch (e) {}
+}
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'visible' && !_tvWakeLock && state.currentPage === 'tv') tvManterAcesa();
+});
+
 function tvIniciar() {
   tvParar();
+  tvManterAcesa();
   if (_tvAba !== 'painel') return;
   tvRenderGrafico();
   tvRenderRanking();
@@ -2360,6 +2388,7 @@ function tvIniciar() {
 }
 
 function tvParar() {
+  if (_tvWakeLock) { try { _tvWakeLock.release(); } catch(e) {} _tvWakeLock = null; }
   if (_tvCarTimer)   { clearInterval(_tvCarTimer);   _tvCarTimer   = null; }
   if (_tvMuralTimer) { clearInterval(_tvMuralTimer); _tvMuralTimer = null; }
   if (_tvRelogio)  { clearInterval(_tvRelogio);  _tvRelogio  = null; }

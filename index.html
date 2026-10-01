@@ -624,6 +624,48 @@ async function loadState() {
 // O Firebase Realtime Database suporta Server-Sent Events nativamente.
 // Quando qualquer usuário salva, todos os outros recebem o dado novo em ~1s
 // sem precisar recarregar a página.
+// Um snapshot valido e um objeto com ao menos uma das chaves conhecidas do estado.
+// Evita tratar um evento parcial (ex: so o token) como se fosse o estado inteiro.
+var CHAVES_ESTADO = ['tasks','compras','mural','agenda','tabnutri','estoque','ponto','devolucoes','logs'];
+function snapshotValido(d) {
+  if (!d || typeof d !== 'object' || Array.isArray(d)) return false;
+  return CHAVES_ESTADO.some(function(k){ return d[k] !== undefined; });
+}
+var _dadosProntos  = false;  // ha dados validos em memoria (cache local ou Firebase)
+var _remotoAplicado = false;  // o 1o snapshot vindo do Firebase ja foi aplicado
+
+// Evento parcial do stream (path diferente de '/'): nunca vira estado.
+var _refetchTimer = null;
+function sseEventoParcial(path, data) {
+  // Tokens: atualiza so o token, sem re-renderizar nem mexer no resto
+  if (path.indexOf('/shopeeToken') === 0 && data && typeof data === 'object') {
+    state.shopeeToken = data;
+    _shopeeToken = data;
+    try { localStorage.setItem('shopee_token', JSON.stringify(data)); } catch(e) {}
+    return;
+  }
+  if (path.indexOf('/mlToken') === 0 && data && typeof data === 'object') {
+    state.mlToken = data;
+    try { localStorage.setItem('ml_token', JSON.stringify(data)); } catch(e) {}
+    return;
+  }
+  // Qualquer outra mudanca parcial: rele o estado completo (agrupa rajadas)
+  if (_refetchTimer) clearTimeout(_refetchTimer);
+  _refetchTimer = setTimeout(function() {
+    fetch(FIREBASE_URL + '/data.json?x=' + Date.now())
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!snapshotValido(d) || _isSaving) return;
+        applyParsed(d, true);
+        try { localStorage.setItem('costa_state', JSON.stringify(d)); } catch(e) {}
+        _dadosProntos = true;
+        if (state.currentPage === 'tv' && document.getElementById('tvPanel')) tvAtualizarDados();
+        else safeRenderPage();
+      })
+      .catch(function(e){ console.warn('Falha ao reler estado:', e); });
+  }, 400);
+}
+
 function startRealtimeSync() {
   if (_sseSource) { _sseSource.close(); _sseSource = null; }
 
@@ -633,9 +675,19 @@ function startRealtimeSync() {
     _sseSource.addEventListener('put', function(e) {
       try {
         const msg = JSON.parse(e.data);
+        if (!msg) return;
+
+        // Evento parcial: path diferente de '/' traz so um pedaco do estado.
+        // Tratar como completo esvaziava a tela e envenenava o cache local.
+        if (msg.path && msg.path !== '/') {
+          if (state.currentUser) sseEventoParcial(msg.path, msg.data);
+          return;
+        }
+
         // msg.path === '/' significa dados completos; msg.data é o payload
-        if (!msg || !msg.data) return;
+        if (!msg.data) return;
         const incoming = msg.data;
+        if (!snapshotValido(incoming)) { console.warn('SSE: payload ignorado (nao e um snapshot completo)'); return; }
 
         // Não aplicar sem usuário logado ou se EU fui quem salvou (evita flicker)
         if (!state.currentUser || _isSaving) return;
@@ -652,18 +704,22 @@ function startRealtimeSync() {
 
         // SSE data is authoritative -- use forceMerge=true
         _firebaseReady = true;
+        const primeira = !_remotoAplicado;
         applyParsed(incoming, true);
-        localStorage.setItem('costa_state', JSON.stringify(incoming));
+        try { localStorage.setItem('costa_state', JSON.stringify(incoming)); } catch(e) {}
+        _dadosProntos = true;
+        _remotoAplicado = true;
 
         // Re-renderiza a página atual com os novos dados.
         // Na TV, atualiza so o conteudo: recriar a pagina derruba a tela cheia.
         if (state.currentUser) {
           if (state.currentPage === 'tv' && document.getElementById('tvPanel')) tvAtualizarDados();
+          else if (primeira) renderPage();      // 1o carregamento: nunca pular por foco em campo
           else safeRenderPage();
           showSyncStatus('🔄 Atualizado', 'var(--green)');
           setTimeout(() => showSyncStatus('', ''), 1500);
         }
-      } catch(err) {}
+      } catch(err) { console.error('SSE: falha ao aplicar atualizacao', err); }
     });
 
     _sseSource.addEventListener('cancel', function() {
@@ -693,7 +749,7 @@ function startPolling() {
       const resp = await fetch(FIREBASE_URL + '/data.json');
       if (!resp.ok) return;
       const parsed = await resp.json();
-      if (!parsed) return;
+      if (!snapshotValido(parsed)) return;
       const local = localStorage.getItem('costa_state');
       const remoteStr = JSON.stringify(parsed);
       if (local !== remoteStr) {
@@ -925,6 +981,7 @@ function doLogout() {
   addLog('Saiu da plataforma');
   stopSync();
   _firebaseReady = false; // reset -- próximo login não pode salvar antes de sincronizar
+  _remotoAplicado = false;
   state.currentUser = null;
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
@@ -971,7 +1028,15 @@ function togglePassVis() {
 (function checkSavedLogin() {
   try {
     const s = localStorage.getItem('costa_state');
-    if (s) applyParsed(JSON.parse(s));
+    if (s) {
+      const c = JSON.parse(s);
+      if (snapshotValido(c)) {
+        applyParsed(c);
+        if (dataSize(c) > 0) _dadosProntos = true;
+      } else {
+        localStorage.removeItem('costa_state');   // cache corrompido (ex: so um token)
+      }
+    }
   } catch(e) {}
 
   const urlParams  = new URLSearchParams(window.location.search);
@@ -1118,8 +1183,35 @@ function cleanOldTasks() {
   // Os dados serão salvos na próxima ação real do usuário
 }
 
+// Rede de seguranca: se o stream nao entregar o 1o snapshot, busca direto.
+function garantirCargaInicial(tentativa) {
+  tentativa = tentativa || 1;
+  if (_remotoAplicado || !state.currentUser) return;
+  fetch(FIREBASE_URL + '/data.json?x=' + Date.now())
+    .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function(d){
+      if (_remotoAplicado || !state.currentUser) return;
+      if (!snapshotValido(d)) throw new Error('payload invalido');
+      _firebaseReady = true;
+      applyParsed(d, true);
+      try { localStorage.setItem('costa_state', JSON.stringify(d)); } catch(e) {}
+      _dadosProntos = true;
+      _remotoAplicado = true;
+      renderPage();
+    })
+    .catch(function(e){
+      console.warn('Carga inicial (tentativa ' + tentativa + '):', e.message);
+      if (tentativa < 4) { setTimeout(function(){ garantirCargaInicial(tentativa + 1); }, 4000); return; }
+      var av = document.getElementById('carga-aviso');
+      if (av && !_dadosProntos) av.innerHTML = '<p>⚠ Não foi possível carregar os dados.</p>' +
+        '<button class="btn btn-green btn-sm" onclick="garantirCargaInicial(1)">Tentar novamente</button>';
+    });
+}
+
 function startApp() {
   if (!state.currentUser) { console.error('startApp called without currentUser!'); return; }
+  // Tira o foco do campo de login: um input ainda focado faz o safeRenderPage pular o render
+  try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch(e) {}
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   if (localStorage.getItem('costa_sidebar_collapsed') === '1') {
@@ -1150,6 +1242,7 @@ function startApp() {
     try { renderPage(); } catch (e2) { console.error('Falha ao abrir o Inicio:', e2); }
   }
   startRealtimeSync();
+  setTimeout(function(){ garantirCargaInicial(1); }, 5000);
   setTimeout(estoqueHistLoadFirebase, 2000);
   iniciarRenovacaoAutomatica();
 }
@@ -1189,6 +1282,10 @@ function renderPage() {
   var c = document.getElementById('page-content');
   if (!c) return;
   var pg = state.currentPage;
+  if (!_dadosProntos) {
+    c.innerHTML = '<div class="empty-state" id="carga-aviso"><p>⏳ Carregando dados...</p></div>';
+    return;
+  }
   if (pg === 'inicio')    { c.innerHTML = renderInicio(); return; }
   if (pg === 'tarefas')   { c.innerHTML = renderTarefas(); setTimeout(function(){ tarefaSetTipo(_tarefaTipo); }, 30); return; }
   if (pg === 'tv')        { c.innerHTML = renderTV(); setTimeout(tvIniciar, 50); return; }
@@ -2404,7 +2501,7 @@ function tvIniciar() {
     fetch(FIREBASE_URL + '/data.json?x=' + Date.now())
       .then(function(r){ return r.json(); })
       .then(function(d){
-        if (!d || dataSize(d) === 0) return;
+        if (!snapshotValido(d) || dataSize(d) === 0) return;
         applyParsed(d, true);
         tvAtualizarDados();
       })

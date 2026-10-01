@@ -1025,6 +1025,13 @@ function togglePassVis() {
 }
 
 // Try saved login
+// Entrada automatica (login salvo + #tv, retorno do OAuth) precisa esperar os
+// modulos de pages/*.js: o startApp() usa funcoes que vivem neles.
+function aposCarregar(fn) {
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn);
+  else fn();
+}
+
 (function checkSavedLogin() {
   try {
     const s = localStorage.getItem('costa_state');
@@ -1057,15 +1064,18 @@ function togglePassVis() {
         // Modo TV: abrindo em .../#tv entra sozinho e vai direto ao painel.
         // Serve para a TV da operacao ligar ja na tela certa, sem ninguem clicar.
         if (window.location.hash === '#tv') {
-          state.currentUser = user;
-          _loginTime = Date.now();
-          _firebaseReady = false;
-          state.currentPage = 'tv';
-          startApp();
+          aposCarregar(function() {
+            state.currentUser = user;
+            _loginTime = Date.now();
+            _firebaseReady = false;
+            state.currentPage = 'tv';
+            try { startApp(); } catch (e) { console.error('Falha ao iniciar a TV:', e); }
+          });
           return;
         }
 
         if (mlCode || (shopeeCode && shopeeShopId)) {
+          aposCarregar(function() {
           state.currentUser = user;
           _loginTime = Date.now();
           _firebaseReady = false;
@@ -1083,10 +1093,11 @@ function togglePassVis() {
               navigate('margemviva');
             } catch(e) { navigate('margemviva'); }
           }, 500);
+          });
           return;
         }
       }
-    } catch(e) {}
+    } catch(e) { console.error('Entrada automatica falhou:', e); }
   }
 
   if (mlCode && !urlParams.get('shop_id')) {
@@ -1220,7 +1231,7 @@ function startApp() {
   }
   cleanOldTasks();
   // Carrega catálogo de produtos do Firebase em paralelo
-  prodLoadFirebase();
+  if (typeof prodLoadFirebase === 'function') prodLoadFirebase();
   // Abre na página do hash se existir, senão vai para início
   var initialPage = pageFromHash() || 'inicio';
   state.currentPage = initialPage;
@@ -1243,7 +1254,7 @@ function startApp() {
   }
   startRealtimeSync();
   setTimeout(function(){ garantirCargaInicial(1); }, 5000);
-  setTimeout(estoqueHistLoadFirebase, 2000);
+  setTimeout(function(){ if (typeof estoqueHistLoadFirebase === 'function') estoqueHistLoadFirebase(); }, 2000);
   iniciarRenovacaoAutomatica();
 }
 

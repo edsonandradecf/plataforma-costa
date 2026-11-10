@@ -63,10 +63,21 @@ async function vendaCarregarCacheFirebase(chave) {
   } catch(e) {}
 })();
 
+// Escolhe o token mais novo (maior expires_at) entre memoria, navegador e
+// estado sincronizado. Antes a copia em memoria nunca era trocada, e um
+// aparelho podia ficar tentando renovar com um refresh token ja substituido
+// por outro aparelho.
+function tokenMaisNovo(lista) {
+  var melhor = null;
+  lista.forEach(function(t) {
+    if (t && t.access_token && (!melhor || (t.expires_at || 0) > (melhor.expires_at || 0))) melhor = t;
+  });
+  return melhor;
+}
 function shopeeLoadToken() {
-  if (_shopeeToken) return _shopeeToken;
-  try { _shopeeToken = JSON.parse(localStorage.getItem('shopee_token')); } catch(e) {}
-  if (!_shopeeToken && state.shopeeToken) _shopeeToken = state.shopeeToken;
+  var local = null;
+  try { local = JSON.parse(localStorage.getItem('shopee_token')); } catch(e) {}
+  _shopeeToken = tokenMaisNovo([_shopeeToken, local, state.shopeeToken]);
   return _shopeeToken;
 }
 function shopeeSaveToken(t) {
@@ -117,14 +128,20 @@ function mlSaveToken(t) {
   localStorage.setItem('ml_token', JSON.stringify(t));
   // Also save to shared Firebase state so all users can use it
   state.mlToken = t;
-  saveState();
+  // Grava SOMENTE o token no Firebase (igual a Shopee). Antes chamava
+  // saveState(), que manda o /data.json inteiro em segundo plano.
+  try {
+    fetch(FIREBASE_URL + '/data/mlToken.json', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(t),
+    }).catch(function(){});
+  } catch(e) {}
 }
 function mlLoadToken() {
-  if (_mlToken) return _mlToken;
-  // Try localStorage first
-  try { _mlToken = JSON.parse(localStorage.getItem('ml_token')); } catch(e) {}
-  // Fall back to shared Firebase state (set by admin on their device)
-  if (!_mlToken && state.mlToken) _mlToken = state.mlToken;
+  var local = null;
+  try { local = JSON.parse(localStorage.getItem('ml_token')); } catch(e) {}
+  _mlToken = tokenMaisNovo([_mlToken, local, state.mlToken]);
   return _mlToken;
 }
 function mlTokenValid() {
@@ -168,8 +185,9 @@ async function mlRefreshToken() {
   });
   if (!resp.ok) {
     var rb = ''; try { var rj = await resp.json(); rb = rj.message || rj.error || JSON.stringify(rj); } catch(e2) {}
-    // Clear bad token so next login shows connect button
-    localStorage.removeItem('ml_token'); _mlToken = null; state.mlToken = null;
+    // Nao apaga o token compartilhado: outro aparelho pode ja ter renovado.
+    // So descarta a copia local; a proxima leitura pega a do Firebase.
+    localStorage.removeItem('ml_token'); _mlToken = null;
     throw new Error('Token expirado (' + resp.status + '). Reconecte o Mercado Livre.');
   }
   var data = await resp.json();

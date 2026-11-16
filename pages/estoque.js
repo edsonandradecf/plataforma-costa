@@ -580,6 +580,11 @@ function estoqueAbrirModalAcabado(idx) {
         (mps.length ? '' : '<div style="font-size:0.75rem;color:var(--amber);margin-top:4px">Cadastre uma matéria prima primeiro.</div>') +
       '</div>' +
 
+      '<div style="margin-bottom:12px">' +
+        '<label style="font-size:0.8rem;color:var(--text2);display:block;margin-bottom:4px;font-weight:600">Estoque mínimo (aviso na TV)</label>' +
+        '<input id="pa-minimo" type="number" min="0" class="tn-input" placeholder="0 = sem aviso" value="' + (p && p.minimo ? p.minimo : '') + '" style="width:100%;margin:0">' +
+      '</div>' +
+
       '<div style="display:flex;gap:8px">' +
         '<button class="btn" style="flex:1" onclick="closeModal()">Cancelar</button>' +
         '<button class="btn btn-green" style="flex:1" onclick="estoqueSalvarAcabado(' + (idx !== null && idx !== undefined ? idx : 'null') + ')">💾 Salvar</button>' +
@@ -597,6 +602,7 @@ function estoqueSalvarAcabado(idx) {
   var peso    = parseFloat((document.getElementById('pa-peso')||{}).value || 0);
   var unidade = ((document.getElementById('pa-unidade') ||{}).value || 'kg').trim();
   var mp      = ((document.getElementById('pa-mp')      ||{}).value || '');
+  var minimo  = parseFloat((document.getElementById('pa-minimo')||{}).value || 0) || 0;
   var st      = document.getElementById('pa-status');
   function erro(t){ if (st) st.textContent = t; }
 
@@ -609,10 +615,11 @@ function estoqueSalvarAcabado(idx) {
   var dup = lista.some(function(p, i){ return p.sku === sku && i !== idx; });
   if (dup) return erro('⚠ Já existe um produto com o SKU "' + sku + '".');
 
-  var reg = { nome:nome, sku:sku, peso:peso, unidade:unidade, materiaPrima:mp, qtd:0 };
+  var reg = { nome:nome, sku:sku, peso:peso, unidade:unidade, materiaPrima:mp, qtd:0, minimo:minimo };
 
   if (idx !== null && idx !== 'null' && lista[idx]) {
-    reg.qtd = lista[idx].qtd || 0;   // preserva o estoque ao editar
+    // Preserva o estoque e quaisquer outros campos já gravados no produto
+    reg = Object.assign({}, lista[idx], reg, { qtd: lista[idx].qtd || 0 });
     lista[idx] = reg;
     addLog('Editou produto acabado: "' + nome + '"');
   } else {

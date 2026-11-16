@@ -319,57 +319,61 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .fin-rank-row { display:grid; grid-template-columns:1.7fr 0.55fr 0.55fr 0.55fr 0.75fr;
   padding:7px 6px; border-bottom:0.5px solid var(--border); align-items:center; font-size:0.82rem; }
 .fin-rank-row:hover { background:var(--bg3); }
-/* ---- Painel da TV ---- */
+/* ---- Painel da TV (expedicao, tempo real) ---- */
 .tv-panel { font-family:'Segoe UI',system-ui,sans-serif; color:#e8eaf2; border-radius:22px; padding:2.6vh 1.6vw;
-  background:#1e2235; aspect-ratio:16/9; width:100%; display:flex; flex-direction:column; overflow:hidden; }
+  background:#1f2338; aspect-ratio:16/9; width:100%; display:flex; flex-direction:column; gap:1.8vh; overflow:hidden; }
 .tv-panel:fullscreen, .tv-panel:-webkit-full-screen { border-radius:0; aspect-ratio:auto; height:100vh; }
-.tv-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:2vh; flex-shrink:0; }
-.tv-header h1 { font-size:2.4vh; font-weight:700; letter-spacing:-0.01em; margin:0; }
-.tv-clock { font-size:1.5vh; color:#94a3c4; background:#272c44; padding:0.8vh 1.2vw; border-radius:10px;
-  text-transform:capitalize; font-weight:500; }
-.tv-grid { display:grid; grid-template-columns:1.35fr 0.9fr; gap:1.6vh 1.2vw; flex:1; min-height:0; }
-.tv-col { display:flex; flex-direction:column; gap:1.6vh; min-height:0; }
-.tv-baixo { display:grid; grid-template-columns:1fr 1fr; gap:1.2vw; flex:1; min-height:0; }
-.tv-flex { flex:1; display:flex; flex-direction:column; min-height:0; }
-.tv-glass { background:#272c44; border:1px solid #2f3552; border-radius:16px; padding:1.8vh 1.2vw; min-height:0; }
-.tv-glass h2 { font-size:1.35vh; font-weight:700; margin:0 0 1.6vh; display:flex; align-items:center; gap:0.5vw;
-  text-transform:uppercase; letter-spacing:0.09em; color:#b9c0da; }
-.tv-dot { width:0.85vh; height:0.85vh; border-radius:50%; background:#34d399; box-shadow:0 0 8px rgba(52,211,153,0.7); flex-shrink:0; }
-.tv-dot.azul { background:#60a5fa; box-shadow:0 0 8px rgba(96,165,250,0.7); }
-.tv-dot.rosa { background:#fb7185; box-shadow:0 0 8px rgba(251,113,133,0.7); }
-.tv-chart-wrap { position:relative; height:20vh; }
-/* mais vendidos: uma coluna, paginado */
-.tv-rank-cols { flex:1; overflow:hidden; }
-.tv-rank-item { margin-bottom:1.05vh; }
-.tv-rank-row { display:flex; justify-content:space-between; font-size:1.5vh; margin-bottom:0.45vh; color:#dfe3f0; gap:0.5vw; }
-.tv-rank-row span:first-child { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.tv-rank-row span:last-child { color:#8b94b8; flex-shrink:0; font-weight:600; }
-.tv-rank-track { height:0.8vh; border-radius:999px; background:#323852; overflow:hidden; }
-.tv-rank-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,#60a5fa,#3b82f6); }
-/* tarefas */
-.tv-car-wrap { flex:1; display:flex; flex-direction:column; min-height:0; }
-.tv-car-slot { flex:1; display:flex; flex-direction:column; gap:1.4vh; min-height:0; }
-.tv-card { flex:1; background:#2f3552; border:1px solid #384063; border-radius:14px; padding:1.6vh 1.1vw;
-  opacity:0; transform:translateY(6px); transition:opacity .5s ease, transform .5s ease;
-  display:flex; flex-direction:column; min-height:0; overflow:hidden; }
-.tv-card.show { opacity:1; transform:none; }
-.tv-person { display:flex; align-items:center; gap:0.8vw; margin-bottom:1.3vh; }
-.tv-avatar { width:5.2vh; height:5.2vh; border-radius:14px; display:flex; align-items:center; justify-content:center;
-  font-size:1.9vh; font-weight:800; color:#fff; flex-shrink:0; }
-.tv-name { font-size:2vh; font-weight:700; line-height:1.1; }
-.tv-role { font-size:1.3vh; color:#8b94b8; margin-top:0.25vh; font-weight:500; }
-.tv-task { font-size:1.6vh; display:flex; align-items:flex-start; gap:0.6vw; margin-bottom:1vh; color:#dfe3f0; }
-.tv-box { width:1.5vh; height:1.5vh; border-radius:5px; border:2px solid #566089; margin-top:0.25vh; flex-shrink:0; }
-.tv-box.fix { background:#34d399; border-color:#34d399; }
-/* mural */
-.tv-note { border-radius:12px; padding:1vh 1vw; margin-bottom:0.9vh; background:#2f3552; border-left:3px solid #60a5fa; }
-.tv-note:last-child { margin-bottom:0; }
-.tv-note-date { font-size:1.15vh; font-weight:700; color:#8b94b8; text-transform:uppercase; letter-spacing:0.06em; }
-.tv-note-text { font-size:1.55vh; margin-top:0.35vh; font-weight:500; color:#e8eaf2; }
-/* indicadores */
-.tv-car-dots { display:flex; justify-content:center; gap:0.5vw; margin-top:1.1vh; flex-shrink:0; align-items:center; }
-.tv-car-dots span { width:0.75vh; height:0.75vh; border-radius:50%; background:#3d4468; transition:all .3s; }
-.tv-car-dots span.active { background:#60a5fa; width:2.2vw; border-radius:99px; }
+.tv-hdr { display:flex; justify-content:space-between; align-items:center; flex-shrink:0; }
+.tv-hdr h1 { font-size:2.6vh; font-weight:700; margin:0; letter-spacing:-0.01em; }
+.tv-hdr h1 small { font-weight:500; color:#8b94b8; font-size:1.7vh; margin-left:0.8vw; }
+.tv-hdr-dir { display:flex; gap:0.8vw; align-items:center; }
+.tv-pill { font-size:1.5vh; color:#94a3c4; background:#272c44; padding:0.8vh 1.1vw; border-radius:10px; border:1px solid #2f3552; }
+.tv-pill b { color:#e8eaf2; }
+.tv-pill.ok::before, .tv-pill.velho::before { content:''; display:inline-block; width:0.9vh; height:0.9vh; border-radius:50%;
+  margin-right:0.5vw; vertical-align:middle; background:#34d399; box-shadow:0 0 8px rgba(52,211,153,.7); }
+.tv-pill.velho { color:#fcd34d; border-color:rgba(251,191,36,.45); }
+.tv-pill.velho::before { background:#fbbf24; box-shadow:0 0 8px rgba(251,191,36,.7); }
+.tv-pedidos { display:flex; flex-direction:column; gap:1.4vh; flex-shrink:0; }
+.tv-plats { display:grid; grid-template-columns:repeat(3,1fr); gap:1.2vw; }
+.tv-plat { background:#272c44; border:1px solid #2f3552; border-radius:18px; padding:2vh 1.4vw; border-top:0.6vh solid var(--cor); }
+.tv-plat-top { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:1.6vh; }
+.tv-plat-nome { font-size:2.3vh; font-weight:700; }
+.tv-plat-total { font-size:1.5vh; color:#8b94b8; }
+.tv-plat-total b { font-size:2.6vh; color:#e8eaf2; margin-right:0.3vw; }
+.tv-etapas { display:grid; grid-template-columns:repeat(3,1fr); gap:0.8vw; }
+.tv-etapa { background:#2f3552; border-radius:12px; padding:1.4vh 0.6vw; text-align:center; }
+.tv-etapa .n { font-size:5.4vh; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; }
+.tv-etapa .l { font-size:1.4vh; color:#94a3c4; margin-top:0.8vh; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; }
+.tv-etapa.zero .n { color:#4a5275; }
+.tv-etapa.zero .l { color:#5f688d; }
+.tv-alerta { display:flex; align-items:center; gap:0.8vw; background:rgba(251,113,133,0.12); border:1px solid rgba(251,113,133,0.45);
+  color:#fecdd3; border-radius:12px; padding:1.2vh 1.2vw; font-size:2vh; font-weight:600; }
+.tv-alerta .ic { width:3vh; height:3vh; border-radius:50%; background:#fb7185; color:#1f2338; display:flex; align-items:center;
+  justify-content:center; font-weight:900; font-size:1.9vh; flex-shrink:0; }
+.tv-baixo { display:grid; grid-template-columns:1.2fr 1fr 1fr; gap:1.2vw; flex:1; min-height:0; }
+.tv-box { background:#272c44; border:1px solid #2f3552; border-radius:16px; padding:1.8vh 1.2vw; min-height:0; overflow:hidden;
+  display:flex; flex-direction:column; }
+.tv-box h2 { font-size:1.45vh; font-weight:700; margin:0 0 1.5vh; display:flex; align-items:center; gap:0.5vw;
+  text-transform:uppercase; letter-spacing:0.08em; color:#aab3d4; }
+.tv-dot { width:0.9vh; height:0.9vh; border-radius:50%; background:var(--c,#34d399); box-shadow:0 0 8px var(--c,#34d399); flex-shrink:0; }
+.tv-setor { margin-bottom:1.4vh; }
+.tv-setor-n { font-size:1.6vh; font-weight:700; color:#cfd5ea; margin-bottom:0.7vh; }
+.tv-task { font-size:1.65vh; display:flex; gap:0.6vw; align-items:flex-start; margin-bottom:0.8vh; color:#dfe3f0; }
+.tv-chk { width:1.6vh; height:1.6vh; border-radius:5px; border:2px solid #566089; margin-top:0.2vh; flex-shrink:0; }
+.tv-chk.ok { background:#34d399; border-color:#34d399; }
+.tv-task.feita { color:#6b7499; text-decoration:line-through; }
+.tv-linha { display:flex; justify-content:space-between; align-items:center; gap:0.6vw; padding:1vh 0.8vw; background:#2f3552;
+  border-radius:10px; margin-bottom:0.8vh; font-size:1.7vh; }
+.tv-linha > span:first-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tv-linha > span:last-child { font-weight:700; font-variant-numeric:tabular-nums; flex-shrink:0; }
+.tv-full-data { font-size:1.4vh; color:#8b94b8; margin-bottom:1vh; }
+.tv-full-data b { color:#e8eaf2; }
+.tv-tag { font-size:1.2vh; font-weight:700; padding:0.3vh 0.5vw; border-radius:6px; margin-left:0.5vw; text-transform:uppercase; }
+.tv-tag.zerado { background:rgba(251,113,133,.18); color:#fda4af; }
+.tv-tag.baixo { background:rgba(251,191,36,.16); color:#fcd34d; }
+.tv-tag.compra { background:rgba(96,165,250,.16); color:#93c5fd; }
+.tv-vazio { color:#5f688d; font-size:1.6vh; }
+.tv-mais { color:#8b94b8; font-size:1.4vh; margin-top:0.4vh; }
 
 .fin-upload-box { background:var(--card); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border:0.5px solid var(--border); border-radius:14px;
   padding:1.5rem; box-shadow:var(--shadow); }
@@ -1928,566 +1932,190 @@ function deleteTarefa(setor, i) {
   setTimeout(tarefaRestaurarBotoes, 30);
 }
 
-// --- TV: painel da operacao ----------------------------------------------------
-var _tvAba      = 'painel';   // 'painel' | 'dados'
-var _tvRelogio  = null;
-var _tvCarTimer = null;
-var _tvCarIdx   = 0;
-var _tvMuralIdx = 0;
-var _tvMuralTimer = null;
-var _tvChart    = null;
-var TV_CAR_SEG  = 6;
-var TV_MURAL_SEG = 10;
-var TV_RANK_SEG  = 8;
-var _tvRankTimer = null;
+// --- TV: painel da expedicao (tempo real) --------------------------------------
+// Pedidos: o Claude le o UpSeller a cada 10 min (seg-sab, 8h-17h) e grava SO o no
+// /tvPedidos.json. Full: gravado em /tvFull.json. Tarefas, estoque e compras vem do
+// estado normal. A TV so LE esses nos; nunca grava nada.
+var _tvRelogio    = null;
+var _tvPollTimer  = null;
+var _tvExtraTimer = null;
+var _tvExtra      = { pedidos: null, full: null };
+var TV_EXTRA_SEG  = 60;         // releitura de /tvPedidos e /tvFull
+var TV_VELHO_MIN  = 25;         // acima disso o selo "Atualizado" fica amarelo
+var TV_PLATS = [
+  { id:'mercado', nome:'Mercado Livre', cor:'#facc15' },
+  { id:'shopee',  nome:'Shopee',        cor:'#f97316' },
+  { id:'tiktok',  nome:'TikTok Shop',   cor:'#22d3ee' }
+];
+var TV_ETAPAS = [ ['emitir','Para emitir'], ['enviar','Para enviar'], ['imprimir','Para imprimir'] ];
 
-// ---------- helpers de dados ----------
+function tvHHMM(d) { return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0'); }
 
-var MES_NOMES = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-var MES_CURTO = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
-
-// Garante a estrutura e migra o formato antigo (periodos) se existir
-function tvDados() {
-  if (!state.tv) state.tv = {};
-  if (!state.tv.meses) state.tv.meses = {};
-  // Migracao: pega o periodo mais recente do formato antigo como semana
-  if (!state.tv.semana && state.tv.periodos) {
-    var ks = Object.keys(state.tv.periodos).sort();
-    if (ks.length) state.tv.semana = state.tv.periodos[ks[ks.length - 1]];
-    delete state.tv.periodos;
+function tvBuscarExtras() {
+  function ler(no) {
+    return fetch(FIREBASE_URL + '/' + no + '.json?x=' + Date.now())
+      .then(function(r){ return r.ok ? r.json() : undefined; })
+      .catch(function(){ return undefined; });
   }
-  return state.tv;
-}
-
-function tvSemana() { return tvDados().semana || null; }
-
-function tvFmtData(iso) {
-  if (!iso) return '';
-  var p = String(iso).split('-');
-  return p.length >= 3 ? p[2] + '/' + p[1] : iso;
-}
-
-function tvMesLabel(chave) {
-  var p = String(chave).split('-');
-  return MES_NOMES[parseInt(p[1],10) - 1] + ' ' + p[0];
-}
-
-// Grafico de barras: pedidos por mes, a partir das planilhas mensais
-function tvPedidosPorMes() {
-  var m = tvDados().meses || {};
-  var chaves = Object.keys(m).sort().slice(-12);
-  return {
-    labels:  chaves.map(function(k){ return MES_CURTO[parseInt(k.slice(5,7),10) - 1]; }),
-    valores: chaves.map(function(k){ return m[k].pedidos || 0; }),
-  };
-}
-
-// ---------- leitura da planilha ----------
-
-function tvPeriodoDoNome(nome) {
-  var m = String(nome).match(/(\d{8})-(\d{8})/);
-  if (!m) return null;
-  function iso(s){ return s.slice(0,4) + '-' + s.slice(4,6) + '-' + s.slice(6,8); }
-  return { inicio: iso(m[1]), fim: iso(m[2]) };
-}
-
-function tvPlataforma(loja) {
-  var s = String(loja || '').toLowerCase();
-  if (s.indexOf('shopee')  !== -1) return 'Shopee';
-  if (s.indexOf('mercado') !== -1) return 'Mercado Livre';
-  if (s.indexOf('tiktok')  !== -1) return 'TikTok';
-  return 'Outros';
-}
-
-// Le o arquivo e devolve o resumo agrupado por SKU
-function tvLerPlanilha(arq, ok, erro) {
-  if (typeof XLSX === 'undefined') { erro('Biblioteca de planilha nao carregou. Recarregue a pagina.'); return; }
-  var fr = new FileReader();
-  fr.onerror = function(){ erro('Falha ao ler o arquivo.'); };
-  fr.onload = function(e) {
-    try {
-      var wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
-      var linhas = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
-      if (!linhas.length) { erro('A planilha esta vazia.'); return; }
-
-      var col = Object.keys(linhas[0]);
-      function achar(alvo){ return col.find(function(c){ return c.trim().toLowerCase() === alvo; }); }
-      var cSku  = achar('sku');
-      var cUni  = achar('unidades vendidas');
-      var cProd = achar('produtos');
-      var cPed  = achar('pedidos válidos') || achar('pedidos validos');
-      var cLoja = achar('loja');
-      var cVal  = achar('valor de vendas');
-
-      if (!cSku || !cUni) {
-        erro('A planilha precisa ter as colunas "SKU" e "Unidades Vendidas". Encontrei: ' + col.join(', '));
-        return;
-      }
-
-      var mapa = {}, totalPed = 0, totalUni = 0, totalVal = 0, plats = {};
-      linhas.forEach(function(r) {
-        var sku = String(r[cSku] || '').trim();
-        if (!sku) return;
-        var uni = parseFloat(r[cUni]) || 0;
-        var ped = cPed ? (parseFloat(r[cPed]) || 0) : 0;
-        var val = cVal ? (parseFloat(r[cVal]) || 0) : 0;
-        if (!mapa[sku]) mapa[sku] = { sku: sku, nome: String(cProd ? r[cProd] : sku) || sku, unidades: 0, pedidos: 0 };
-        mapa[sku].unidades += uni;
-        mapa[sku].pedidos  += ped;
-        totalUni += uni; totalPed += ped; totalVal += val;
-        if (cLoja) { var p = tvPlataforma(r[cLoja]); plats[p] = (plats[p] || 0) + ped; }
-      });
-
-      var skus = Object.keys(mapa).map(function(k){ return mapa[k]; })
-        .sort(function(a,b){ return b.unidades - a.unidades; })
-        .slice(0, 20)
-        .map(function(s){ return { sku:s.sku, nome:s.nome, unidades:Math.round(s.unidades), pedidos:Math.round(s.pedidos) }; });
-
-      ok({
-        pedidos:  Math.round(totalPed),
-        unidades: Math.round(totalUni),
-        valor:    Math.round(totalVal * 100) / 100,
-        plataformas: plats,
-        skus: skus,
-        totalSkus: Object.keys(mapa).length,
-        arquivo: arq.name,
-        importadoEm: Date.now(),
-      });
-    } catch (err) { erro('Erro ao processar: ' + err.message); }
-  };
-  fr.readAsArrayBuffer(arq);
-}
-
-// ---------- import: semana (sempre substitui) ----------
-
-function tvImportarSemana(input) {
-  var arq = input && input.files && input.files[0];
-  if (!arq) return;
-  var st = document.getElementById('tv-st-semana');
-  function msg(t,c){ if(st){ st.textContent=t; st.style.color=c||'var(--text2)'; } }
-
-  msg('Lendo planilha...');
-  tvLerPlanilha(arq, function(res) {
-    var per = tvPeriodoDoNome(arq.name) || { inicio:'', fim:'' };
-    var d = tvDados();
-    d.semana = Object.assign({}, res, { inicio: per.inicio, fim: per.fim });
-    saveState();
-    addLog('Atualizou vendas da semana na TV (' + res.totalSkus + ' SKUs, ' + res.pedidos + ' pedidos)');
-    msg('Semana atualizada: ' + res.pedidos + ' pedidos, ' + res.unidades + ' unidades, ' + res.totalSkus + ' SKUs.', 'var(--green)');
-    input.value = '';
-    setTimeout(function(){ tvSetAba('dados'); }, 900);
-  }, function(e){ msg(e, 'var(--red)'); });
-}
-
-function tvLimparSemana() {
-  if (!confirm('Remover os dados da semana? O ranking da TV fica vazio ate voce subir outra planilha.')) return;
-  var d = tvDados();
-  delete d.semana;
-  addLog('Removeu os dados da semana na TV');
-  saveState();
-  tvSetAba('dados');
-}
-
-// ---------- import: mes (escolhe o mes) ----------
-
-function tvImportarMes(input) {
-  var arq = input && input.files && input.files[0];
-  if (!arq) return;
-  var st  = document.getElementById('tv-st-mes');
-  var sel = document.getElementById('tv-mes-sel');
-  function msg(t,c){ if(st){ st.textContent=t; st.style.color=c||'var(--text2)'; } }
-
-  var chave = sel ? sel.value : '';
-  if (!chave) { msg('Selecione o mes antes de escolher o arquivo.', 'var(--red)'); input.value=''; return; }
-
-  msg('Lendo planilha...');
-  tvLerPlanilha(arq, function(res) {
-    var d = tvDados();
-    d.meses[chave] = Object.assign({}, res, { mes: chave });
-    // Mantem no maximo 12 meses
-    var ks = Object.keys(d.meses).sort();
-    while (ks.length > 12) { delete d.meses[ks.shift()]; }
-    saveState();
-    addLog('Importou vendas de ' + tvMesLabel(chave) + ' na TV (' + res.pedidos + ' pedidos)');
-    msg(tvMesLabel(chave) + ': ' + res.pedidos + ' pedidos, ' + res.unidades + ' unidades.', 'var(--green)');
-    input.value = '';
-    setTimeout(function(){ tvSetAba('dados'); }, 900);
-  }, function(e){ msg(e, 'var(--red)'); });
-}
-
-function tvExcluirMes(chave) {
-  var d = tvDados();
-  if (!d.meses[chave]) return;
-  if (!confirm('Excluir os dados de ' + tvMesLabel(chave) + '?')) return;
-  delete d.meses[chave];
-  addLog('Excluiu vendas de ' + tvMesLabel(chave) + ' na TV');
-  saveState();
-  tvSetAba('dados');
-}
-
-// ---------- render: aba de dados ----------
-
-function tvRenderDados() {
-  var d   = tvDados();
-  var sem = d.semana;
-  var meses = d.meses || {};
-
-  // Select dos ultimos 18 meses
-  var hoje = new Date(), opts = '';
-  for (var i = 0; i < 18; i++) {
-    var dt = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
-    var k  = dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0');
-    opts += '<option value="' + k + '">' + tvMesLabel(k) + (meses[k] ? '  (ja importado)' : '') + '</option>';
-  }
-
-  var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">';
-
-  // --- Caixa da semana ---
-  html += '<div class="card">' +
-    '<div style="font-weight:700;font-size:0.95rem;margin-bottom:0.4rem">Vendas da semana</div>' +
-    '<div style="font-size:0.82rem;color:var(--text2);line-height:1.55;margin-bottom:0.9rem">' +
-      'Alimenta o ranking <strong>Mais vendidos</strong> da TV. Cada arquivo novo substitui o anterior.' +
-    '</div>';
-
-  if (sem) {
-    html += '<div style="background:var(--bg3);border-radius:10px;padding:0.8rem 1rem;margin-bottom:0.9rem;border-left:4px solid var(--green)">' +
-      '<div style="font-weight:700;font-size:0.9rem">' +
-        (sem.inicio ? tvFmtData(sem.inicio) + ' a ' + tvFmtData(sem.fim) : 'Periodo nao identificado') +
-      '</div>' +
-      '<div style="font-size:0.8rem;color:var(--text2);margin-top:0.25rem">' +
-        (sem.pedidos||0).toLocaleString('pt-BR') + ' pedidos &middot; ' +
-        (sem.unidades||0).toLocaleString('pt-BR') + ' unidades &middot; ' +
-        (sem.totalSkus || (sem.skus||[]).length) + ' SKUs' +
-      '</div>' +
-      ((sem.skus && sem.skus[0]) ? '<div style="font-size:0.78rem;color:var(--text3);margin-top:0.25rem">Top 1: ' +
-        esc(sem.skus[0].sku) + ' com ' + sem.skus[0].unidades + ' un</div>' : '') +
-    '</div>';
-  } else {
-    html += '<div style="background:var(--bg3);border-radius:10px;padding:0.8rem 1rem;margin-bottom:0.9rem;font-size:0.83rem;color:var(--text3)">Nenhuma planilha da semana carregada</div>';
-  }
-
-  html += '<input type="file" accept=".xlsx,.xls" onchange="tvImportarSemana(this)" ' +
-      'style="font-size:0.83rem;color:var(--text2);cursor:pointer;padding:0.65rem;border:2px dashed var(--border);border-radius:10px;width:100%;background:var(--bg3)">' +
-    '<div id="tv-st-semana" style="font-size:0.83rem;margin-top:0.6rem;min-height:1.2em"></div>' +
-    (sem ? '<button class="btn btn-sm btn-red" style="margin-top:0.5rem" onclick="tvLimparSemana()">Remover semana</button>' : '') +
-  '</div>';
-
-  // --- Caixa do mes ---
-  html += '<div class="card">' +
-    '<div style="font-weight:700;font-size:0.95rem;margin-bottom:0.4rem">Vendas do mes</div>' +
-    '<div style="font-size:0.82rem;color:var(--text2);line-height:1.55;margin-bottom:0.9rem">' +
-      'Alimenta o grafico <strong>Pedidos por mes</strong>. Escolha o mes e depois o arquivo.' +
-    '</div>' +
-    '<label style="font-size:0.78rem;color:var(--text2);font-weight:600;display:block;margin-bottom:0.3rem">Mes de referencia</label>' +
-    '<select id="tv-mes-sel" style="width:100%;padding:0.6rem 0.9rem;border:1px solid var(--border);border-radius:8px;background:var(--input-bg);color:var(--text);font-size:0.88rem;margin-bottom:0.8rem">' + opts + '</select>' +
-    '<input type="file" accept=".xlsx,.xls" onchange="tvImportarMes(this)" ' +
-      'style="font-size:0.83rem;color:var(--text2);cursor:pointer;padding:0.65rem;border:2px dashed var(--border);border-radius:10px;width:100%;background:var(--bg3)">' +
-    '<div id="tv-st-mes" style="font-size:0.83rem;margin-top:0.6rem;min-height:1.2em"></div>' +
-  '</div>';
-
-  html += '</div>';
-
-  // --- Tabela dos meses ---
-  var chaves = Object.keys(meses).sort().reverse();
-  if (!chaves.length) {
-    html += '<div class="empty-state">' + iconEmpty() + '<p>Nenhum mes importado ainda</p></div>';
-    return html;
-  }
-
-  html += '<div class="card">' +
-    '<div style="font-weight:700;font-size:0.95rem;margin-bottom:0.9rem">Meses no grafico (' + chaves.length + ')</div>' +
-    '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">' +
-    '<thead><tr style="background:var(--bg3)">' +
-      '<th style="text-align:left;padding:9px 12px">Mes</th>' +
-      '<th style="text-align:center;padding:9px 12px">Pedidos</th>' +
-      '<th style="text-align:center;padding:9px 12px">Unidades</th>' +
-      '<th style="text-align:left;padding:9px 12px">Top 1</th>' +
-      '<th style="padding:9px 12px"></th>' +
-    '</tr></thead><tbody>';
-
-  chaves.forEach(function(k) {
-    var m = meses[k];
-    var top = (m.skus && m.skus[0]) ? m.skus[0] : null;
-    html += '<tr style="border-bottom:1px solid var(--border)">' +
-      '<td style="padding:8px 12px;font-weight:600">' + tvMesLabel(k) + '</td>' +
-      '<td style="padding:8px 12px;text-align:center;font-weight:700">' + (m.pedidos||0).toLocaleString('pt-BR') + '</td>' +
-      '<td style="padding:8px 12px;text-align:center">' + (m.unidades||0).toLocaleString('pt-BR') + '</td>' +
-      '<td style="padding:8px 12px;font-size:0.8rem;color:var(--text2)">' + (top ? esc(top.sku) + ' (' + top.unidades + ' un)' : '--') + '</td>' +
-      '<td style="padding:8px 12px;text-align:right"><button class="btn btn-sm btn-red" onclick="tvExcluirMes(\'' + k + '\')">x</button></td>' +
-    '</tr>';
+  return Promise.all([ler('tvPedidos'), ler('tvFull')]).then(function(res) {
+    if (res[0] !== undefined) _tvExtra.pedidos = res[0];
+    if (res[1] !== undefined) _tvExtra.full    = res[1];
+    tvAtualizarDados();
   });
-
-  html += '</tbody></table></div></div>';
-  return html;
 }
 
-// ---------- render: painel ----------
+// ---------- blocos ----------
 
-function tvCarrosselPares() {
-  var cols = (state.ponto && state.ponto.colaboradores) || [];
-  var hojeStr = new Date().toISOString().slice(0,10);
-
-  var todas = [];
-  SETORES.forEach(function(s) {
-    ((state.tasks && state.tasks[s.id]) || []).forEach(function(t) {
-      if (!tarefaPendenteHoje(t)) return;
-      todas.push(Object.assign({}, t, { _setor: s.id }));
-    });
-  });
-
-  var pessoas = cols.map(function(c, i) {
-    var setor = setorDoColab(c);
-    var minhas = todas.filter(function(t){ return t.colabIdx === i; });
-    var doSetor = todas.filter(function(t) {
-      var semDono = t.colabIdx === undefined || t.colabIdx === null;
-      return semDono && setor && normalizarSetor(t._setor) === setor;
-    });
-    var juntas = minhas.concat(doSetor)
-      .filter(function(t){ return tarefaEhRecorrente(t) || t.date <= hojeStr; })
-      .sort(function(a,b){ return (tarefaEhRecorrente(a)?0:1) - (tarefaEhRecorrente(b)?0:1); });
-    return { nome: c.nome, idx: i, setor: setor, tarefas: juntas };
-  });
-
-  var pares = [];
-  for (var i = 0; i < pessoas.length; i += 2) pares.push(pessoas.slice(i, i + 2));
-  return pares;
-}
-
-function tvCardPessoa(p) {
-  var CORES = ['linear-gradient(135deg,#60a5fa,#6366f1)','linear-gradient(135deg,#fb7185,#f43f5e)','linear-gradient(135deg,#34d399,#10b981)','linear-gradient(135deg,#c084fc,#a855f7)'];
-  var cor = CORES[p.idx % 6];
-  var ini = (p.nome || '?').split(' ').map(function(x){ return x[0]; }).slice(0,2).join('').toUpperCase();
-  var setorTxt = p.setor === 'expedicao' ? 'Expedicao' : (p.setor === 'producao' ? 'Producao' : '');
-
-  var itens = p.tarefas.length
-    ? p.tarefas.slice(0, 9).map(function(t) {
-        return '<div class="tv-task"><span class="tv-box' + (tarefaEhRecorrente(t) ? ' fix' : '') + '"></span>' + esc(t.text) + '</div>';
-      }).join('')
-    : '<div class="tv-task" style="opacity:0.55;font-style:italic">Sem tarefas para hoje</div>';
-
-  return '<div class="tv-card show">' +
-    '<div class="tv-person">' +
-      '<div class="tv-avatar" style="background:' + cor + '">' + ini + '</div>' +
-      '<div><div class="tv-name">' + esc(p.nome) + '</div>' +
-      (setorTxt ? '<div class="tv-role">' + setorTxt + '</div>' : '') + '</div>' +
-    '</div>' + itens +
-  '</div>';
-}
-
-function tvRenderCarrossel() {
-  var slot = document.getElementById('tvCarSlot');
-  var dots = document.getElementById('tvCarDots');
-  if (!slot) return;
-  var pares = tvCarrosselPares();
-  if (!pares.length) {
-    slot.innerHTML = '<div style="opacity:0.6;font-size:15px">Nenhum colaborador cadastrado</div>';
-    if (dots) dots.innerHTML = '';
+function tvRenderPedidos() {
+  var box = document.getElementById('tvPedidos');
+  var sel = document.getElementById('tvAtualizado');
+  if (!box) return;
+  var d = _tvExtra.pedidos;
+  if (!d || !d.plat) {
+    box.innerHTML = '<div class="tv-box"><div class="tv-vazio">Aguardando a primeira leitura do UpSeller...</div></div>';
+    if (sel) { sel.className = 'tv-pill velho'; sel.innerHTML = 'Sem dados do UpSeller'; }
     return;
   }
-  if (_tvCarIdx >= pares.length) _tvCarIdx = 0;
-  slot.innerHTML = pares[_tvCarIdx].map(tvCardPessoa).join('');
-  if (dots) {
-    dots.innerHTML = pares.map(function(_, i) {
-      return '<span class="' + (i === _tvCarIdx ? 'active' : '') + '"></span>';
+
+  var cards = TV_PLATS.map(function(p) {
+    var v = d.plat[p.id] || {};
+    var total = 0;
+    var etapas = TV_ETAPAS.map(function(e) {
+      var n = Number(v[e[0]]) || 0; total += n;
+      return '<div class="tv-etapa' + (n ? '' : ' zero') + '"><div class="n">' + n + '</div><div class="l">' + e[1] + '</div></div>';
     }).join('');
-  }
-}
-
-var TV_RANK_POR_PAGINA = 14;
-var _tvRankIdx = 0;
-var TV_CORES = ['linear-gradient(90deg,#60a5fa,#3b82f6)','linear-gradient(90deg,#fb7185,#f43f5e)',
-                'linear-gradient(90deg,#34d399,#10b981)','linear-gradient(90deg,#c084fc,#a855f7)'];
-
-function tvRankPaginas() {
-  var per = tvSemana();
-  var skus = (per && per.skus) || [];
-  var pgs = [];
-  for (var i = 0; i < skus.length; i += TV_RANK_POR_PAGINA) pgs.push(skus.slice(i, i + TV_RANK_POR_PAGINA));
-  return pgs;
-}
-
-function tvRenderRanking() {
-  var box  = document.getElementById('tvRank');
-  var dots = document.getElementById('tvRankDots');
-  if (!box) return;
-
-  var per  = tvSemana();
-  var skus = (per && per.skus) || [];
-  if (!skus.length) {
-    box.innerHTML = '<div style="opacity:0.6;font-size:1.5vh">Importe uma planilha na aba Dados para ver o ranking</div>';
-    if (dots) dots.innerHTML = '';
-    return;
-  }
-
-  var pgs = tvRankPaginas();
-  if (_tvRankIdx >= pgs.length) _tvRankIdx = 0;
-  var max = skus[0].unidades || 1;
-
-  box.innerHTML = pgs[_tvRankIdx].map(function(s, i) {
-    var pct = Math.max(6, Math.round((s.unidades / max) * 100));
-    return '<div class="tv-rank-item">' +
-      '<div class="tv-rank-row"><span>' + esc(s.nome || s.sku) + '</span><span>' + s.unidades + ' un</span></div>' +
-      '<div class="tv-rank-track"><div class="tv-rank-fill" style="width:' + pct + '%;background:' + TV_CORES[i % 4] + '"></div></div>' +
-    '</div>';
+    return '<div class="tv-plat" style="--cor:' + p.cor + '">' +
+      '<div class="tv-plat-top"><span class="tv-plat-nome">' + p.nome + '</span>' +
+      '<span class="tv-plat-total"><b>' + total + '</b>' + (total === 1 ? 'pedido' : 'pedidos') + '</span></div>' +
+      '<div class="tv-etapas">' + etapas + '</div></div>';
   }).join('');
 
-  if (dots) {
-    dots.innerHTML = pgs.length > 1
-      ? pgs.map(function(_, i){ return '<span class="' + (i === _tvRankIdx ? 'active' : '') + '"></span>'; }).join('')
-      : '';
+  var falha = Number(d.falha) || 0, buffer = Number(d.buffer) || 0;
+  var partes = [];
+  if (falha)  partes.push(falha  + (falha  === 1 ? ' pedido com falha' : ' pedidos com falha'));
+  if (buffer) partes.push(buffer + ' em buffering');
+  var alerta = partes.length ? '<div class="tv-alerta"><span class="ic">!</span>' + partes.join(' e ') + '</div>' : '';
+
+  box.innerHTML = '<div class="tv-plats">' + cards + '</div>' + alerta;
+
+  if (sel && d.ts) {
+    var t = new Date(d.ts);
+    var velho = (Date.now() - t.getTime()) > TV_VELHO_MIN * 60 * 1000;
+    var hoje = tkDataLocal(t) === tkDataLocal();
+    sel.className = 'tv-pill ' + (velho ? 'velho' : 'ok');
+    sel.innerHTML = 'Atualizado ' + (hoje ? 'às ' : 'em ' + t.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'}) + ' ') +
+      '<b>' + tvHHMM(t) + '</b> · UpSeller';
   }
 }
 
-function tvRenderGrafico() {
-  var cv = document.getElementById('tvChart');
-  if (!cv || typeof Chart === 'undefined') return;
-  var d = tvPedidosPorMes();
-  if (_tvChart) { _tvChart.destroy(); _tvChart = null; }
-  if (!d.labels.length) return;
-
-  // Plugin inline: escreve o valor acima de cada barra
-  var rotuloValores = {
-    id: 'rotuloValores',
-    afterDatasetsDraw: function(chart) {
-      var ctx = chart.ctx;
-      var alt = chart.chartArea ? (chart.chartArea.bottom - chart.chartArea.top) : 200;
-      ctx.save();
-      ctx.fillStyle = '#e8eaf2';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'bottom';
-      ctx.font = '700 ' + Math.max(10, Math.round(alt * 0.075)) + 'px "Segoe UI", system-ui, sans-serif';
-      chart.getDatasetMeta(0).data.forEach(function(barra, i) {
-        var v = chart.data.datasets[0].data[i];
-        if (v === null || v === undefined) return;
-        ctx.fillText(Number(v).toLocaleString('pt-BR'), barra.x, barra.y - 5);
-      });
-      ctx.restore();
-    },
-  };
-
-  _tvChart = new Chart(cv, {
-    type: 'bar',
-    data: { labels: d.labels, datasets: [{
-      data: d.valores,
-      backgroundColor: function(ctx) {
-        var g = ctx.chart.ctx.createLinearGradient(0, 0, 0, ctx.chart.height || 200);
-        g.addColorStop(0, '#60a5fa'); g.addColorStop(1, '#6366f1');
-        return g;
-      },
-      borderRadius: 7, maxBarThickness: 30,
-    }]},
-    options: {
-      responsive: true, maintainAspectRatio: false, animation: { duration: 600 },
-      layout: { padding: { top: 22 } },   // espaco para o rotulo nao cortar
-      plugins: { legend: { display: false }, tooltip: { enabled: false } },
-      scales: {
-        y: { beginAtZero: true, grid: { color: '#323852' }, ticks: { color: '#7c86a8' } },
-        x: { grid: { display: false }, ticks: { color: '#7c86a8' } },
-      },
-    },
-    plugins: [rotuloValores],
+function tvTarefasDoSetor(setorId) {
+  var hojeStr = tkDataLocal();
+  var lista = ((state.tasks && state.tasks[setorId]) || []).filter(function(t) {
+    if (tarefaEhRecorrente(t)) return tarefaOcorreEm(t);
+    return !t.done && (!t.date || t.date <= hojeStr);
+  }).map(function(t) {
+    var feita = tarefaEhRecorrente(t) ? tarefaFeitaHoje(t) : !!t.done;
+    return { text: t.text, feita: feita };
   });
+  lista.sort(function(a, b){ return (a.feita ? 1 : 0) - (b.feita ? 1 : 0); });
+  return lista;
 }
 
-function tvMuralPaginas() {
-  var avisos = (state.mural || []);
-  var pgs = [];
-  for (var i = 0; i < avisos.length; i += 2) pgs.push(avisos.slice(i, i + 2));
-  return pgs;
-}
-
-function tvRenderMural() {
-  var box  = document.getElementById('tvMural');
-  var dots = document.getElementById('tvMuralDots');
+function tvRenderTarefas() {
+  var box = document.getElementById('tvTarefas');
   if (!box) return;
-
-  var pgs = tvMuralPaginas();
-  if (!pgs.length) {
-    box.innerHTML = '<div style="opacity:0.6;font-size:1.5vh">Nenhum aviso no mural</div>';
-    if (dots) dots.innerHTML = '';
-    return;
-  }
-  if (_tvMuralIdx >= pgs.length) _tvMuralIdx = 0;
-
-  var bordas = ['#60a5fa','#fb7185','#34d399','#c084fc'];
-  box.innerHTML = pgs[_tvMuralIdx].map(function(a, i) {
-    return '<div class="tv-note" style="border-left-color:' + bordas[i % 4] + '">' +
-      '<div class="tv-note-date">' + esc(a.author || 'Aviso') + (a.time ? ' &middot; ' + esc(a.time) : '') + '</div>' +
-      '<div class="tv-note-text">' + esc(a.text) + '</div>' +
-    '</div>';
+  var MAX = 6;
+  box.innerHTML = SETORES.map(function(s) {
+    var ts = tvTarefasDoSetor(s.id);
+    var itens = ts.length
+      ? ts.slice(0, MAX).map(function(t) {
+          return '<div class="tv-task' + (t.feita ? ' feita' : '') + '"><span class="tv-chk' + (t.feita ? ' ok' : '') + '"></span>' + esc(t.text) + '</div>';
+        }).join('') + (ts.length > MAX ? '<div class="tv-mais">+ ' + (ts.length - MAX) + ' tarefas</div>' : '')
+      : '<div class="tv-vazio">Sem tarefas para hoje</div>';
+    return '<div class="tv-setor"><div class="tv-setor-n">' + s.label + '</div>' + itens + '</div>';
   }).join('');
+}
 
-  if (dots) {
-    dots.innerHTML = pgs.length > 1
-      ? pgs.map(function(_, i){ return '<span class="' + (i === _tvMuralIdx ? 'active' : '') + '"></span>'; }).join('')
-      : '';
+function tvRenderFull() {
+  var box = document.getElementById('tvFull');
+  if (!box) return;
+  var f = _tvExtra.full;
+  var itens = (f && Array.isArray(f.itens)) ? f.itens : [];
+  if (!itens.length) { box.innerHTML = '<div class="tv-vazio">Nenhum envio programado</div>'; return; }
+  var cab = '';
+  if (f.data || f.canal) {
+    var dt = '';
+    if (f.data) {
+      var p = String(f.data).split('-');
+      var dd = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+      dt = dd.toLocaleDateString('pt-BR', { weekday:'short', day:'2-digit', month:'2-digit' });
+    }
+    cab = '<div class="tv-full-data">' + (dt ? 'Envio: <b>' + esc(dt) + '</b>' : '') +
+          (dt && f.canal ? ' · ' : '') + (f.canal ? esc(f.canal) : '') + '</div>';
   }
+  var MAX = 7;
+  box.innerHTML = cab + itens.slice(0, MAX).map(function(i) {
+    return '<div class="tv-linha"><span>' + esc(i.nome) + '</span><span>' + esc(String(i.qtd)) + (i.un ? ' ' + esc(i.un) : ' un') + '</span></div>';
+  }).join('') + (itens.length > MAX ? '<div class="tv-mais">+ ' + (itens.length - MAX) + ' itens</div>' : '') +
+  (f.obs ? '<div class="tv-mais">' + esc(f.obs) + '</div>' : '');
+}
+
+function tvRenderRepor() {
+  var box = document.getElementById('tvRepor');
+  if (!box) return;
+  var acab = ((state.estoque && state.estoque.acabados) || []).filter(function(p) {
+    return Number(p.minimo) > 0 && (Number(p.qtd) || 0) <= Number(p.minimo);
+  }).map(function(p) {
+    var q = Number(p.qtd) || 0;
+    return { nome: p.nome, zerado: q <= 0, txt: q + ' / mín ' + p.minimo };
+  });
+  acab.sort(function(a, b){ return (b.zerado ? 1 : 0) - (a.zerado ? 1 : 0) || String(a.nome).localeCompare(String(b.nome), 'pt-BR'); });
+  var compras = (state.compras || []).filter(function(c){ return c && !c.done; });
+
+  var linhas = acab.map(function(a) {
+    return '<div class="tv-linha"><span>' + esc(a.nome) + '<span class="tv-tag ' + (a.zerado ? 'zerado">zerado' : 'baixo">baixo') + '</span></span><span>' + a.txt + '</span></div>';
+  }).concat(compras.map(function(c) {
+    return '<div class="tv-linha"><span>' + esc(c.text) + '<span class="tv-tag compra">compras</span></span><span>—</span></div>';
+  }));
+  var MAX = 7;
+  box.innerHTML = linhas.length
+    ? linhas.slice(0, MAX).join('') + (linhas.length > MAX ? '<div class="tv-mais">+ ' + (linhas.length - MAX) + ' itens</div>' : '')
+    : '<div class="tv-vazio">Nada para repor</div>';
 }
 
 function tvPainelHTML() {
-  var per = tvSemana();
-  var agora = new Date();
-  var dataTxt = agora.toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long' });
-  var periodoTxt = (per && per.inicio) ? ('Semana ' + tvFmtData(per.inicio) + ' a ' + tvFmtData(per.fim))
-                 : (per ? 'Semana atual' : 'Sem dados importados');
-
+  var n = new Date();
   return '<div id="tvPanel" class="tv-panel">' +
-    '<div class="tv-header">' +
-      '<h1>Painel de Expedição</h1>' +
-      '<div class="tv-clock" id="tvClock">' + dataTxt + '</div>' +
+    '<div class="tv-hdr">' +
+      '<h1>Expedição <small>Costa Nature Life</small></h1>' +
+      '<div class="tv-hdr-dir">' +
+        '<div class="tv-pill velho" id="tvAtualizado">Carregando...</div>' +
+        '<div class="tv-pill" id="tvClock"><b>' + n.toLocaleDateString('pt-BR', { weekday:'short', day:'2-digit', month:'2-digit' }) + '</b> · ' + tvHHMM(n) + '</div>' +
+      '</div>' +
     '</div>' +
-    '<div class="tv-grid">' +
-
-      // Esquerda: grafico em cima; embaixo mais vendidos + mural lado a lado
-      '<div class="tv-col">' +
-        '<div class="tv-glass">' +
-          '<h2><span class="tv-dot azul"></span>Pedidos por mês</h2>' +
-          '<div class="tv-chart-wrap"><canvas id="tvChart"></canvas></div>' +
-        '</div>' +
-        '<div class="tv-baixo">' +
-          '<div class="tv-glass tv-flex">' +
-            '<h2><span class="tv-dot"></span>Mais vendidos &middot; ' + periodoTxt + '</h2>' +
-            '<div class="tv-rank-cols" id="tvRank"></div>' +
-            '<div class="tv-car-dots" id="tvRankDots"></div>' +
-          '</div>' +
-          '<div class="tv-glass tv-flex">' +
-            '<h2><span class="tv-dot rosa"></span>Mural de avisos</h2>' +
-            '<div id="tvMural" style="flex:1"></div>' +
-            '<div class="tv-car-dots" id="tvMuralDots"></div>' +
-          '</div>' +
-        '</div>' +
-      '</div>' +
-
-      // Direita: tarefas ocupando a lateral inteira
-      '<div class="tv-col">' +
-        '<div class="tv-glass tv-flex">' +
-          '<h2><span class="tv-dot"></span>Tarefas da equipe</h2>' +
-          '<div class="tv-car-wrap">' +
-            '<div class="tv-car-slot" id="tvCarSlot"></div>' +
-            '<div class="tv-car-dots" id="tvCarDots"></div>' +
-          '</div>' +
-        '</div>' +
-      '</div>' +
-
+    '<div class="tv-pedidos" id="tvPedidos"></div>' +
+    '<div class="tv-baixo">' +
+      '<div class="tv-box"><h2><span class="tv-dot"></span>Tarefas de hoje</h2><div id="tvTarefas"></div></div>' +
+      '<div class="tv-box"><h2><span class="tv-dot" style="--c:#60a5fa"></span>Full a enviar</h2><div id="tvFull"></div></div>' +
+      '<div class="tv-box"><h2><span class="tv-dot" style="--c:#fb7185"></span>Repor estoque</h2><div id="tvRepor"></div></div>' +
     '</div>' +
   '</div>';
 }
 
 // ---------- ciclo de vida ----------
 
-// Atualiza os blocos da TV sem recriar o painel (mantem a tela cheia ativa)
+// Atualiza os blocos sem recriar o painel (mantem a tela cheia ativa)
 function tvAtualizarDados() {
   try {
-    tvRenderMural();
-    tvRenderRanking();
-    tvRenderCarrossel();
-    tvRenderGrafico();
+    tvRenderPedidos();
+    tvRenderTarefas();
+    tvRenderFull();
+    tvRenderRepor();
   } catch (e) { console.warn('TV: falha ao atualizar', e); }
 }
 
 var _tvWakeLock = null;
-// Impede a tela de apagar/entrar em descanso enquanto o painel esta aberto.
-// Onde o navegador nao suportar, simplesmente nao faz nada.
+// Impede a tela de apagar enquanto o painel esta aberto (onde houver suporte).
 function tvManterAcesa() {
   try {
     if (!navigator.wakeLock) return;
@@ -2501,12 +2129,19 @@ document.addEventListener('visibilitychange', function() {
   if (document.visibilityState === 'visible' && !_tvWakeLock && state.currentPage === 'tv') tvManterAcesa();
 });
 
-var _tvPollTimer = null;
 function tvIniciar() {
   tvParar();
   tvManterAcesa();
+  tvAtualizarDados();
+  tvBuscarExtras();
 
-  // Releitura periodica: se a conexao em tempo real cair, a TV nao fica defasada
+  _tvExtraTimer = setInterval(function() {
+    if (!document.getElementById('tvPanel')) { tvParar(); return; }
+    tvBuscarExtras();
+  }, TV_EXTRA_SEG * 1000);
+
+  // Releitura periodica do estado: se a conexao em tempo real cair, tarefas e
+  // estoque nao ficam defasados. So LE; nao grava nada.
   _tvPollTimer = setInterval(function() {
     if (state.currentPage !== 'tv') return;
     fetch(FIREBASE_URL + '/data.json?x=' + Date.now())
@@ -2518,69 +2153,20 @@ function tvIniciar() {
       })
       .catch(function(){});
   }, 5 * 60 * 1000);
-  if (_tvAba !== 'painel') return;
-  tvRenderGrafico();
-  tvRenderRanking();
-  _tvCarIdx = 0;
-  tvRenderCarrossel();
-  _tvMuralIdx = 0;
-  tvRenderMural();
-  _tvRankIdx = 0;
-  tvRenderRanking();
-
-  _tvRankTimer = setInterval(function() {
-    if (!document.getElementById('tvRank')) { tvParar(); return; }
-    var pgs = tvRankPaginas();
-    if (pgs.length > 1) { _tvRankIdx = (_tvRankIdx + 1) % pgs.length; tvRenderRanking(); }
-  }, TV_RANK_SEG * 1000);
-
-  _tvMuralTimer = setInterval(function() {
-    var box = document.getElementById('tvMural');
-    if (!box) { tvParar(); return; }
-    var pgs = tvMuralPaginas();
-    if (pgs.length > 1) {
-      _tvMuralIdx = (_tvMuralIdx + 1) % pgs.length;
-      tvRenderMural();
-    }
-  }, TV_MURAL_SEG * 1000);
-
-  _tvCarTimer = setInterval(function() {
-    var slot = document.getElementById('tvCarSlot');
-    if (!slot) { tvParar(); return; }
-    Array.prototype.forEach.call(slot.querySelectorAll('.tv-card'), function(c){ c.classList.remove('show'); });
-    setTimeout(function() {
-      var pares = tvCarrosselPares();
-      _tvCarIdx = pares.length ? (_tvCarIdx + 1) % pares.length : 0;
-      if (_tvCarIdx === 0) tvRenderRanking();
-      tvRenderCarrossel();
-    }, 350);
-  }, TV_CAR_SEG * 1000);
 
   _tvRelogio = setInterval(function() {
     var c = document.getElementById('tvClock');
     if (!c) { tvParar(); return; }
     var n = new Date();
-    c.textContent = n.toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long' }) +
-      ' — ' + String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0');
+    c.innerHTML = '<b>' + n.toLocaleDateString('pt-BR', { weekday:'short', day:'2-digit', month:'2-digit' }) + '</b> · ' + tvHHMM(n);
   }, 1000);
 }
 
 function tvParar() {
-  if (_tvRankTimer) { clearInterval(_tvRankTimer); _tvRankTimer = null; }
-  if (_tvPollTimer) { clearInterval(_tvPollTimer); _tvPollTimer = null; }
+  if (_tvPollTimer)  { clearInterval(_tvPollTimer);  _tvPollTimer  = null; }
+  if (_tvExtraTimer) { clearInterval(_tvExtraTimer); _tvExtraTimer = null; }
+  if (_tvRelogio)    { clearInterval(_tvRelogio);    _tvRelogio    = null; }
   if (_tvWakeLock) { try { _tvWakeLock.release(); } catch(e) {} _tvWakeLock = null; }
-  if (_tvCarTimer)   { clearInterval(_tvCarTimer);   _tvCarTimer   = null; }
-  if (_tvMuralTimer) { clearInterval(_tvMuralTimer); _tvMuralTimer = null; }
-  if (_tvRelogio)  { clearInterval(_tvRelogio);  _tvRelogio  = null; }
-  if (_tvChart)    { _tvChart.destroy();         _tvChart    = null; }
-}
-
-function tvSetAba(aba) {
-  _tvAba = aba;
-  tvParar();
-  var el = document.getElementById('page-content');
-  if (el) el.innerHTML = renderTV();
-  if (aba === 'painel') setTimeout(tvIniciar, 60);
 }
 
 function tvTelaCheia() {
@@ -2594,22 +2180,11 @@ function tvTelaCheia() {
 }
 
 function renderTV() {
-  var ehPainel = _tvAba === 'painel';
-
-  var abas = '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:1.2rem">' +
-    '<div style="display:flex;border-bottom:2px solid var(--border)">' +
-      '<button onclick="tvSetAba(\'painel\')" style="padding:0.6rem 1.4rem;background:none;border:none;border-bottom:' +
-        (ehPainel?'3px solid var(--green);color:var(--green);font-weight:700':'none;color:var(--text2)') +
-        ';cursor:pointer;font-size:0.92rem;margin-bottom:-2px">Painel</button>' +
-      '<button onclick="tvSetAba(\'dados\')" style="padding:0.6rem 1.4rem;background:none;border:none;border-bottom:' +
-        (!ehPainel?'3px solid var(--green);color:var(--green);font-weight:700':'none;color:var(--text2)') +
-        ';cursor:pointer;font-size:0.92rem;margin-bottom:-2px">Dados</button>' +
-    '</div>' +
-    (ehPainel ? '<button class="btn btn-green btn-sm" onclick="tvTelaCheia()">Tela cheia</button>' : '') +
-  '</div>';
-
-  return abas + (ehPainel ? tvPainelHTML() : tvRenderDados());
+  return '<div style="display:flex;justify-content:flex-end;margin-bottom:1rem">' +
+      '<button class="btn btn-green btn-sm" onclick="tvTelaCheia()">Tela cheia</button>' +
+    '</div>' + tvPainelHTML();
 }
+
 function renderCompras() {
   let html = `<div class="card">
     <div class="add-task-form mb-2">
@@ -4064,7 +3639,7 @@ var _mktsMesSel  = ''; // mês independente
 // [RADAR -- carregado de pages/radar.js]
 </script>
 <script src="pages/ponto.js?v=2"></script>
-<script src="pages/estoque.js?v=2"></script>
+<script src="pages/estoque.js?v=3"></script>
 <script src="pages/shopee.js?v=3"></script>
 <script src="pages/tabnutri.js?v=2"></script>
 <script src="pages/produtos.js?v=2"></script>

@@ -356,12 +356,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .tv-box h2 { font-size:1.45vh; font-weight:700; margin:0 0 1.5vh; display:flex; align-items:center; gap:0.5vw;
   text-transform:uppercase; letter-spacing:0.08em; color:#aab3d4; }
 .tv-dot { width:0.9vh; height:0.9vh; border-radius:50%; background:var(--c,#34d399); box-shadow:0 0 8px var(--c,#34d399); flex-shrink:0; }
-.tv-setor { margin-bottom:1.4vh; }
-.tv-setor-n { font-size:1.6vh; font-weight:700; color:#cfd5ea; margin-bottom:0.7vh; }
-.tv-task { font-size:1.65vh; display:flex; gap:0.6vw; align-items:flex-start; margin-bottom:0.8vh; color:#dfe3f0; }
-.tv-chk { width:1.6vh; height:1.6vh; border-radius:5px; border:2px solid #566089; margin-top:0.2vh; flex-shrink:0; }
-.tv-chk.ok { background:#34d399; border-color:#34d399; }
-.tv-task.feita { color:#6b7499; text-decoration:line-through; }
 .tv-linha { display:flex; justify-content:space-between; align-items:center; gap:0.6vw; padding:1vh 0.8vw; background:#2f3552;
   border-radius:10px; margin-bottom:0.8vh; font-size:1.7vh; }
 .tv-linha > span:first-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -2012,19 +2006,6 @@ function tvRenderPedidos() {
   }
 }
 
-function tvTarefasDoSetor(setorId) {
-  var hojeStr = tkDataLocal();
-  var lista = ((state.tasks && state.tasks[setorId]) || []).filter(function(t) {
-    if (tarefaEhRecorrente(t)) return tarefaOcorreEm(t);
-    return !t.done && (!t.date || t.date <= hojeStr);
-  }).map(function(t) {
-    var feita = tarefaEhRecorrente(t) ? tarefaFeitaHoje(t) : !!t.done;
-    return { text: t.text, feita: feita };
-  });
-  lista.sort(function(a, b){ return (a.feita ? 1 : 0) - (b.feita ? 1 : 0); });
-  return lista;
-}
-
 // Aviso de prazo: pedidos ainda nas 3 etapas (nao impressos) que vencem ate hoje.
 // So vale se a leitura do UpSeller for de hoje (diaRef), para nao mostrar numero de ontem.
 function tvAvisoPrazo() {
@@ -2048,19 +2029,12 @@ function tvAvisoFalha() {
   return partes.length ? '<div class="tv-aviso erro">' + partes.join(' e ') + '</div>' : '';
 }
 
+// Quadro Avisos: so avisos dos pedidos (as tarefas sairam da TV em 16/11/2026)
 function tvRenderTarefas() {
   var box = document.getElementById('tvTarefas');
   if (!box) return;
-  var MAX = 5;
-  box.innerHTML = tvAvisoPrazo() + tvAvisoFalha() + SETORES.map(function(s) {
-    var ts = tvTarefasDoSetor(s.id);
-    var itens = ts.length
-      ? ts.slice(0, MAX).map(function(t) {
-          return '<div class="tv-task' + (t.feita ? ' feita' : '') + '"><span class="tv-chk' + (t.feita ? ' ok' : '') + '"></span>' + esc(t.text) + '</div>';
-        }).join('') + (ts.length > MAX ? '<div class="tv-mais">+ ' + (ts.length - MAX) + ' tarefas</div>' : '')
-      : '<div class="tv-vazio">Sem tarefas para hoje</div>';
-    return '<div class="tv-setor"><div class="tv-setor-n">' + s.label + '</div>' + itens + '</div>';
-  }).join('');
+  var html = tvAvisoPrazo() + tvAvisoFalha();
+  box.innerHTML = html || '<div class="tv-vazio">Nenhum aviso</div>';
 }
 
 function tvRenderFull() {

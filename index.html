@@ -374,6 +374,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .tv-tag.compra { background:rgba(96,165,250,.16); color:#93c5fd; }
 .tv-vazio { color:#5f688d; font-size:1.6vh; }
 .tv-mais { color:#8b94b8; font-size:1.4vh; margin-top:0.4vh; }
+.tv-aviso { background:rgba(251,191,36,.12); border:1px solid rgba(251,191,36,.45); border-left:0.5vh solid #fbbf24; color:#fde68a;
+  border-radius:12px; padding:1.4vh 1vw; font-size:2vh; font-weight:600; line-height:1.3; margin-bottom:1.6vh; }
+.tv-aviso b { font-size:3vh; color:#fff; margin-right:0.3vw; }
+.tv-aviso.ok { background:rgba(52,211,153,.10); border-color:rgba(52,211,153,.4); border-left-color:#34d399; color:#a7f3d0; font-size:1.7vh; }
 .tv-sub { font-size:1.35vh; font-weight:700; color:#8b94b8; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.8vh; }
 .tv-sub b { color:#fda4af; margin-left:0.3vw; }
 .tv-zerados { display:grid; grid-template-columns:1fr 1fr; gap:0.6vh 0.6vw; }
@@ -2026,11 +2030,23 @@ function tvTarefasDoSetor(setorId) {
   return lista;
 }
 
+// Aviso de prazo: pedidos ainda nas 3 etapas (nao impressos) que vencem ate hoje.
+// So vale se a leitura do UpSeller for de hoje (diaRef), para nao mostrar numero de ontem.
+function tvAvisoPrazo() {
+  var d = _tvExtra.pedidos;
+  if (!d || d.venceHoje === undefined || d.diaRef !== tkDataLocal()) return '';
+  var n = Number(d.venceHoje) || 0;
+  if (!n) return '<div class="tv-aviso ok">Todos os pedidos para enviar até hoje já foram impressos</div>';
+  return '<div class="tv-aviso">' + (n === 1
+    ? '<b>1</b> pedido para enviar até hoje ainda não foi impresso'
+    : '<b>' + n + '</b> pedidos para enviar até hoje ainda não foram impressos') + '</div>';
+}
+
 function tvRenderTarefas() {
   var box = document.getElementById('tvTarefas');
   if (!box) return;
-  var MAX = 6;
-  box.innerHTML = SETORES.map(function(s) {
+  var MAX = 5;
+  box.innerHTML = tvAvisoPrazo() + SETORES.map(function(s) {
     var ts = tvTarefasDoSetor(s.id);
     var itens = ts.length
       ? ts.slice(0, MAX).map(function(t) {
@@ -2117,7 +2133,7 @@ function tvPainelHTML() {
     '</div>' +
     '<div class="tv-pedidos" id="tvPedidos"></div>' +
     '<div class="tv-baixo">' +
-      '<div class="tv-box"><h2><span class="tv-dot"></span>Tarefas de hoje</h2><div id="tvTarefas"></div></div>' +
+      '<div class="tv-box"><h2><span class="tv-dot" style="--c:#fbbf24"></span>Avisos</h2><div id="tvTarefas"></div></div>' +
       '<div class="tv-box"><h2><span class="tv-dot" style="--c:#60a5fa"></span>Full a enviar</h2><div id="tvFull"></div></div>' +
       '<div class="tv-box"><h2><span class="tv-dot" style="--c:#fb7185"></span>Repor estoque</h2><div id="tvRepor"></div></div>' +
     '</div>' +

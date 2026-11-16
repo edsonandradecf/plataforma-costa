@@ -374,6 +374,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .tv-tag.compra { background:rgba(96,165,250,.16); color:#93c5fd; }
 .tv-vazio { color:#5f688d; font-size:1.6vh; }
 .tv-mais { color:#8b94b8; font-size:1.4vh; margin-top:0.4vh; }
+.tv-sub { font-size:1.35vh; font-weight:700; color:#8b94b8; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.8vh; }
+.tv-sub b { color:#fda4af; margin-left:0.3vw; }
+.tv-zerados { display:grid; grid-template-columns:1fr 1fr; gap:0.6vh 0.6vw; }
+.tv-zerado { display:block; background:#2f3552; border-radius:8px; padding:0.7vh 0.6vw;
+  font-size:1.5vh; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-left:3px solid #fb7185; }
 
 .fin-upload-box { background:var(--card); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border:0.5px solid var(--border); border-radius:14px;
   padding:1.5rem; box-shadow:var(--shadow); }
@@ -2063,24 +2068,41 @@ function tvRenderFull() {
 function tvRenderRepor() {
   var box = document.getElementById('tvRepor');
   if (!box) return;
-  var acab = ((state.estoque && state.estoque.acabados) || []).filter(function(p) {
-    return Number(p.minimo) > 0 && (Number(p.qtd) || 0) <= Number(p.minimo);
-  }).map(function(p) {
+  var porNome = function(a, b){ return String(a.nome).localeCompare(String(b.nome), 'pt-BR'); };
+  var acabados = (state.estoque && state.estoque.acabados) || [];
+  // Zerados: todo acabado com qtd <= 0, tenha ou nao minimo cadastrado
+  var zerados = acabados.filter(function(p){ return (Number(p.qtd) || 0) <= 0; }).sort(porNome);
+  // Baixos: acima de zero mas no minimo ou abaixo (so quem tem minimo)
+  var baixos = acabados.filter(function(p) {
     var q = Number(p.qtd) || 0;
-    return { nome: p.nome, zerado: q <= 0, txt: q + ' / mín ' + p.minimo };
-  });
-  acab.sort(function(a, b){ return (b.zerado ? 1 : 0) - (a.zerado ? 1 : 0) || String(a.nome).localeCompare(String(b.nome), 'pt-BR'); });
+    return q > 0 && Number(p.minimo) > 0 && q <= Number(p.minimo);
+  }).sort(porNome);
   var compras = (state.compras || []).filter(function(c){ return c && !c.done; });
 
-  var linhas = acab.map(function(a) {
-    return '<div class="tv-linha"><span>' + esc(a.nome) + '<span class="tv-tag ' + (a.zerado ? 'zerado">zerado' : 'baixo">baixo') + '</span></span><span>' + a.txt + '</span></div>';
+  if (!zerados.length && !baixos.length && !compras.length) {
+    box.innerHTML = '<div class="tv-vazio">Nada para repor</div>';
+    return;
+  }
+
+  var MAX_Z = 16, html = '';
+  if (zerados.length) {
+    html += '<div class="tv-sub">Zerados <b>' + zerados.length + '</b></div><div class="tv-zerados">' +
+      zerados.slice(0, MAX_Z).map(function(p) {
+        return '<div class="tv-zerado">' + esc(p.nome) + '</div>';
+      }).join('') + '</div>' +
+      (zerados.length > MAX_Z ? '<div class="tv-mais">+ ' + (zerados.length - MAX_Z) + ' zerados</div>' : '');
+  }
+  var linhas = baixos.map(function(p) {
+    return '<div class="tv-linha"><span>' + esc(p.nome) + '<span class="tv-tag baixo">baixo</span></span><span>' + (Number(p.qtd) || 0) + ' / mín ' + p.minimo + '</span></div>';
   }).concat(compras.map(function(c) {
     return '<div class="tv-linha"><span>' + esc(c.text) + '<span class="tv-tag compra">compras</span></span><span>—</span></div>';
   }));
-  var MAX = 7;
-  box.innerHTML = linhas.length
-    ? linhas.slice(0, MAX).join('') + (linhas.length > MAX ? '<div class="tv-mais">+ ' + (linhas.length - MAX) + ' itens</div>' : '')
-    : '<div class="tv-vazio">Nada para repor</div>';
+  var MAX_L = zerados.length ? 3 : 7;
+  if (linhas.length) {
+    html += (zerados.length ? '<div class="tv-sub" style="margin-top:1.2vh">Baixos e compras</div>' : '') +
+      linhas.slice(0, MAX_L).join('') + (linhas.length > MAX_L ? '<div class="tv-mais">+ ' + (linhas.length - MAX_L) + ' itens</div>' : '');
+  }
+  box.innerHTML = html;
 }
 
 function tvPainelHTML() {
